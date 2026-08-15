@@ -143,6 +143,43 @@ main{flex:1; display:flex; overflow:hidden;}
 }
 .empty-state{color:var(--text-dim); font-size:12.5px; text-align:center; padding:40px 10px;}
 
+/* ===== RESUMEN DEL TURNO (al pie de la Lista) ===== */
+.resumen-turno{
+  margin-top:16px; padding-top:16px; border-top:1px dashed var(--border);
+}
+.resumen-turno-title{
+  font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--gold-bright);
+  margin-bottom:10px;
+}
+.resumen-grid-mini{display:flex; gap:10px; margin-bottom:14px;}
+.resumen-mini{
+  flex:1; background:var(--panel-alt); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:10px; text-align:center;
+}
+.resumen-mini-val{font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; color:var(--text);}
+.resumen-mini-label{font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.3px; margin-top:2px;}
+.resumen-seccion{margin-bottom:12px;}
+.resumen-seccion-head{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:11.5px; font-weight:700; color:var(--text-muted); margin-bottom:6px;
+  text-transform:uppercase; letter-spacing:0.3px;
+}
+.resumen-fila{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:12.5px; padding:5px 8px; background:var(--panel-alt); border-radius:6px; margin-bottom:4px;
+  border-left:2px solid var(--gold);
+}
+.resumen-fila-label{color:var(--text); font-weight:600;}
+.resumen-fila-nombre{color:var(--text-dim); font-weight:400;}
+.resumen-fila-val{font-family:'JetBrains Mono',monospace; color:var(--gold-bright); font-weight:600; white-space:nowrap;}
+.resumen-vacio{border-left-color:var(--border); color:var(--text-dim); font-style:italic;}
+.resumen-total{
+  display:flex; justify-content:space-between; align-items:center;
+  background:linear-gradient(135deg, rgba(201,161,90,0.15), rgba(201,161,90,0.05));
+  border:1px solid var(--gold); border-radius:var(--radius); padding:11px 13px;
+  font-size:12.5px; font-weight:700; color:var(--gold-bright); margin-top:4px;
+}
+
 /* ===== FLOOR PLAN ===== */
 .salon-group{margin-bottom:26px;}
 .salon-head{
@@ -559,16 +596,17 @@ function renderStats(){
 
 /* ============ RENDER: LISTA ============ */
 function renderLista(){
+  const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
   const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
   const el = document.getElementById('panelLista');
   if(rs.length===0){
     el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
     return;
   }
-  el.innerHTML = rs.map(r=>{
+  const cardsHtml = rs.map(r=>{
     const mesaTxt = r.mesa ? mesaLabel(r.mesa) : '—';
     const isVip = mesaEsVip(r.mesa);
-    return `<div class="res-card" onclick="abrirModal(${r.id})">
+    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''}" onclick="abrirModal(${JSON.stringify(r.id)})">
       <div class="res-top">
         <div>
           <div class="res-hora">${r.hora}</div>
@@ -584,6 +622,62 @@ function renderLista(){
       </div>
     </div>`;
   }).join('');
+
+  el.innerHTML = cardsHtml + renderResumenTurnoHTML(rsTodas);
+}
+
+function renderResumenTurnoHTML(rsTodas){
+  const vipReservas = rsTodas.filter(r=>mesaEsVip(r.mesa)).sort((a,b)=>(a.mesa||'').localeCompare(b.mesa||''));
+  const generalReservas = rsTodas.filter(r=>!mesaEsVip(r.mesa));
+
+  const vipPax = vipReservas.reduce((a,r)=>a+Number(r.pax||0),0);
+  const generalPax = generalReservas.reduce((a,r)=>a+Number(r.pax||0),0);
+  const totalPax = vipPax + generalPax;
+  const totalReservas = rsTodas.length;
+
+  const vipFilas = vipReservas.length
+    ? vipReservas.map(r => `<div class="resumen-fila">
+        <span class="resumen-fila-label">${mesaLabel(r.mesa)} <span class="resumen-fila-nombre">· ${r.nombre}</span></span>
+        <span class="resumen-fila-val">${r.pax} pax</span>
+      </div>`).join('')
+    : `<div class="resumen-fila resumen-vacio"><span>Sin mesas VIP reservadas</span></div>`;
+
+  return `
+    <div class="resumen-turno">
+      <div class="resumen-turno-title">Resumen del turno</div>
+
+      <div class="resumen-grid-mini">
+        <div class="resumen-mini">
+          <div class="resumen-mini-val">${totalReservas}</div>
+          <div class="resumen-mini-label">Reservas</div>
+        </div>
+        <div class="resumen-mini">
+          <div class="resumen-mini-val">${totalPax}</div>
+          <div class="resumen-mini-label">Personas</div>
+        </div>
+      </div>
+
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head">
+          <span>♛ Mesas VIP</span>
+          <span>${vipReservas.length} mesas · ${vipPax} pax</span>
+        </div>
+        ${vipFilas}
+      </div>
+
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head">
+          <span>Mesas generales</span>
+          <span>${generalReservas.length} mesas · ${generalPax} pax</span>
+        </div>
+      </div>
+
+      <div class="resumen-total">
+        <span>Total del turno</span>
+        <span>${totalReservas} reservas · ${totalPax} pax</span>
+      </div>
+    </div>
+  `;
 }
 
 function estadoLabel(e){
@@ -622,7 +716,7 @@ function renderPlano(){
       if(r) cls = r.estado==='pendiente' ? 'pendiente' : 'ocupada';
       const vipCls = s.vip ? 'vip' : '';
       const guestName = r ? (r.nombre.split(' ')[0]) : '';
-      return `<div class="mesa ${cls} ${vipCls}" onclick="${r?`abrirModal(${r.id})`:`abrirModal(null,'${m.id}')`}" title="${m.id} · cap ${m.cap}">
+      return `<div class="mesa ${cls} ${vipCls}" onclick="${r?`abrirModal(${JSON.stringify(r.id)})`:`abrirModal(null,'${m.id}')`}" title="${m.id} · cap ${m.cap}">
         <div class="num">${m.id}</div>
         <div class="cap">${m.cap}p</div>
         ${guestName?`<div class="guest">${guestName}</div>`:''}
