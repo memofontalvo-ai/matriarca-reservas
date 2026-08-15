@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -324,6 +327,10 @@ main{flex:1; display:flex; overflow:hidden;}
   }
   .bottom-nav button.active{color:var(--gold-bright);}
   .bottom-nav .icon{font-size:17px;}
+.version-tag{
+  position:fixed; bottom:4px; right:8px; font-size:9px; color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace; z-index:200; pointer-events:none; opacity:.6;
+}
 }
 </style>
 
@@ -377,6 +384,7 @@ main{flex:1; display:flex; overflow:hidden;}
     <button data-view="plano" onclick="cambiarVista('plano')"><span class="icon">▦</span>Plano</button>
     <button data-view="resumen" onclick="cambiarVista('resumen')"><span class="icon">◔</span>Resumen</button>
   </div>
+  <div class="version-tag">v1.5</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -610,7 +618,7 @@ function renderLista(){
   const cardsHtml = rs.map(r=>{
     const mesaTxt = r.mesa ? mesaLabel(r.mesa) : '—';
     const isVip = mesaEsVip(r.mesa);
-    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''}" onclick="abrirModal(${JSON.stringify(r.id)})">
+    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
         <div>
           <div class="res-hora">${r.hora}</div>
@@ -723,7 +731,7 @@ function renderPlano(){
       if(r) cls = r.estado==='pendiente' ? 'pendiente' : 'ocupada';
       const vipCls = s.vip ? 'vip' : '';
       const guestName = r ? (r.nombre.split(' ')[0]) : '';
-      return `<div class="mesa ${cls} ${vipCls}" onclick="${r?`abrirModal(${JSON.stringify(r.id)})`:`abrirModal(null,'${m.id}')`}" title="${m.id} · cap ${m.cap}">
+      return `<div class="mesa ${cls} ${vipCls}" onclick='${r?`abrirModal(${JSON.stringify(r.id)})`:`abrirModal(null,${JSON.stringify(m.id)})`}' title="${m.id} · cap ${m.cap}">
         <div class="num">${m.id}</div>
         <div class="cap">${m.cap}p</div>
         ${guestName?`<div class="guest">${guestName}</div>`:''}
