@@ -136,10 +136,7 @@ main{flex:1; display:flex; overflow:hidden;}
 .res-card:hover{border-color:var(--gold);}
 .res-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
 .res-top-right{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
-.res-actions{display:flex; gap:10px;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
-.delete-hint{font-size:10px; color:var(--cancelled); font-weight:500; opacity:.75;}
-.delete-hint:hover{opacity:1;}
 .res-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright);}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;}
@@ -396,7 +393,7 @@ main{flex:1; display:flex; overflow:hidden;}
     <button data-view="plano" onclick="cambiarVista('plano')"><span class="icon">▦</span>Plano</button>
     <button data-view="resumen" onclick="cambiarVista('resumen')"><span class="icon">◔</span>Resumen</button>
   </div>
-  <div class="version-tag">v1.6</div>
+  <div class="version-tag">v1.7</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -638,10 +635,7 @@ function renderLista(){
         </div>
         <div class="res-top-right">
           <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
-          <span class="res-actions">
-            <span class="edit-hint">✎ Editar</span>
-            <span class="delete-hint" onclick='event.stopPropagation(); eliminarReservaDirecta(${JSON.stringify(r.id)}, ${JSON.stringify(r.nombre)})'>✕ Eliminar</span>
-          </span>
+          <span class="edit-hint">✎ Editar / Eliminar</span>
         </div>
       </div>
       <div class="res-meta">
