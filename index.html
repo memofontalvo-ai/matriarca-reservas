@@ -140,6 +140,14 @@ main{flex:1; display:flex; overflow:hidden;}
   margin-top:8px; padding-top:8px; border-top:1px dashed rgba(199,155,255,0.3);
   font-size:11px; color:#c79bff; font-weight:600; line-height:1.4;
 }
+.aprobacion-hint{
+  margin-top:8px; padding-top:8px; border-top:1px dashed rgba(232,163,61,0.3);
+  font-size:11px; color:#e8a33d; font-weight:600; line-height:1.4;
+}
+.aprobada-tag{
+  font-size:10px; font-weight:700; color:#e8a33d; border:1px solid #e8a33d;
+  padding:2px 7px; border-radius:999px;
+}
 .res-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
 .res-top-right{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
@@ -155,6 +163,7 @@ main{flex:1; display:flex; overflow:hidden;}
 .badge.walkin{background:var(--walkin-bg); color:var(--walkin);}
 .badge.cancelada{background:var(--cancelled-bg); color:var(--cancelled);}
 .badge.solicitud{background:rgba(180,120,255,0.16); color:#c79bff;}
+.badge.pendiente_aprobacion{background:rgba(232,163,61,0.16); color:#e8a33d;}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
   padding:2px 7px; border-radius:999px;
@@ -365,6 +374,12 @@ main{flex:1; display:flex; overflow:hidden;}
 .btn-ghost{background:var(--panel-alt); color:var(--text-muted); border:1px solid var(--border);}
 .btn-ghost:hover{color:var(--text);}
 .btn-danger{background:transparent; color:var(--cancelled); border:1px solid var(--cancelled);}
+.modal-actions-wrap{margin-bottom:10px;}
+.btn-aprobacion{
+  width:100%; padding:11px; border-radius:8px; font-size:13px; font-weight:700;
+  background:rgba(232,163,61,0.14); color:#e8a33d; border:1.5px solid #e8a33d;
+}
+.btn-aprobacion:hover{background:rgba(232,163,61,0.24);}
 
 /* ===== BOTTOM NAV (mobile) ===== */
 .bottom-nav{display:none;}
@@ -473,7 +488,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v2.1</div>
+  <div class="version-tag">v2.2</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -562,11 +577,12 @@ main{flex:1; display:flex; overflow:hidden;}
 
     <div class="field"><label>Observaciones</label><textarea id="fObs" placeholder="Notas operativas..."></textarea></div>
 
-    <div class="modal-actions">
+    <div class="modal-actions modal-actions-wrap">
       <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
       <button class="btn btn-danger" id="btnEliminar" style="display:none;" onclick="eliminarReserva()">Eliminar</button>
       <button class="btn btn-primary" onclick="guardarReserva()">Guardar</button>
     </div>
+    <button class="btn btn-aprobacion" onclick="enviarParaAprobacion()">📤 Enviar para aprobación del cliente</button>
     </div>
   </div>
 </div>
@@ -680,6 +696,8 @@ let turnoActivo = 'cena';
 let vistaActual = 'lista';
 let editandoId = null;
 let mesaPreseleccionada = null;
+let modalFecha = null;
+let modalTurno = null;
 let estadoSeleccionado = 'confirmada';
 
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -756,8 +774,10 @@ function renderLista(){
         <span>Mesa ${mesaTxt}</span>
         ${isVip?`<span class="vip-tag">VIP</span>`:''}
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
+        ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
       </div>
       ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+r.obs:''}</div>`:''}
+      ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
     </div>`;
   }).join('');
 
@@ -827,7 +847,7 @@ function renderResumenTurnoHTML(rsTodas){
 }
 
 function estadoLabel(e){
-  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', solicitud:'Solicitud'}[e]||e;
+  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', solicitud:'Solicitud', pendiente_aprobacion:'Por aprobar'}[e]||e;
 }
 function mesaLabel(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return m.id;
@@ -1151,6 +1171,8 @@ function abrirModal(id, mesaId){
 
   if(id){
     const r = reservas.find(x=>x.id===id);
+    modalFecha = r.fecha;
+    modalTurno = r.turno;
     canalNuevoBlock.style.display = 'none';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'block';
@@ -1168,6 +1190,8 @@ function abrirModal(id, mesaId){
     estadoSeleccionado = r.estado;
     btnEliminar.style.display = 'block';
   } else {
+    modalFecha = fechaISO(fechaActual);
+    modalTurno = turnoActivo;
     canalNuevoBlock.style.display = 'block';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'none';
@@ -1241,8 +1265,8 @@ function guardarReserva(){
   const nombre = document.getElementById('fNombre').value.trim();
   if(!nombre){ alert('Ingresa el nombre del cliente.'); return; }
   const data = {
-    fecha: fechaISO(fechaActual),
-    turno: turnoActivo,
+    fecha: modalFecha,
+    turno: modalTurno,
     hora: document.getElementById('fHora').value || '00:00',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
@@ -1263,6 +1287,50 @@ function guardarReserva(){
   }).catch(err => {
     console.error('Error guardando reserva:', err);
     alert('No se pudo guardar la reserva. Revisa tu conexión e intenta de nuevo.');
+  });
+}
+
+function urlAprobacion(id){
+  return new URL('aprobar.html', location.href).href + '?id=' + encodeURIComponent(id);
+}
+
+function enviarParaAprobacion(){
+  const nombre = document.getElementById('fNombre').value.trim();
+  const celular = document.getElementById('fCelular').value.trim();
+  const mesa = document.getElementById('fMesa').value;
+  if(!nombre){ alert('Ingresa el nombre del cliente.'); return; }
+  if(!celular){ alert('Ingresa el celular del cliente para poder enviarle el link de aprobación.'); return; }
+  if(!mesa){ if(!confirm('No has asignado mesa todavía. ¿Enviar de todas formas para que el cliente apruebe los demás datos?')) return; }
+
+  const data = {
+    fecha: modalFecha,
+    turno: modalTurno,
+    hora: document.getElementById('fHora').value || '00:00',
+    pax: Number(document.getElementById('fPax').value)||1,
+    nombre,
+    celular,
+    mesa,
+    canal: document.getElementById('fCanal').value,
+    abono: Number(document.getElementById('fAbono').value)||0,
+    menu: document.getElementById('fMenu').value,
+    obs: document.getElementById('fObs').value.trim(),
+    estado: 'pendiente_aprobacion',
+    aprobadaPorCliente: false,
+  };
+
+  const promesa = editandoId
+    ? reservasRef.doc(editandoId).update(data).then(()=>editandoId)
+    : reservasRef.add(data).then(docRef=>docRef.id);
+
+  promesa.then(id => {
+    let digitos = celular.replace(/\D/g,'');
+    if(digitos.length === 10) digitos = '57' + digitos;
+    const mensaje = `Hola ${nombre}, ya dejamos lista tu reserva en La Matriarca. Por favor revisa los detalles y apruébala aquí:\n${urlAprobacion(id)}`;
+    window.open(`https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    cerrarModal();
+  }).catch(err => {
+    console.error('Error enviando para aprobación:', err);
+    alert('No se pudo enviar. Revisa tu conexión e intenta de nuevo.');
   });
 }
 
