@@ -126,6 +126,8 @@ main{flex:1; display:flex; overflow:hidden;}
 }
 .res-card:hover{border-color:var(--gold);}
 .res-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+.res-top-right{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
+.edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
 .res-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright);}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;}
@@ -157,7 +159,7 @@ main{flex:1; display:flex; overflow:hidden;}
   padding:10px; text-align:center;
 }
 .resumen-mini-val{font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; color:var(--text);}
-.resumen-mini-label{font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.3px; margin-top:2px;}
+.resumen-mini-label{font-size:11px; color:var(--text-muted); font-weight:600; margin-top:3px;}
 .resumen-seccion{margin-bottom:12px;}
 .resumen-seccion-head{
   display:flex; justify-content:space-between; align-items:baseline;
@@ -306,7 +308,9 @@ main{flex:1; display:flex; overflow:hidden;}
   .subbar{padding:8px 14px;}
   .stats{display:none;}
   main{flex-direction:column;}
-  .panel-lista{width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:none;}
+  .panel-lista{width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:none; flex:1; min-height:0;}
+  .panel-plano{flex:1; min-height:0;}
+  .panel-resumen{flex:1; min-height:0;}
   .panel-lista, .panel-plano, .panel-resumen{display:none;}
   .panel-lista.mobile-active, .panel-plano.mobile-active, .panel-resumen.mobile-active{display:block;}
   .tabs{display:none;}
@@ -612,7 +616,10 @@ function renderLista(){
           <div class="res-hora">${r.hora}</div>
           <div class="res-nombre">${r.nombre}</div>
         </div>
-        <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
+        <div class="res-top-right">
+          <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
+          <span class="edit-hint">✎ Editar</span>
+        </div>
       </div>
       <div class="res-meta">
         <span>${r.pax} pax</span>
@@ -649,11 +656,11 @@ function renderResumenTurnoHTML(rsTodas){
       <div class="resumen-grid-mini">
         <div class="resumen-mini">
           <div class="resumen-mini-val">${totalReservas}</div>
-          <div class="resumen-mini-label">Reservas</div>
+          <div class="resumen-mini-label">Total de reservas</div>
         </div>
         <div class="resumen-mini">
           <div class="resumen-mini-val">${totalPax}</div>
-          <div class="resumen-mini-label">Personas</div>
+          <div class="resumen-mini-label">Total de personas</div>
         </div>
       </div>
 
