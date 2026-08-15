@@ -134,6 +134,12 @@ main{flex:1; display:flex; overflow:hidden;}
   padding:12px 13px; margin-bottom:8px; cursor:pointer; transition:border-color .15s;
 }
 .res-card:hover{border-color:var(--gold);}
+.cancelada-card{opacity:.55;}
+.solicitud-card{border-color:#c79bff; border-width:1.5px;}
+.solicitud-hint{
+  margin-top:8px; padding-top:8px; border-top:1px dashed rgba(199,155,255,0.3);
+  font-size:11px; color:#c79bff; font-weight:600; line-height:1.4;
+}
 .res-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
 .res-top-right{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
@@ -148,6 +154,7 @@ main{flex:1; display:flex; overflow:hidden;}
 .badge.pendiente{background:var(--pending-bg); color:var(--pending);}
 .badge.walkin{background:var(--walkin-bg); color:var(--walkin);}
 .badge.cancelada{background:var(--cancelled-bg); color:var(--cancelled);}
+.badge.solicitud{background:rgba(180,120,255,0.16); color:#c79bff;}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
   padding:2px 7px; border-radius:999px;
@@ -184,12 +191,18 @@ main{flex:1; display:flex; overflow:hidden;}
 .resumen-fila-nombre{color:var(--text-dim); font-weight:400;}
 .resumen-fila-val{font-family:'JetBrains Mono',monospace; color:var(--gold-bright); font-weight:600; white-space:nowrap;}
 .resumen-vacio{border-left-color:var(--border); color:var(--text-dim); font-style:italic;}
+.resumen-subsalon{margin-bottom:10px; margin-left:6px;}
+.resumen-subsalon-head{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:11px; font-weight:700; color:var(--gold-bright); margin-bottom:4px;
+}
 .resumen-total{
   display:flex; justify-content:space-between; align-items:center;
   background:linear-gradient(135deg, rgba(201,161,90,0.15), rgba(201,161,90,0.05));
   border:1px solid var(--gold); border-radius:var(--radius); padding:11px 13px;
   font-size:12.5px; font-weight:700; color:var(--gold-bright); margin-top:4px;
 }
+.resumen-total-sub{font-size:10px; font-weight:500; color:var(--text-dim);}
 
 /* ===== FLOOR PLAN ===== */
 .salon-group{margin-bottom:26px;}
@@ -298,6 +311,19 @@ main{flex:1; display:flex; overflow:hidden;}
 .estado-opt.sel-walkin.on{background:var(--walkin-bg); border-color:var(--walkin); color:var(--walkin);}
 .estado-opt.sel-cancelada.on{background:var(--cancelled-bg); border-color:var(--cancelled); color:var(--cancelled);}
 .modal-actions{display:flex; gap:10px; margin-top:18px;}
+.canal-nuevo-opts{display:flex; flex-direction:column; gap:10px;}
+.canal-nuevo-btn{
+  display:flex; align-items:center; gap:12px; text-align:left;
+  background:var(--panel-alt); border:1.5px solid var(--border); color:var(--text);
+  padding:14px; border-radius:var(--radius); font-size:20px;
+}
+.canal-nuevo-btn:hover{border-color:var(--gold);}
+.canal-nuevo-btn span{font-size:14px; font-weight:600;}
+.canal-nuevo-sub{font-size:11px; font-weight:400; color:var(--text-dim);}
+.whatsapp-nota{
+  font-size:11.5px; color:var(--text-muted); background:var(--panel-alt);
+  border-radius:8px; padding:10px 12px; margin-top:4px; line-height:1.5;
+}
 .btn{padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; flex:1; text-align:center;}
 .btn-primary{background:var(--gold); color:#1a1408;}
 .btn-primary:hover{background:var(--gold-bright);}
@@ -393,7 +419,7 @@ main{flex:1; display:flex; overflow:hidden;}
     <button data-view="plano" onclick="cambiarVista('plano')"><span class="icon">▦</span>Plano</button>
     <button data-view="resumen" onclick="cambiarVista('resumen')"><span class="icon">◔</span>Resumen</button>
   </div>
-  <div class="version-tag">v1.7</div>
+  <div class="version-tag">v2.0</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -401,6 +427,38 @@ main{flex:1; display:flex; overflow:hidden;}
     <h3 id="modalTitle">Nueva reserva</h3>
     <div class="modal-sub" id="modalSub">Completa los datos del cliente y la mesa</div>
 
+    <div class="field" id="canalNuevoBlock" style="display:none;">
+      <label>¿Cómo estás tomando esta reserva?</label>
+      <div class="canal-nuevo-opts">
+        <button type="button" class="canal-nuevo-btn" onclick="elegirCanalNuevo('telefono')">
+          📞 <span>Por teléfono<br><span class="canal-nuevo-sub">Yo lleno todos los datos</span></span>
+        </button>
+        <button type="button" class="canal-nuevo-btn" onclick="elegirCanalNuevo('whatsapp')">
+          💬 <span>Por WhatsApp<br><span class="canal-nuevo-sub">Le envío un link al cliente</span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field" id="whatsappBlock" style="display:none;">
+      <div class="field">
+        <label>Teléfono de WhatsApp del cliente</label>
+        <input type="tel" id="fWhatsTelefono" placeholder="300 000 0000">
+      </div>
+      <div class="field">
+        <label>¿Con quién estás hablando? (solo para el saludo)</label>
+        <input type="text" id="fWhatsContacto" placeholder="Nombre de quien contesta">
+      </div>
+      <div class="whatsapp-nota">
+        Se le va a enviar un link de WhatsApp para que la persona llene: fecha, hora, nombre de la reserva, cantidad de personas, si quiere mesa VIP, y observaciones.
+        La reserva va a quedar como <b>"Solicitud"</b> en tu lista hasta que la revises y le asignes mesa.
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="enviarSolicitudWhatsapp()">💬 Enviar solicitud por WhatsApp</button>
+      </div>
+    </div>
+
+    <div id="formCompletoBlock">
     <div class="field">
       <label>Estado</label>
       <div class="estado-select" id="estadoSelect">
@@ -454,6 +512,7 @@ main{flex:1; display:flex; overflow:hidden;}
       <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
       <button class="btn btn-danger" id="btnEliminar" style="display:none;" onclick="eliminarReserva()">Eliminar</button>
       <button class="btn btn-primary" onclick="guardarReserva()">Guardar</button>
+    </div>
     </div>
   </div>
 </div>
@@ -627,7 +686,7 @@ function renderLista(){
   const cardsHtml = rs.map(r=>{
     const mesaTxt = r.mesa ? mesaLabel(r.mesa) : '—';
     const isVip = mesaEsVip(r.mesa);
-    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
         <div>
           <div class="res-hora">${r.hora}</div>
@@ -644,6 +703,7 @@ function renderLista(){
         ${isVip?`<span class="vip-tag">VIP</span>`:''}
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
       </div>
+      ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+r.obs:''}</div>`:''}
     </div>`;
   }).join('');
 
@@ -651,43 +711,43 @@ function renderLista(){
 }
 
 function renderResumenTurnoHTML(rsTodas){
-  const vipReservas = rsTodas.filter(r=>mesaEsVip(r.mesa)).sort((a,b)=>(a.mesa||'').localeCompare(b.mesa||''));
   const generalReservas = rsTodas.filter(r=>!mesaEsVip(r.mesa));
-
-  const vipPax = vipReservas.reduce((a,r)=>a+Number(r.pax||0),0);
   const generalPax = generalReservas.reduce((a,r)=>a+Number(r.pax||0),0);
-  const totalPax = vipPax + generalPax;
-  const totalReservas = rsTodas.length;
 
-  const vipFilas = vipReservas.length
-    ? vipReservas.map(r => `<div class="resumen-fila">
-        <span class="resumen-fila-label">${mesaLabel(r.mesa)} <span class="resumen-fila-nombre">· ${r.nombre}</span></span>
-        <span class="resumen-fila-val">${r.pax} pax</span>
-      </div>`).join('')
-    : `<div class="resumen-fila resumen-vacio"><span>Sin mesas VIP reservadas</span></div>`;
+  // Los 3 salones VIP se muestran siempre en este orden, cada uno por separado.
+  const salonesVip = SALONES.filter(s=>s.vip);
+  const vipPorSalon = salonesVip.map(salon => {
+    const idsDeEsteSalon = new Set(salon.mesas.map(m=>m.id));
+    const reservasDeEsteSalon = rsTodas.filter(r => idsDeEsteSalon.has(r.mesa))
+      .sort((a,b)=>(a.mesa||'').localeCompare(b.mesa||''));
+    const pax = reservasDeEsteSalon.reduce((a,r)=>a+Number(r.pax||0),0);
+    return { salon, reservas: reservasDeEsteSalon, pax };
+  });
+
+  const vipReservasCount = vipPorSalon.reduce((a,s)=>a+s.reservas.length,0);
+  const vipPax = vipPorSalon.reduce((a,s)=>a+s.pax,0);
+  const totalReservas = generalReservas.length + vipReservasCount;
+  const totalPax = generalPax + vipPax;
+
+  const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
+    const filas = reservas.length
+      ? reservas.map(r => `<div class="resumen-fila">
+          <span class="resumen-fila-label">${mesaLabel(r.mesa)} <span class="resumen-fila-nombre">· ${r.nombre}</span></span>
+          <span class="resumen-fila-val">${r.pax} pax</span>
+        </div>`).join('')
+      : `<div class="resumen-fila resumen-vacio"><span>Sin reservas</span></div>`;
+    return `<div class="resumen-subsalon">
+      <div class="resumen-subsalon-head">
+        <span>${salon.nombre}</span>
+        <span>${reservas.length} mesas · ${pax} pax</span>
+      </div>
+      ${filas}
+    </div>`;
+  }).join('');
 
   return `
     <div class="resumen-turno">
       <div class="resumen-turno-title">Resumen del turno</div>
-
-      <div class="resumen-grid-mini">
-        <div class="resumen-mini">
-          <div class="resumen-mini-val">${totalReservas}</div>
-          <div class="resumen-mini-label">Total de reservas</div>
-        </div>
-        <div class="resumen-mini">
-          <div class="resumen-mini-val">${totalPax}</div>
-          <div class="resumen-mini-label">Total de personas</div>
-        </div>
-      </div>
-
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head">
-          <span>♛ Mesas VIP</span>
-          <span>${vipReservas.length} mesas · ${vipPax} pax</span>
-        </div>
-        ${vipFilas}
-      </div>
 
       <div class="resumen-seccion">
         <div class="resumen-seccion-head">
@@ -696,8 +756,16 @@ function renderResumenTurnoHTML(rsTodas){
         </div>
       </div>
 
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head">
+          <span>♛ Mesas VIP (3 salones)</span>
+          <span>${vipReservasCount} mesas · ${vipPax} pax</span>
+        </div>
+        ${vipSalonesHtml}
+      </div>
+
       <div class="resumen-total">
-        <span>Total del turno</span>
+        <span>Total del turno<br><span class="resumen-total-sub">Generales + VIP</span></span>
         <span>${totalReservas} reservas · ${totalPax} pax</span>
       </div>
     </div>
@@ -705,7 +773,7 @@ function renderResumenTurnoHTML(rsTodas){
 }
 
 function estadoLabel(e){
-  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada'}[e]||e;
+  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', solicitud:'Solicitud'}[e]||e;
 }
 function mesaLabel(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return m.id;
@@ -929,9 +997,15 @@ function abrirModal(id, mesaId){
   mesaPreseleccionada = mesaId || null;
   const overlay = document.getElementById('overlay');
   const btnEliminar = document.getElementById('btnEliminar');
+  const canalNuevoBlock = document.getElementById('canalNuevoBlock');
+  const whatsappBlock = document.getElementById('whatsappBlock');
+  const formCompletoBlock = document.getElementById('formCompletoBlock');
 
   if(id){
     const r = reservas.find(x=>x.id===id);
+    canalNuevoBlock.style.display = 'none';
+    whatsappBlock.style.display = 'none';
+    formCompletoBlock.style.display = 'block';
     document.getElementById('modalTitle').textContent = 'Editar reserva';
     document.getElementById('modalSub').textContent = `${r.turno.charAt(0).toUpperCase()+r.turno.slice(1)} · ${fechaISO(fechaActual)}`;
     document.getElementById('fHora').value = r.hora;
@@ -946,6 +1020,9 @@ function abrirModal(id, mesaId){
     estadoSeleccionado = r.estado;
     btnEliminar.style.display = 'block';
   } else {
+    canalNuevoBlock.style.display = 'block';
+    whatsappBlock.style.display = 'none';
+    formCompletoBlock.style.display = 'none';
     document.getElementById('modalTitle').textContent = 'Nueva reserva';
     document.getElementById('modalSub').textContent = `${turnoActivo.charAt(0).toUpperCase()+turnoActivo.slice(1)} · ${fechaISO(fechaActual)}`;
     document.getElementById('fHora').value = '';
@@ -953,15 +1030,47 @@ function abrirModal(id, mesaId){
     document.getElementById('fNombre').value = '';
     document.getElementById('fCelular').value = '';
     document.getElementById('fMesa').value = mesaId || '';
-    document.getElementById('fCanal').value = 'WhatsApp';
+    document.getElementById('fCanal').value = 'Teléfono';
     document.getElementById('fAbono').value = '';
     document.getElementById('fMenu').value = '';
     document.getElementById('fObs').value = '';
+    document.getElementById('fWhatsTelefono').value = '';
+    document.getElementById('fWhatsContacto').value = '';
     estadoSeleccionado = 'confirmada';
     btnEliminar.style.display = 'none';
   }
   actualizarEstadoUI();
   overlay.classList.add('open');
+}
+
+function elegirCanalNuevo(tipo){
+  document.getElementById('canalNuevoBlock').style.display = 'none';
+  if(tipo === 'telefono'){
+    document.getElementById('fCanal').value = 'Teléfono';
+    document.getElementById('formCompletoBlock').style.display = 'block';
+  } else {
+    document.getElementById('whatsappBlock').style.display = 'block';
+  }
+}
+
+function urlFormularioSolicitud(){
+  return new URL('solicitud.html', location.href).href;
+}
+
+function enviarSolicitudWhatsapp(){
+  const telefono = document.getElementById('fWhatsTelefono').value.trim();
+  const contacto = document.getElementById('fWhatsContacto').value.trim();
+  if(!telefono){ alert('Ingresa el teléfono de WhatsApp del cliente.'); return; }
+
+  let digitos = telefono.replace(/\D/g,'');
+  if(digitos.length === 10) digitos = '57' + digitos; // asume celular colombiano
+
+  const saludo = contacto ? `Hola ${contacto}, ` : 'Hola, ';
+  const mensaje = `${saludo}gracias por comunicarte con La Matriarca 🍽️. Para agilizar tu reserva, por favor completa este formulario con la fecha, hora y detalles que necesitas:\n${urlFormularioSolicitud()}`;
+
+  const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
+  window.open(url, '_blank');
+  cerrarModal();
 }
 
 function actualizarEstadoUI(){
