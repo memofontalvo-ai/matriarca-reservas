@@ -198,6 +198,8 @@ main{flex:1; display:flex; overflow:hidden;}
   background:var(--panel-alt); border:1.5px solid #c79bff; border-radius:var(--radius);
   padding:13px; margin-bottom:10px; cursor:pointer;
 }
+.solicitud-card-global.card-por-aprobar{border-color:#e8a33d;}
+.solicitud-card-global.card-por-aprobar .sc-fecha{color:#e8a33d;}
 .solicitud-card-global .sc-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
 .solicitud-card-global .sc-fecha{font-size:11.5px; color:#c79bff; font-weight:700; text-transform:capitalize;}
 .solicitud-card-global .sc-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright); margin-top:2px;}
@@ -488,7 +490,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v2.2</div>
+  <div class="version-tag">v2.3</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1074,7 +1076,7 @@ function formatearFechaCorta(iso){
 }
 
 function renderSolicitudesScreen(){
-  const sols = reservas.filter(r=>r.estado==='solicitud')
+  const sols = reservas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion')
     .sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
 
   const badge = document.getElementById('solicitudesBadge');
@@ -1083,31 +1085,41 @@ function renderSolicitudesScreen(){
 
   const el = document.getElementById('panelSolicitudes');
   if(sols.length === 0){
-    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes pendientes por procesar.<br>Las reservas que los clientes envíen por WhatsApp van a aparecer aquí primero.</div>`;
+    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes pendientes.<br>Las reservas que los clientes envíen por WhatsApp van a aparecer aquí, y se quedan hasta que el cliente las apruebe.</div>`;
     return;
   }
 
-  const cardsHtml = sols.map(r => `
-    <div class="solicitud-card-global" onclick='abrirModal(${JSON.stringify(r.id)})'>
+  const cardsHtml = sols.map(r => {
+    const esPorAprobar = r.estado === 'pendiente_aprobacion';
+    const claseColor = esPorAprobar ? 'card-por-aprobar' : 'card-solicitud';
+    const hint = esPorAprobar
+      ? `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`
+      : `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
+    return `
+    <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${formatearFechaCorta(r.fecha)} · ${r.turno}</div>
           <div class="sc-hora">${r.hora}</div>
           <div class="sc-nombre">${r.nombre}</div>
         </div>
-        <span class="badge solicitud">Solicitud</span>
+        <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
       </div>
       <div class="sc-meta">
         <span>${r.pax} pax</span>
         ${r.celular?`<span>${r.celular}</span>`:''}
+        ${r.mesa?`<span>Mesa ${mesaLabel(r.mesa)}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
       </div>
       ${r.obs?`<div class="sc-obs">${r.obs}</div>`:''}
-    </div>
-  `).join('');
+      ${hint}
+    </div>`;
+  }).join('');
 
-  // Resumen: total, VIP solicitada vs general, y desglose por día
+  // Resumen: por etapa, VIP solicitada vs general, y desglose por día
   const totalPax = sols.reduce((a,r)=>a+Number(r.pax||0),0);
+  const sinGestionar = sols.filter(r=>r.estado==='solicitud');
+  const porAprobar = sols.filter(r=>r.estado==='pendiente_aprobacion');
   const vipSols = sols.filter(r=>r.vipSolicitada);
   const generalSols = sols.filter(r=>!r.vipSolicitada);
   const vipPax = vipSols.reduce((a,r)=>a+Number(r.pax||0),0);
@@ -1130,6 +1142,12 @@ function renderSolicitudesScreen(){
     <div class="resumen-turno">
       <div class="resumen-turno-title">Resumen de solicitudes</div>
       <div class="resumen-seccion">
+        <div class="resumen-seccion-head"><span>⚠ Sin gestionar</span><span>${sinGestionar.length} · ${sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
+      </div>
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head"><span>📤 Por aprobar del cliente</span><span>${porAprobar.length} · ${porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
+      </div>
+      <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>Piden mesa general</span><span>${generalSols.length} · ${generalPax} pax</span></div>
       </div>
       <div class="resumen-seccion">
@@ -1140,7 +1158,7 @@ function renderSolicitudesScreen(){
         ${diasHtml}
       </div>
       <div class="resumen-total">
-        <span>Total solicitudes<br><span class="resumen-total-sub">Todas las fechas</span></span>
+        <span>Total pendientes<br><span class="resumen-total-sub">Todas las fechas</span></span>
         <span>${sols.length} solicitudes · ${totalPax} pax</span>
       </div>
     </div>
@@ -1302,6 +1320,12 @@ function enviarParaAprobacion(){
   if(!celular){ alert('Ingresa el celular del cliente para poder enviarle el link de aprobación.'); return; }
   if(!mesa){ if(!confirm('No has asignado mesa todavía. ¿Enviar de todas formas para que el cliente apruebe los demás datos?')) return; }
 
+  // Abrimos la pestaña YA, en el mismo clic, para que el navegador no la bloquee
+  // como pop-up (si esperamos a que termine de guardar en Firebase, ya no cuenta
+  // como "acción directa del usuario" y Safari la bloquea en silencio).
+  const ventana = window.open('', '_blank');
+  if(ventana){ ventana.document.write('<body style="background:#12151a;color:#8b93a3;font-family:sans-serif;padding:40px;text-align:center;">Preparando el link para el cliente...</body>'); }
+
   const data = {
     fecha: modalFecha,
     turno: modalTurno,
@@ -1326,10 +1350,12 @@ function enviarParaAprobacion(){
     let digitos = celular.replace(/\D/g,'');
     if(digitos.length === 10) digitos = '57' + digitos;
     const mensaje = `Hola ${nombre}, ya dejamos lista tu reserva en La Matriarca. Por favor revisa los detalles y apruébala aquí:\n${urlAprobacion(id)}`;
-    window.open(`https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    const waUrl = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
+    if(ventana){ ventana.location.href = waUrl; } else { window.open(waUrl, '_blank'); }
     cerrarModal();
   }).catch(err => {
     console.error('Error enviando para aprobación:', err);
+    if(ventana) ventana.close();
     alert('No se pudo enviar. Revisa tu conexión e intenta de nuevo.');
   });
 }
