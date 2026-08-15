@@ -171,7 +171,7 @@ body{
     }
     errorMsg.style.display = 'none';
 
-    const obsFinal = (vipSel === 'si' ? '⭐ Cliente solicita mesa VIP. ' : '') + obsTexto;
+    const obsFinal = obsTexto;
 
     const btn = document.getElementById('btnEnviar');
     btn.disabled = true;
@@ -180,6 +180,7 @@ body{
     db.collection('reservas').add({
       fecha, turno: turnoSel, hora, nombre, celular, pax,
       mesa: '', abono: 0, menu: '', obs: obsFinal,
+      vipSolicitada: (vipSel === 'si'),
       estado: 'solicitud', canal: 'WhatsApp (autogestión)'
     }).then(() => {
       document.getElementById('formulario').style.display = 'none';
