@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Aprobar reserva · La Matriarca</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+
+:root{
+  --bg:#12151a; --panel:#191d25; --panel-alt:#1f242e; --panel-raised:#262c38;
+  --border:#2b313d; --text:#edeef1; --text-muted:#8b93a3; --text-dim:#5c6472;
+  --gold:#c9a15a; --gold-bright:#e0bb78; --radius:12px;
+  --confirmed:#47b881;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background:var(--bg); color:var(--text); font-family:'Inter',sans-serif;
+  min-height:100vh; padding:20px 16px 60px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:480px; margin:0 auto;}
+.brand{font-family:'Fraunces',serif; font-weight:700; font-size:24px; color:var(--gold-bright); text-align:center; margin-bottom:4px;}
+.subtitle{text-align:center; color:var(--text-muted); font-size:13px; margin-bottom:28px;}
+
+.resumen-card{
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; margin-bottom:20px;
+}
+.rc-hora{font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; color:var(--gold-bright);}
+.rc-fecha{font-size:13px; color:var(--text-muted); margin-top:2px; text-transform:capitalize;}
+.rc-nombre{font-family:'Fraunces',serif; font-size:19px; font-weight:600; margin-top:14px;}
+.rc-row{
+  display:flex; justify-content:space-between; padding:9px 0; border-top:1px solid var(--border);
+  font-size:13.5px;
+}
+.rc-row .label{color:var(--text-muted);}
+.rc-row .val{font-weight:600; text-align:right;}
+.rc-obs{
+  margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
+  font-size:12.5px; color:var(--text-muted); line-height:1.5;
+}
+
+.btn-aprobar{
+  width:100%; padding:16px; border-radius:12px; background:var(--confirmed); color:#0c2417;
+  font-size:15.5px; font-weight:700; border:none;
+}
+.btn-aprobar:active{opacity:.85;}
+.btn-aprobar:disabled{opacity:.5;}
+
+.estado{text-align:center; padding:60px 10px; display:none;}
+.estado .icon{font-size:52px; margin-bottom:16px;}
+.estado h2{font-family:'Fraunces',serif; font-size:21px; color:var(--gold-bright); margin-bottom:10px;}
+.estado p{color:var(--text-muted); font-size:14px; line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="brand">La Matriarca</div>
+  <div class="subtitle">Revisa y aprueba tu reserva</div>
+
+  <div id="cargando" class="estado" style="display:block;">
+    <div class="icon">⏳</div>
+    <h2>Cargando tu reserva...</h2>
+  </div>
+
+  <div id="noEncontrada" class="estado">
+    <div class="icon">⚠️</div>
+    <h2>No encontramos esta reserva</h2>
+    <p>El link puede estar incompleto o la reserva ya no existe. Comunícate con el restaurante para verificar.</p>
+  </div>
+
+  <div id="contenido" style="display:none;">
+    <div class="resumen-card">
+      <div class="rc-hora" id="rcHora"></div>
+      <div class="rc-fecha" id="rcFecha"></div>
+      <div class="rc-nombre" id="rcNombre"></div>
+      <div class="rc-row"><span class="label">Personas</span><span class="val" id="rcPax"></span></div>
+      <div class="rc-row"><span class="label">Mesa</span><span class="val" id="rcMesa"></span></div>
+      <div class="rc-row" id="rcAbonoRow" style="display:none;"><span class="label">Abono</span><span class="val" id="rcAbono"></span></div>
+      <div class="rc-row" id="rcMenuRow" style="display:none;"><span class="label">Menú</span><span class="val" id="rcMenu"></span></div>
+      <div class="rc-obs" id="rcObs" style="display:none;"></div>
+    </div>
+    <button class="btn-aprobar" id="btnAprobar" onclick="aprobar()">✓ Aprobar mi reserva</button>
+  </div>
+
+  <div id="yaAprobada" class="estado">
+    <div class="icon">✅</div>
+    <h2>¡Reserva confirmada!</h2>
+    <p>Ya quedó todo listo. Te esperamos en La Matriarca.</p>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDJCy93GCOhDySnC_OLo6pcV-wK_pC48_A",
+    authDomain: "matriarca-reservas.firebaseapp.com",
+    projectId: "matriarca-reservas",
+    storageBucket: "matriarca-reservas.firebasestorage.app",
+    messagingSenderId: "370240403780",
+    appId: "1:370240403780:web:2ccceaf8da9daf37b8bf11"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+
+  const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+  function mostrarSolo(idVisible){
+    ['cargando','noEncontrada','contenido','yaAprobada'].forEach(x=>{
+      document.getElementById(x).style.display = (x===idVisible) ? (x==='contenido'?'block':'block') : 'none';
+    });
+  }
+
+  if(!id){
+    mostrarSolo('noEncontrada');
+  } else {
+    db.collection('reservas').doc(id).get().then(doc => {
+      if(!doc.exists){ mostrarSolo('noEncontrada'); return; }
+      const r = doc.data();
+
+      if(r.aprobadaPorCliente){
+        mostrarSolo('yaAprobada');
+        return;
+      }
+
+      const [y,m,d] = r.fecha.split('-').map(Number);
+      const fechaObj = new Date(y, m-1, d, 12);
+      document.getElementById('rcFecha').textContent = `${DIAS[fechaObj.getDay()]} ${d} de ${MESES[m-1]}`;
+      document.getElementById('rcHora').textContent = r.hora || '';
+      document.getElementById('rcNombre').textContent = r.nombre || '';
+      document.getElementById('rcPax').textContent = `${r.pax} personas`;
+      document.getElementById('rcMesa').textContent = r.mesa || 'Por confirmar';
+      if(r.abono > 0){
+        document.getElementById('rcAbonoRow').style.display = 'flex';
+        document.getElementById('rcAbono').textContent = '$' + Number(r.abono).toLocaleString('es-CO');
+      }
+      if(r.menu){
+        document.getElementById('rcMenuRow').style.display = 'flex';
+        document.getElementById('rcMenu').textContent = r.menu;
+      }
+      if(r.obs){
+        document.getElementById('rcObs').style.display = 'block';
+        document.getElementById('rcObs').textContent = r.obs;
+      }
+      mostrarSolo('contenido');
+    }).catch(err => {
+      console.error(err);
+      mostrarSolo('noEncontrada');
+    });
+  }
+
+  function aprobar(){
+    const btn = document.getElementById('btnAprobar');
+    btn.disabled = true;
+    btn.textContent = 'Confirmando...';
+    db.collection('reservas').doc(id).update({
+      estado: 'confirmada',
+      aprobadaPorCliente: true
+    }).then(() => {
+      mostrarSolo('yaAprobada');
+    }).catch(err => {
+      console.error(err);
+      alert('No se pudo confirmar. Intenta de nuevo.');
+      btn.disabled = false;
+      btn.textContent = '✓ Aprobar mi reserva';
+    });
+  }
+</script>
+</body>
+</html>
