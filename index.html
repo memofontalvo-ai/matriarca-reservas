@@ -200,6 +200,12 @@ main{flex:1; display:flex; overflow:hidden;}
 }
 .solicitud-card-global.card-por-aprobar{border-color:#e8a33d;}
 .solicitud-card-global.card-por-aprobar .sc-fecha{color:#e8a33d;}
+.solicitud-card-global.card-aprobada{border-color:var(--confirmed); opacity:.85;}
+.solicitud-card-global.card-aprobada .sc-fecha{color:var(--confirmed);}
+.historial-aprobada-hint{
+  margin-top:8px; padding-top:8px; border-top:1px dashed rgba(71,184,129,0.3);
+  font-size:11px; color:var(--confirmed); font-weight:600; line-height:1.4;
+}
 .solicitud-card-global .sc-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
 .solicitud-card-global .sc-fecha{font-size:11.5px; color:#c79bff; font-weight:700; text-transform:capitalize;}
 .solicitud-card-global .sc-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright); margin-top:2px;}
@@ -490,7 +496,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v2.3</div>
+  <div class="version-tag">v2.4</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -730,7 +736,10 @@ function renderHeader(){
 /* ============ RENDER: STATS ============ */
 function reservasDelTurno(){
   const iso = fechaISO(fechaActual);
-  return reservas.filter(r=>r.fecha===iso && r.turno===turnoActivo);
+  // La vista "por día" solo muestra reservas ya resueltas: no incluye las que
+  // siguen en el flujo de solicitud/aprobación del cliente (esas viven en
+  // la pantalla "Solicitudes" hasta que el cliente las apruebe).
+  return reservas.filter(r=>r.fecha===iso && r.turno===turnoActivo && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
 }
 
 function renderStats(){
@@ -1076,25 +1085,36 @@ function formatearFechaCorta(iso){
 }
 
 function renderSolicitudesScreen(){
-  const sols = reservas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion')
-    .sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  // Historial completo: todo lo que alguna vez pasó por el flujo de
+  // solicitud/aprobación del cliente, sin importar en qué quedó.
+  // Nunca se quita de aquí — sirve de registro para informes.
+  const todas = reservas.filter(r=>
+    r.pasoPorSolicitud === true ||
+    r.estado==='solicitud' || r.estado==='pendiente_aprobacion' ||
+    r.aprobadaPorCliente !== undefined
+  ).sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+
+  const activas = todas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion');
 
   const badge = document.getElementById('solicitudesBadge');
-  badge.textContent = sols.length;
-  badge.classList.toggle('zero', sols.length===0);
+  badge.textContent = activas.length;
+  badge.classList.toggle('zero', activas.length===0);
 
   const el = document.getElementById('panelSolicitudes');
-  if(sols.length === 0){
-    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes pendientes.<br>Las reservas que los clientes envíen por WhatsApp van a aparecer aquí, y se quedan hasta que el cliente las apruebe.</div>`;
+  if(todas.length === 0){
+    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes todavía.<br>Las reservas que los clientes envíen por WhatsApp van a aparecer aquí, y quedan registradas para siempre como historial.</div>`;
     return;
   }
 
-  const cardsHtml = sols.map(r => {
+  const cardsHtml = todas.map(r => {
+    const esSinGestionar = r.estado === 'solicitud';
     const esPorAprobar = r.estado === 'pendiente_aprobacion';
-    const claseColor = esPorAprobar ? 'card-por-aprobar' : 'card-solicitud';
-    const hint = esPorAprobar
-      ? `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`
-      : `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
+    const yaAprobada = r.aprobadaPorCliente === true;
+    const claseColor = esPorAprobar ? 'card-por-aprobar' : (esSinGestionar ? 'card-solicitud' : 'card-aprobada');
+    let hint = '';
+    if(esSinGestionar) hint = `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
+    else if(esPorAprobar) hint = `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`;
+    else if(yaAprobada) hint = `<div class="historial-aprobada-hint">✓ Aprobada por el cliente — ya está en Reservas por día</div>`;
     return `
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="sc-top">
@@ -1116,17 +1136,23 @@ function renderSolicitudesScreen(){
     </div>`;
   }).join('');
 
-  // Resumen: por etapa, VIP solicitada vs general, y desglose por día
-  const totalPax = sols.reduce((a,r)=>a+Number(r.pax||0),0);
-  const sinGestionar = sols.filter(r=>r.estado==='solicitud');
-  const porAprobar = sols.filter(r=>r.estado==='pendiente_aprobacion');
-  const vipSols = sols.filter(r=>r.vipSolicitada);
-  const generalSols = sols.filter(r=>!r.vipSolicitada);
+  // Resumen histórico: aprobadas vs no aprobadas, VIP vs general, por día
+  const totalPax = todas.reduce((a,r)=>a+Number(r.pax||0),0);
+  const aprobadas = todas.filter(r=>r.aprobadaPorCliente===true);
+  const noAprobadas = todas.filter(r=>r.aprobadaPorCliente!==true);
+  const aprobadasPax = aprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
+  const noAprobadasPax = noAprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
+
+  const sinGestionar = todas.filter(r=>r.estado==='solicitud');
+  const porAprobar = todas.filter(r=>r.estado==='pendiente_aprobacion');
+
+  const vipSols = todas.filter(r=>r.vipSolicitada);
+  const generalSols = todas.filter(r=>!r.vipSolicitada);
   const vipPax = vipSols.reduce((a,r)=>a+Number(r.pax||0),0);
   const generalPax = generalSols.reduce((a,r)=>a+Number(r.pax||0),0);
 
   const porDia = {};
-  sols.forEach(r => {
+  todas.forEach(r => {
     if(!porDia[r.fecha]) porDia[r.fecha] = {count:0, pax:0};
     porDia[r.fecha].count++;
     porDia[r.fecha].pax += Number(r.pax||0);
@@ -1140,7 +1166,14 @@ function renderSolicitudesScreen(){
 
   const resumenHtml = `
     <div class="resumen-turno">
-      <div class="resumen-turno-title">Resumen de solicitudes</div>
+      <div class="resumen-turno-title">Resumen histórico de solicitudes</div>
+
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head"><span>✓ Aprobadas por el cliente</span><span>${aprobadas.length} · ${aprobadasPax} pax</span></div>
+      </div>
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head"><span>Sin aprobar todavía</span><span>${noAprobadas.length} · ${noAprobadasPax} pax</span></div>
+      </div>
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>⚠ Sin gestionar</span><span>${sinGestionar.length} · ${sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
       </div>
@@ -1158,8 +1191,8 @@ function renderSolicitudesScreen(){
         ${diasHtml}
       </div>
       <div class="resumen-total">
-        <span>Total pendientes<br><span class="resumen-total-sub">Todas las fechas</span></span>
-        <span>${sols.length} solicitudes · ${totalPax} pax</span>
+        <span>Total histórico<br><span class="resumen-total-sub">Todas las fechas</span></span>
+        <span>${todas.length} solicitudes · ${totalPax} pax</span>
       </div>
     </div>
   `;
@@ -1340,6 +1373,7 @@ function enviarParaAprobacion(){
     obs: document.getElementById('fObs').value.trim(),
     estado: 'pendiente_aprobacion',
     aprobadaPorCliente: false,
+    pasoPorSolicitud: true,
   };
 
   const promesa = editandoId
