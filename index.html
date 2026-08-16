@@ -1146,7 +1146,18 @@ function renderLista(){
   const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
   const el = document.getElementById('panelLista');
   if(rs.length===0){
-    el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
+    // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
+    // lo decimos explícitamente para no confundir con "no hay nada este día".
+    const iso = fechaISO(fechaActual);
+    const otrosTurnos = ['desayuno','almuerzo','cena']
+      .filter(t => t !== turnoActivo)
+      .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
+    if(otrosTurnos.length){
+      const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
+      el.innerHTML = `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
+    } else {
+      el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
+    }
     return;
   }
   const cardsHtml = rs.map(r=>{
