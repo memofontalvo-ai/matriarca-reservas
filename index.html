@@ -394,6 +394,11 @@ main{flex:1; display:flex; overflow:hidden;}
   font-size:10.5px; color:var(--text-dim);
 }
 .cal-inline-leyenda span{display:flex; align-items:center; gap:5px;}
+.cal-aviso-navegando{
+  margin-top:12px; padding:10px 12px; background:rgba(232,163,61,0.1);
+  border:1px solid #e8a33d; border-radius:8px; color:#e8a33d;
+  font-size:11.5px; line-height:1.5; text-align:center;
+}
 .cal-dot-leyenda{width:6px; height:6px; border-radius:50%; background:var(--confirmed); display:inline-block;}
 .cal-star-leyenda{font-size:11px;}
 .cal-jump{display:flex; gap:8px; margin-top:14px;}
@@ -619,6 +624,7 @@ main{flex:1; display:flex; overflow:hidden;}
         <span><span class="cal-dot-leyenda"></span> Día con reservas</span>
         <span><span class="cal-star-leyenda">⭐</span> Tiene reserva especial (30+)</span>
       </div>
+      <div class="cal-aviso-navegando" id="calAvisoNavegando" style="display:none;"></div>
     </div>
 
     <div class="subbar">
@@ -650,7 +656,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.6</div>
+  <div class="version-tag">v3.7</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1005,7 +1011,12 @@ let calendarioInlineAbierto = true; // visible por defecto: lo primero que se ve
 function toggleCalendarioPorDia(){
   calendarioInlineAbierto = !calendarioInlineAbierto;
   document.getElementById('calendarioInlineWrap').style.display = calendarioInlineAbierto ? 'block' : 'none';
-  if(calendarioInlineAbierto) renderCalendarioInline();
+  if(calendarioInlineAbierto){
+    // Al reabrirlo, lo centramos de nuevo en el día seleccionado actualmente.
+    calInlineMes = fechaActual.getMonth();
+    calInlineAno = fechaActual.getFullYear();
+    renderCalendarioInline();
+  }
 }
 
 function cambiarMesInline(delta){
@@ -1060,6 +1071,17 @@ function renderCalendarioInline(){
     html += `<div class="cal-day muted">${d}</div>`;
   }
   document.getElementById('calInlineDays').innerHTML = html;
+
+  // Si el mes que se está mirando no es el del día seleccionado, lo avisamos
+  // claramente para que no se confunda con la información mostrada abajo.
+  const avisoEl = document.getElementById('calAvisoNavegando');
+  const explorandoOtroMes = (calInlineMes !== fechaActual.getMonth() || calInlineAno !== fechaActual.getFullYear());
+  if(explorandoOtroMes){
+    avisoEl.style.display = 'block';
+    avisoEl.textContent = `👀 Estás explorando ${MESES[calInlineMes]} — la información de abajo sigue siendo la de ${formatearFechaCorta(fechaISO(fechaActual))}. Toca un día marcado para cambiarla.`;
+  } else {
+    avisoEl.style.display = 'none';
+  }
 }
 
 function seleccionarDiaInline(d){
@@ -1301,6 +1323,10 @@ function cambiarDia(delta){
   if(!grupo[turnoActivo].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
+  // Aquí sí sincronizamos el calendario, porque el usuario acaba de elegir
+  // explícitamente otra fecha con las flechitas.
+  calInlineMes = fechaActual.getMonth();
+  calInlineAno = fechaActual.getFullYear();
   renderAll();
 }
 
@@ -1425,8 +1451,13 @@ function renderAll(){
   renderPlano();
   renderResumen();
   renderSolicitudesScreen();
-  calInlineMes = fechaActual.getMonth();
-  calInlineAno = fechaActual.getFullYear();
+  // OJO: no reseteamos calInlineMes/calInlineAno aquí — renderAll() se llama
+  // constantemente (cada vez que llega un cambio en tiempo real desde Firebase),
+  // y si reseteáramos el mes en cada llamada, el calendario se saltaría solo
+  // al mes de la fecha seleccionada mientras el usuario está navegando a
+  // otro mes para revisar reservas futuras. Solo lo re-sincronizamos en las
+  // acciones donde el usuario realmente elige una fecha nueva (ver cambiarDia,
+  // seleccionarDiaInline, toggleCalendarioPorDia).
   renderCalendarioInline();
 }
 
