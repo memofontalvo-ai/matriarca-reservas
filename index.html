@@ -64,6 +64,16 @@ header{
 }
 .brand span{color:var(--text-dim); font-weight:400; font-size:13px; margin-left:8px;}
 .date-nav{display:flex; align-items:center; gap:6px;}
+.date-nav-solicitudes{
+  justify-content:center; padding:12px 16px; background:var(--panel);
+  border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.alerta-atrasadas{
+  background:rgba(232,163,61,0.12); border-bottom:1px solid #e8a33d;
+  color:#e8a33d; font-size:12.5px; font-weight:600; padding:11px 16px;
+  cursor:pointer; line-height:1.4; flex-shrink:0;
+}
+.alerta-atrasadas:hover{background:rgba(232,163,61,0.2);}
 .date-nav button{
   width:30px; height:30px; border-radius:8px; background:var(--panel-alt);
   border:1px solid var(--border); color:var(--text-muted); font-size:14px;
@@ -458,6 +468,12 @@ main{flex:1; display:flex; overflow:hidden;}
     <header class="header-simple">
       <div class="brand">La Matriarca <span>Barranquilla · Reservas</span></div>
     </header>
+    <div class="date-nav date-nav-solicitudes">
+      <button onclick="cambiarDiaSolicitudes(-1)">‹</button>
+      <div class="date-label" id="dateLabelSolicitudes" onclick="abrirCalendario('solicitudes')"></div>
+      <button onclick="cambiarDiaSolicitudes(1)">›</button>
+    </div>
+    <div id="alertaAtrasadas"></div>
     <div class="solicitudes-panel" id="panelSolicitudes"></div>
   </div>
 
@@ -496,7 +512,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v2.4</div>
+  <div class="version-tag">v2.5</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -971,10 +987,14 @@ function cambiarDia(delta){
 /* ============ CALENDAR PICKER ============ */
 let calMes = fechaActual.getMonth();
 let calAno = fechaActual.getFullYear();
+let calTarget = 'porDia'; // 'porDia' o 'solicitudes' — a cuál pantalla afecta el calendario
+let fechaSolicitudes = new Date(); // fecha que se está revisando en la pantalla de Solicitudes
 
-function abrirCalendario(){
-  calMes = fechaActual.getMonth();
-  calAno = fechaActual.getFullYear();
+function abrirCalendario(target){
+  calTarget = target || 'porDia';
+  const base = calTarget === 'solicitudes' ? fechaSolicitudes : fechaActual;
+  calMes = base.getMonth();
+  calAno = base.getFullYear();
   poblarSelectsCal();
   renderCalendario();
   document.getElementById('calOverlay').classList.add('open');
@@ -1015,7 +1035,8 @@ function renderCalendario(){
   const diasEnMes = new Date(calAno, calMes+1, 0).getDate();
   const hoy = new Date();
   const hoyISO = fechaISO(hoy);
-  const selISO = fechaISO(fechaActual);
+  const base = calTarget === 'solicitudes' ? fechaSolicitudes : fechaActual;
+  const selISO = fechaISO(base);
 
   let html = '';
   // días del mes anterior para rellenar la grilla
@@ -1039,7 +1060,14 @@ function renderCalendario(){
   document.getElementById('calDays').innerHTML = html;
 }
 function seleccionarDiaCal(d){
-  fechaActual = new Date(calAno, calMes, d, 12);
+  const nuevaFecha = new Date(calAno, calMes, d, 12);
+  if(calTarget === 'solicitudes'){
+    fechaSolicitudes = nuevaFecha;
+    cerrarCalendario();
+    renderSolicitudesScreen();
+    return;
+  }
+  fechaActual = nuevaFecha;
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
   if(!grupo[turnoActivo].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
@@ -1048,11 +1076,23 @@ function seleccionarDiaCal(d){
   renderAll();
 }
 function irHoy(){
+  if(calTarget === 'solicitudes'){
+    fechaSolicitudes = new Date();
+    calMes = fechaSolicitudes.getMonth();
+    calAno = fechaSolicitudes.getFullYear();
+    cerrarCalendario();
+    renderSolicitudesScreen();
+    return;
+  }
   fechaActual = new Date();
   calMes = fechaActual.getMonth();
   calAno = fechaActual.getFullYear();
   cerrarCalendario();
   renderAll();
+}
+function cambiarDiaSolicitudes(delta){
+  fechaSolicitudes.setDate(fechaSolicitudes.getDate()+delta);
+  renderSolicitudesScreen();
 }
 document.getElementById('calOverlay').addEventListener('click', e=>{
   if(e.target.id==='calOverlay') cerrarCalendario();
@@ -1086,27 +1126,47 @@ function formatearFechaCorta(iso){
 
 function renderSolicitudesScreen(){
   // Historial completo: todo lo que alguna vez pasó por el flujo de
-  // solicitud/aprobación del cliente, sin importar en qué quedó.
-  // Nunca se quita de aquí — sirve de registro para informes.
+  // solicitud/aprobación del cliente, sin importar en qué quedó ni la fecha.
   const todas = reservas.filter(r=>
     r.pasoPorSolicitud === true ||
     r.estado==='solicitud' || r.estado==='pendiente_aprobacion' ||
     r.aprobadaPorCliente !== undefined
-  ).sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  );
 
   const activas = todas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion');
-
   const badge = document.getElementById('solicitudesBadge');
   badge.textContent = activas.length;
   badge.classList.toggle('zero', activas.length===0);
 
+  // Encabezado de fecha de esta pantalla (por defecto: hoy)
+  const iso = fechaISO(fechaSolicitudes);
+  const hoyISO = fechaISO(new Date());
+  document.getElementById('dateLabelSolicitudes').innerHTML =
+    `${DIAS[fechaSolicitudes.getDay()]} ${fechaSolicitudes.getDate()} de ${MESES[fechaSolicitudes.getMonth()]}` +
+    (iso===hoyISO ? `<span class="grupo">Hoy</span>` : '');
+
+  // Aviso de atrasadas: activas de fechas ANTERIORES a hoy, sin importar qué día se esté viendo ahora
+  const atrasadas = activas.filter(r=>r.fecha < hoyISO);
+  const alertaEl = document.getElementById('alertaAtrasadas');
+  if(atrasadas.length > 0){
+    const fechaMasAntigua = atrasadas.map(r=>r.fecha).sort()[0];
+    alertaEl.innerHTML = `<div class="alerta-atrasadas" onclick="irAFechaAtrasada('${fechaMasAntigua}')">
+      ⚠ Tienes <b>${atrasadas.length}</b> solicitud${atrasadas.length===1?'':'es'} atrasada${atrasadas.length===1?'':'s'} de días anteriores sin gestionar o sin aprobar — toca para revisar la más antigua
+    </div>`;
+  } else {
+    alertaEl.innerHTML = '';
+  }
+
+  // Solo lo del día que se está viendo en esta pantalla
+  const delDia = todas.filter(r=>r.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+
   const el = document.getElementById('panelSolicitudes');
-  if(todas.length === 0){
-    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes todavía.<br>Las reservas que los clientes envíen por WhatsApp van a aparecer aquí, y quedan registradas para siempre como historial.</div>`;
+  if(delDia.length === 0){
+    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.</div>`;
     return;
   }
 
-  const cardsHtml = todas.map(r => {
+  const cardsHtml = delDia.map(r => {
     const esSinGestionar = r.estado === 'solicitud';
     const esPorAprobar = r.estado === 'pendiente_aprobacion';
     const yaAprobada = r.aprobadaPorCliente === true;
@@ -1119,7 +1179,7 @@ function renderSolicitudesScreen(){
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="sc-top">
         <div>
-          <div class="sc-fecha">${formatearFechaCorta(r.fecha)} · ${r.turno}</div>
+          <div class="sc-fecha">${r.turno}</div>
           <div class="sc-hora">${r.hora}</div>
           <div class="sc-nombre">${r.nombre}</div>
         </div>
@@ -1136,37 +1196,24 @@ function renderSolicitudesScreen(){
     </div>`;
   }).join('');
 
-  // Resumen histórico: aprobadas vs no aprobadas, VIP vs general, por día
-  const totalPax = todas.reduce((a,r)=>a+Number(r.pax||0),0);
-  const aprobadas = todas.filter(r=>r.aprobadaPorCliente===true);
-  const noAprobadas = todas.filter(r=>r.aprobadaPorCliente!==true);
+  // Resumen del día que se está viendo: aprobadas vs no, VIP vs general
+  const totalPax = delDia.reduce((a,r)=>a+Number(r.pax||0),0);
+  const aprobadas = delDia.filter(r=>r.aprobadaPorCliente===true);
+  const noAprobadas = delDia.filter(r=>r.aprobadaPorCliente!==true);
   const aprobadasPax = aprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
   const noAprobadasPax = noAprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
 
-  const sinGestionar = todas.filter(r=>r.estado==='solicitud');
-  const porAprobar = todas.filter(r=>r.estado==='pendiente_aprobacion');
+  const sinGestionar = delDia.filter(r=>r.estado==='solicitud');
+  const porAprobar = delDia.filter(r=>r.estado==='pendiente_aprobacion');
 
-  const vipSols = todas.filter(r=>r.vipSolicitada);
-  const generalSols = todas.filter(r=>!r.vipSolicitada);
+  const vipSols = delDia.filter(r=>r.vipSolicitada);
+  const generalSols = delDia.filter(r=>!r.vipSolicitada);
   const vipPax = vipSols.reduce((a,r)=>a+Number(r.pax||0),0);
   const generalPax = generalSols.reduce((a,r)=>a+Number(r.pax||0),0);
 
-  const porDia = {};
-  todas.forEach(r => {
-    if(!porDia[r.fecha]) porDia[r.fecha] = {count:0, pax:0};
-    porDia[r.fecha].count++;
-    porDia[r.fecha].pax += Number(r.pax||0);
-  });
-  const diasHtml = Object.keys(porDia).sort().map(fecha => `
-    <div class="resumen-fila">
-      <span class="resumen-fila-label">${formatearFechaCorta(fecha)}</span>
-      <span class="resumen-fila-val">${porDia[fecha].count} sol. · ${porDia[fecha].pax} pax</span>
-    </div>
-  `).join('');
-
   const resumenHtml = `
     <div class="resumen-turno">
-      <div class="resumen-turno-title">Resumen histórico de solicitudes</div>
+      <div class="resumen-turno-title">Resumen del día</div>
 
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>✓ Aprobadas por el cliente</span><span>${aprobadas.length} · ${aprobadasPax} pax</span></div>
@@ -1186,18 +1233,20 @@ function renderSolicitudesScreen(){
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>♛ Piden mesa VIP</span><span>${vipSols.length} · ${vipPax} pax</span></div>
       </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>Por día</span><span></span></div>
-        ${diasHtml}
-      </div>
       <div class="resumen-total">
-        <span>Total histórico<br><span class="resumen-total-sub">Todas las fechas</span></span>
-        <span>${todas.length} solicitudes · ${totalPax} pax</span>
+        <span>Total del día<br><span class="resumen-total-sub">${formatearFechaCorta(iso)}</span></span>
+        <span>${delDia.length} solicitudes · ${totalPax} pax</span>
       </div>
     </div>
   `;
 
   el.innerHTML = cardsHtml + resumenHtml;
+}
+
+function irAFechaAtrasada(fechaIso){
+  const [y,m,d] = fechaIso.split('-').map(Number);
+  fechaSolicitudes = new Date(y, m-1, d, 12);
+  renderSolicitudesScreen();
 }
 
 /* ============ MODAL ============ */
@@ -1437,7 +1486,8 @@ document.getElementById('overlay').addEventListener('click', e=>{
 
 /* ============ INIT ============ */
 renderHeader(); // pinta el encabezado de inmediato; el resto llega con Firestore
-cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes pendientes por procesar
+renderSolicitudesScreen(); // pinta la fecha/label de inmediato; las tarjetas llegan con Firestore
+cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en curso
 </script>
 </body>
 </html>
