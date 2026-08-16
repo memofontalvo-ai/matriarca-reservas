@@ -275,6 +275,27 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .solicitud-card-global .sc-meta{font-size:11.5px; color:var(--text-muted); margin-top:6px; display:flex; gap:10px; flex-wrap:wrap;}
 .solicitud-card-global .sc-obs{font-size:11.5px; color:#c79bff; margin-top:8px; padding-top:8px; border-top:1px dashed rgba(199,155,255,0.3); line-height:1.4;}
 
+/* ===== RESUMEN DEL DÍA POR TURNO (siempre visible, no depende del filtro) ===== */
+.resumen-dia-turnos{
+  margin-top:14px; padding:14px; background:var(--panel-raised);
+  border:1px solid var(--gold); border-radius:12px;
+}
+.resumen-dia-titulo{
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+  color:var(--gold-bright); margin-bottom:10px; text-align:center;
+}
+.resumen-dia-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+.resumen-dia-card{
+  background:var(--panel-alt); border-radius:8px; padding:8px 4px; text-align:center;
+  border:1px solid transparent;
+}
+.resumen-dia-card.activo{border-color:var(--gold);}
+.resumen-dia-card.total{background:rgba(230,180,90,0.14); border-color:var(--gold);}
+.resumen-dia-card-label{font-size:9.5px; color:var(--text-dim); text-transform:uppercase; font-weight:700;}
+.resumen-dia-card-num{font-size:20px; font-weight:800; color:var(--text); margin-top:2px;}
+.resumen-dia-card.total .resumen-dia-card-num{color:var(--gold-bright);}
+.resumen-dia-card-sub{font-size:10px; color:var(--text-dim); margin-top:1px;}
+
 /* ===== RESUMEN DEL TURNO (al pie de la Lista) ===== */
 .resumen-turno{
   margin-top:16px; padding-top:16px; border-top:1px dashed var(--border);
@@ -703,7 +724,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.13</div>
+  <div class="version-tag">v3.14</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1249,6 +1270,37 @@ function renderLista(){
 }
 
 function renderResumenTurnoHTML(rsTodas){
+  // Resumen general del DÍA por turno — siempre se calcula sobre los 3
+  // turnos, sin importar cuál esté seleccionado arriba (Todos/Desayuno/
+  // Almuerzo/Cena). Así, aunque estés viendo solo "Cena", igual ves de un
+  // vistazo cuántas reservas hay en cada turno y el total del día completo.
+  const iso = fechaISO(fechaActual);
+  const reservasDia = reservas.filter(r=>r.fecha===iso && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  const porTurnoDia = ['desayuno','almuerzo','cena'].map(t=>{
+    const rs = reservasDia.filter(r=>r.turno===t);
+    return { turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo',cena:'Cena'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) };
+  });
+  const totalDiaReservas = reservasDia.length;
+  const totalDiaPax = reservasDia.reduce((a,r)=>a+Number(r.pax||0),0);
+  const resumenDiaHtml = `
+    <div class="resumen-dia-turnos">
+      <div class="resumen-dia-titulo">Resumen del día — todos los turnos</div>
+      <div class="resumen-dia-grid">
+        ${porTurnoDia.map(t=>`
+          <div class="resumen-dia-card ${turnoActivo===t.turno?'activo':''}">
+            <div class="resumen-dia-card-label">${t.label}</div>
+            <div class="resumen-dia-card-num">${t.count}</div>
+            <div class="resumen-dia-card-sub">${t.pax} pax</div>
+          </div>`).join('')}
+        <div class="resumen-dia-card total">
+          <div class="resumen-dia-card-label">Total día</div>
+          <div class="resumen-dia-card-num">${totalDiaReservas}</div>
+          <div class="resumen-dia-card-sub">${totalDiaPax} pax</div>
+        </div>
+      </div>
+    </div>
+  `;
+
   const generalReservas = rsTodas.filter(r=>!mesaEsVip(r.mesa));
   const generalPax = generalReservas.reduce((a,r)=>a+Number(r.pax||0),0);
 
@@ -1284,8 +1336,9 @@ function renderResumenTurnoHTML(rsTodas){
   }).join('');
 
   return `
+    ${resumenDiaHtml}
     <div class="resumen-turno">
-      <div class="resumen-turno-title">Resumen del turno</div>
+      <div class="resumen-turno-title">Resumen de ${turnoActivo==='todos'?'todos los turnos':turnoActivo}</div>
 
       <div class="resumen-seccion">
         <div class="resumen-seccion-head">
@@ -1303,7 +1356,7 @@ function renderResumenTurnoHTML(rsTodas){
       </div>
 
       <div class="resumen-total">
-        <span>Total del turno<br><span class="resumen-total-sub">Generales + VIP</span></span>
+        <span>Total de ${turnoActivo==='todos'?'todos los turnos':'este turno'}<br><span class="resumen-total-sub">Generales + VIP</span></span>
         <span>${totalReservas} reservas · ${totalPax} pax</span>
       </div>
     </div>
