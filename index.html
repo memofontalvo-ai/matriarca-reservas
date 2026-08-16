@@ -293,6 +293,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .resumen-dia-card.total{background:rgba(230,180,90,0.14); border-color:var(--gold);}
 .resumen-dia-card-label{font-size:9.5px; color:var(--text-dim); text-transform:uppercase; font-weight:700;}
 .resumen-dia-card-num{font-size:20px; font-weight:800; color:var(--text); margin-top:2px;}
+.resumen-dia-card-unidad{font-size:10px; font-weight:700; color:var(--text-dim); margin-left:3px;}
 .resumen-dia-card.total .resumen-dia-card-num{color:var(--gold-bright);}
 .resumen-dia-card-sub{font-size:10px; color:var(--text-dim); margin-top:1px;}
 
@@ -724,7 +725,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.14</div>
+  <div class="version-tag">v3.15</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1289,13 +1290,13 @@ function renderResumenTurnoHTML(rsTodas){
         ${porTurnoDia.map(t=>`
           <div class="resumen-dia-card ${turnoActivo===t.turno?'activo':''}">
             <div class="resumen-dia-card-label">${t.label}</div>
-            <div class="resumen-dia-card-num">${t.count}</div>
-            <div class="resumen-dia-card-sub">${t.pax} pax</div>
+            <div class="resumen-dia-card-num">${t.pax}<span class="resumen-dia-card-unidad">pax</span></div>
+            <div class="resumen-dia-card-sub">${t.count} reserva${t.count===1?'':'s'}</div>
           </div>`).join('')}
         <div class="resumen-dia-card total">
           <div class="resumen-dia-card-label">Total día</div>
-          <div class="resumen-dia-card-num">${totalDiaReservas}</div>
-          <div class="resumen-dia-card-sub">${totalDiaPax} pax</div>
+          <div class="resumen-dia-card-num">${totalDiaPax}<span class="resumen-dia-card-unidad">pax</span></div>
+          <div class="resumen-dia-card-sub">${totalDiaReservas} reserva${totalDiaReservas===1?'':'s'}</div>
         </div>
       </div>
     </div>
