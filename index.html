@@ -538,7 +538,18 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
      por completo. Ahora #pantallaPorDia hace scroll como una página normal:
      el calendario, la lista y todo lo demás simplemente se acomodan uno
      debajo del otro y siempre son visibles bajando el dedo. */
-  #pantallaPorDia{overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  /* El calendario mensual embebido puede ocupar más alto que lo que queda
+     de pantalla, sobre todo en celulares. Antes cada pantalla (Solicitudes,
+     Por día, Salones) tenía que repartirse el espacio sobrante con flex y
+     el bloque de abajo quedaba en 0px o casi, escondiendo el contenido.
+     Ahora LAS TRES pantallas hacen scroll como una página normal: todo se
+     acomoda uno debajo del otro y siempre es visible bajando el dedo, sin
+     scrolls anidados que confundan (esto se corrigió en "Por día" antes,
+     pero faltaba aplicarlo también aquí — mismo arreglo, un solo lugar).*/
+  #pantallaSolicitudes, #pantallaPorDia, #pantallaSalones{
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .solicitudes-panel, .salones-panel{flex:none; min-height:0; overflow-y:visible;}
   main{flex:none; display:block; overflow:visible; min-height:120px;}
   .bottom-nav{
     display:flex; border-top:1px solid var(--border); background:var(--panel);
@@ -691,7 +702,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.11</div>
+  <div class="version-tag">v3.12</div>
 </div>
 
 <div class="overlay" id="overlay">
