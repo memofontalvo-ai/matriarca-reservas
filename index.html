@@ -559,7 +559,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.0</div>
+  <div class="version-tag">v3.1</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -692,13 +692,22 @@ main{flex:1; display:flex; overflow:hidden;}
       </div>
     </div>
 
-    <div class="field">
+    <div class="field" id="bloqueMesasGenerales">
       <label>Mesas de este salón</label>
       <div id="listaMesasTemp"></div>
       <div class="field-row agregar-mesa-row">
         <input type="text" id="fNuevaMesaId" placeholder="ID (ej. T35)">
         <input type="number" id="fNuevaMesaCap" placeholder="Capacidad" min="1">
         <button type="button" class="btn-agregar-mesa" onclick="agregarMesaTemporal()">+ Agregar</button>
+      </div>
+    </div>
+
+    <div class="field" id="bloqueCapacidadVip" style="display:none;">
+      <label>Capacidad máxima del salón VIP</label>
+      <input type="number" id="fCapacidadMaximaVip" placeholder="Ej. 50" min="1">
+      <div class="whatsapp-nota">
+        En un salón VIP no se divide en mesas fijas — se define cuántas personas caben en total,
+        y al hacer la reserva simplemente se indica cuántas personas van a asistir.
       </div>
     </div>
 
@@ -736,13 +745,13 @@ const SALONES_SEED = [
     {id:'M24',cap:6},{id:'M27',cap:6}
   ]},
   {id:'vipgrande', nombre:'VIP Grande', vip:true, mesas:[
-    {id:'VG-A',cap:12},{id:'VG-B',cap:12},{id:'VG-C',cap:14},{id:'VG-D',cap:14}
+    {id:'VIP-GRANDE-VIP',cap:52}
   ]},
   {id:'vipazul', nombre:'VIP Azul', vip:true, mesas:[
-    {id:'VA-A',cap:10},{id:'VA-B',cap:10},{id:'VA-C',cap:10},{id:'VA-D',cap:10}
+    {id:'VIP-AZUL-VIP',cap:40}
   ]},
   {id:'vippeq', nombre:'VIP Pequeña', vip:true, mesas:[
-    {id:'VP-A',cap:6},{id:'VP-B',cap:6},{id:'VP-C',cap:6},{id:'VP-D',cap:6}
+    {id:'VIP-PEQUEÑA-VIP',cap:24}
   ]},
 ];
 
@@ -1504,12 +1513,17 @@ function abrirModalSalon(salonId){
     document.getElementById('fSalonNombre').value = s.nombre;
     salonVipTemp = s.vip;
     mesasTemp = s.mesas.map(m=>({...m}));
+    // Si el salón VIP venía con varias mesas (formato anterior), sugerimos
+    // como capacidad máxima la suma de todas — el dueño la puede ajustar.
+    const capacidadSugerida = mesasTemp.reduce((a,m)=>a+Number(m.cap||0), 0);
+    document.getElementById('fCapacidadMaximaVip').value = capacidadSugerida || '';
     btnEliminarSalon.style.display = 'block';
   } else {
     document.getElementById('salonModalTitle').textContent = 'Nuevo salón';
     document.getElementById('fSalonNombre').value = '';
     salonVipTemp = false;
     mesasTemp = [];
+    document.getElementById('fCapacidadMaximaVip').value = '';
     btnEliminarSalon.style.display = 'none';
   }
   document.getElementById('fNuevaMesaId').value = '';
@@ -1530,6 +1544,9 @@ function setSalonVip(esVip){
 function actualizarSalonVipUI(){
   document.getElementById('btnSalonVipSi').classList.toggle('on', salonVipTemp===true);
   document.getElementById('btnSalonVipNo').classList.toggle('on', salonVipTemp===false);
+  // Salón VIP = una sola capacidad máxima. Salón general = varias mesas con ID propio.
+  document.getElementById('bloqueMesasGenerales').style.display = salonVipTemp ? 'none' : 'block';
+  document.getElementById('bloqueCapacidadVip').style.display = salonVipTemp ? 'block' : 'none';
 }
 
 function renderMesasTemp(){
@@ -1563,10 +1580,24 @@ function quitarMesaTemporal(i){
   renderMesasTemp();
 }
 
+function generarIdMesaVip(nombre){
+  return nombre.trim().toUpperCase().replace(/\s+/g,'-').replace(/[^A-Z0-9\-]/g,'') + '-VIP';
+}
+
 function guardarSalon(){
   const nombre = document.getElementById('fSalonNombre').value.trim();
   if(!nombre){ alert('Ponle un nombre al salón.'); return; }
-  const data = { nombre, vip: salonVipTemp, mesas: mesasTemp };
+
+  let mesasFinal;
+  if(salonVipTemp){
+    const capMax = Number(document.getElementById('fCapacidadMaximaVip').value);
+    if(!capMax || capMax < 1){ alert('Ingresa la capacidad máxima del salón VIP.'); return; }
+    mesasFinal = [{ id: generarIdMesaVip(nombre), cap: capMax }];
+  } else {
+    mesasFinal = mesasTemp;
+  }
+
+  const data = { nombre, vip: salonVipTemp, mesas: mesasFinal };
 
   const promesa = editandoSalonId
     ? salonesRef.doc(editandoSalonId).update(data)
