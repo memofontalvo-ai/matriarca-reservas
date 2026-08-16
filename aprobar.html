@@ -54,12 +54,18 @@ body{
 .estado .icon{font-size:52px; margin-bottom:16px;}
 .estado h2{font-family:'Fraunces',serif; font-size:21px; color:var(--gold-bright); margin-bottom:10px;}
 .estado p{color:var(--text-muted); font-size:14px; line-height:1.6;}
+.logo-header{display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom:20px;}
+.logo-header-img{height:44px; width:auto; display:block;}
+.logo-header-sub{font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);}
 </style>
 </head>
 <body>
 
 <div class="wrap">
-  <div class="brand">La Matriarca</div>
+  <div class="logo-header">
+    <img src="logo.png" alt="La Matriarca Barranquilla" class="logo-header-img">
+    <div class="logo-header-sub">Software de Reservas</div>
+  </div>
   <div class="subtitle">Revisa y aprueba tu reserva</div>
 
   <div id="cargando" class="estado" style="display:block;">
