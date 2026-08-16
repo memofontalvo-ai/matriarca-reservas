@@ -57,13 +57,19 @@ body{
 .confirmacion .check{font-size:52px; margin-bottom:16px;}
 .confirmacion h2{font-family:'Fraunces',serif; font-size:22px; color:var(--gold-bright); margin-bottom:10px;}
 .confirmacion p{color:var(--text-muted); font-size:14px; line-height:1.6;}
+.logo-header{display:flex; flex-direction:column; align-items:center; gap:2px; margin-bottom:20px;}
+.logo-header-img{height:44px; width:auto; display:block;}
+.logo-header-sub{font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);}
 </style>
 </head>
 <body>
 
 <div class="wrap">
+  <div class="logo-header">
+    <img src="logo.png" alt="La Matriarca Barranquilla" class="logo-header-img">
+    <div class="logo-header-sub">Software de Reservas</div>
+  </div>
   <div id="formulario">
-    <div class="brand">La Matriarca</div>
     <div class="subtitle">Cuéntanos los detalles de tu reserva</div>
 
     <div class="field">
@@ -181,6 +187,7 @@ body{
       fecha, turno: turnoSel, hora, nombre, celular, pax,
       mesa: '', abono: 0, menu: '', obs: obsFinal,
       vipSolicitada: (vipSel === 'si'),
+      pasoPorSolicitud: true,
       estado: 'solicitud', canal: 'WhatsApp (autogestión)'
     }).then(() => {
       document.getElementById('formulario').style.display = 'none';
