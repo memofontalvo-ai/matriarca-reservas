@@ -393,6 +393,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 }
 .cal-day-marcas{display:flex; gap:2px; height:6px; align-items:center; justify-content:center;}
 .cal-dot-marca{width:5px; height:5px; border-radius:50%; background:var(--confirmed);}
+.cal-dot-marca.pendiente{background:#e8a33d;}
 .cal-star-marca{font-size:9px; line-height:1;}
 .cal-inline-leyenda{
   display:flex; justify-content:center; gap:16px; margin-top:10px;
@@ -405,6 +406,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
   font-size:11.5px; line-height:1.5; text-align:center;
 }
 .cal-dot-leyenda{width:6px; height:6px; border-radius:50%; background:var(--confirmed); display:inline-block;}
+.cal-dot-leyenda.cal-dot-pendiente{background:#e8a33d;}
 .cal-star-leyenda{font-size:11px;}
 .cal-jump{display:flex; gap:8px; margin-top:14px;}
 .cal-jump select{
@@ -602,9 +604,27 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
   <div id="pantallaSolicitudes">
     <div class="date-nav date-nav-solicitudes">
       <button onclick="cambiarDiaSolicitudes(-1)">‹</button>
-      <div class="date-label" id="dateLabelSolicitudes" onclick="abrirCalendario('solicitudes')"></div>
+      <div class="date-label" id="dateLabelSolicitudes" onclick="toggleCalendarioSolicitudes()"></div>
       <button onclick="cambiarDiaSolicitudes(1)">›</button>
     </div>
+
+    <div class="calendario-inline-wrap" id="calendarioSolInlineWrap">
+      <div class="cal-head">
+        <button class="cal-nav-btn" onclick="cambiarMesSolInline(-1)">‹</button>
+        <div class="cal-title" id="calSolInlineTitle"></div>
+        <button class="cal-nav-btn" onclick="cambiarMesSolInline(1)">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span>
+      </div>
+      <div class="cal-days cal-days-inline" id="calSolInlineDays"></div>
+      <div class="cal-inline-leyenda">
+        <span><span class="cal-dot-leyenda cal-dot-pendiente"></span> Solicitudes sin gestionar</span>
+        <span><span class="cal-dot-leyenda"></span> Solicitudes ya gestionadas</span>
+      </div>
+      <div class="cal-aviso-navegando" id="calSolAvisoNavegando" style="display:none;"></div>
+    </div>
+
     <div class="filtro-especiales-row">
       <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()">⭐ Reservas especiales (30+ personas)</button>
     </div>
@@ -671,7 +691,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.10</div>
+  <div class="version-tag">v3.11</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1384,6 +1404,99 @@ let calAno = fechaActual.getFullYear();
 let calTarget = 'porDia'; // 'porDia' o 'solicitudes' — a cuál pantalla afecta el calendario
 let fechaSolicitudes = new Date(); // fecha que se está revisando en la pantalla de Solicitudes
 
+/* ============ CALENDARIO EMBEBIDO EN "SOLICITUDES" ============ */
+// Mismo patrón que el calendario de "Por día", pero en vez de marcar días
+// con reservas, marca días con solicitudes SIN GESTIONAR (punto naranja) o
+// ya gestionadas (punto verde). Así el equipo ve de un vistazo si quedó
+// algo pendiente en días anteriores sin tener que ir fecha por fecha.
+let calSolInlineMes = fechaSolicitudes.getMonth();
+let calSolInlineAno = fechaSolicitudes.getFullYear();
+let calendarioSolInlineAbierto = true;
+
+function toggleCalendarioSolicitudes(){
+  calendarioSolInlineAbierto = !calendarioSolInlineAbierto;
+  document.getElementById('calendarioSolInlineWrap').style.display = calendarioSolInlineAbierto ? 'block' : 'none';
+  if(calendarioSolInlineAbierto){
+    calSolInlineMes = fechaSolicitudes.getMonth();
+    calSolInlineAno = fechaSolicitudes.getFullYear();
+    renderCalendarioSolInline();
+  }
+}
+
+function cambiarMesSolInline(delta){
+  calSolInlineMes += delta;
+  if(calSolInlineMes<0){calSolInlineMes=11; calSolInlineAno--;}
+  if(calSolInlineMes>11){calSolInlineMes=0; calSolInlineAno++;}
+  renderCalendarioSolInline();
+}
+
+function renderCalendarioSolInline(){
+  const wrap = document.getElementById('calendarioSolInlineWrap');
+  if(!wrap || wrap.style.display === 'none') return;
+
+  document.getElementById('calSolInlineTitle').textContent = `${MESES[calSolInlineMes]} ${calSolInlineAno}`;
+
+  const primerDia = new Date(calSolInlineAno, calSolInlineMes, 1);
+  const offset = primerDia.getDay();
+  const diasEnMes = new Date(calSolInlineAno, calSolInlineMes+1, 0).getDate();
+  const hoyISO = fechaISO(new Date());
+  const selISO = fechaISO(fechaSolicitudes);
+
+  // Todo lo que alguna vez pasó por el flujo de solicitud/aprobación,
+  // filtrado al mes que se está mirando.
+  const solicitudesDelMes = reservas.filter(r => {
+    const pasoPorFlujo = r.pasoPorSolicitud === true || r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.aprobadaPorCliente !== undefined;
+    if(!pasoPorFlujo) return false;
+    const [y,m] = r.fecha.split('-').map(Number);
+    return y===calSolInlineAno && m===(calSolInlineMes+1);
+  });
+  const diasPendientes = new Set(
+    solicitudesDelMes.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion').map(r=>r.fecha)
+  );
+  const diasGestionados = new Set(
+    solicitudesDelMes.filter(r=>r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion').map(r=>r.fecha)
+  );
+
+  let html = '';
+  const diasMesAnterior = new Date(calSolInlineAno, calSolInlineMes, 0).getDate();
+  for(let i=offset-1; i>=0; i--){
+    html += `<div class="cal-day muted">${diasMesAnterior-i}</div>`;
+  }
+  for(let d=1; d<=diasEnMes; d++){
+    const fecha = new Date(calSolInlineAno, calSolInlineMes, d, 12);
+    const iso = fechaISO(fecha);
+    let cls = 'cal-day';
+    if(iso===hoyISO) cls += ' today';
+    if(iso===selISO) cls += ' selected';
+    // Pendiente tiene prioridad visual: si un día tiene solicitudes sin
+    // gestionar Y gestionadas, se marca en naranja para que no pase inadvertido.
+    const marca = diasPendientes.has(iso)
+      ? `<span class="cal-dot-marca pendiente"></span>`
+      : (diasGestionados.has(iso) ? `<span class="cal-dot-marca"></span>` : '<span></span>');
+    html += `<div class="${cls}" onclick="seleccionarDiaSolInline(${d})">${d}<div class="cal-day-marcas">${marca}</div></div>`;
+  }
+  const totalCeldas = offset + diasEnMes;
+  const restante = (7 - (totalCeldas % 7)) % 7;
+  for(let d=1; d<=restante; d++){
+    html += `<div class="cal-day muted">${d}</div>`;
+  }
+  document.getElementById('calSolInlineDays').innerHTML = html;
+
+  const avisoEl = document.getElementById('calSolAvisoNavegando');
+  const explorandoOtroMes = (calSolInlineMes !== fechaSolicitudes.getMonth() || calSolInlineAno !== fechaSolicitudes.getFullYear());
+  if(explorandoOtroMes){
+    avisoEl.style.display = 'block';
+    avisoEl.textContent = `👀 Estás explorando ${MESES[calSolInlineMes]} — la información de abajo sigue siendo la de ${formatearFechaCorta(fechaISO(fechaSolicitudes))}. Toca un día marcado para cambiarla.`;
+  } else {
+    avisoEl.style.display = 'none';
+  }
+}
+
+function seleccionarDiaSolInline(d){
+  fechaSolicitudes = new Date(calSolInlineAno, calSolInlineMes, d, 12);
+  renderSolicitudesScreen();
+}
+
 function abrirCalendario(target){
   calTarget = target || 'porDia';
   const base = calTarget === 'solicitudes' ? fechaSolicitudes : fechaActual;
@@ -1486,6 +1599,10 @@ function irHoy(){
 }
 function cambiarDiaSolicitudes(delta){
   fechaSolicitudes.setDate(fechaSolicitudes.getDate()+delta);
+  // Igual que en "Por día": si el usuario mueve la fecha con las flechitas,
+  // el calendario embebido salta a mostrar ese mes.
+  calSolInlineMes = fechaSolicitudes.getMonth();
+  calSolInlineAno = fechaSolicitudes.getFullYear();
   renderSolicitudesScreen();
 }
 document.getElementById('calOverlay').addEventListener('click', e=>{
@@ -1568,6 +1685,7 @@ function renderSolicitudesScreen(){
   const el = document.getElementById('panelSolicitudes');
   if(delDia.length === 0){
     el.innerHTML = `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (30+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+    renderCalendarioSolInline();
     return;
   }
 
@@ -1647,11 +1765,18 @@ function renderSolicitudesScreen(){
   `;
 
   el.innerHTML = cardsHtml + resumenHtml;
+
+  // Mantenemos el calendario embebido de arriba sincronizado con los datos
+  // (mismo cuidado que en "Por día": no reseteamos el mes que se está
+  // explorando, solo refrescamos los puntos de colores).
+  renderCalendarioSolInline();
 }
 
 function irAFechaAtrasada(fechaIso){
   const [y,m,d] = fechaIso.split('-').map(Number);
   fechaSolicitudes = new Date(y, m-1, d, 12);
+  calSolInlineMes = fechaSolicitudes.getMonth();
+  calSolInlineAno = fechaSolicitudes.getFullYear();
   renderSolicitudesScreen();
 }
 
@@ -2046,6 +2171,7 @@ renderHeader(); // pinta el encabezado de inmediato; el resto llega con Firestor
 renderSolicitudesScreen(); // pinta la fecha/label de inmediato; las tarjetas llegan con Firestore
 renderSalonesScreen();
 renderCalendarioInline(); // calendario del mes en curso, visible por defecto en "Por día"
+renderCalendarioSolInline(); // calendario del mes en curso, visible por defecto en "Solicitudes"
 cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en curso
 </script>
 </body>
