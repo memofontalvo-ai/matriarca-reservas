@@ -524,15 +524,23 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
   .subbar{padding:8px 14px;}
   .stats{display:none;}
   main{flex-direction:column;}
-  .panel-lista{width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:none; flex:1; min-height:0;}
-  .panel-plano{flex:1; min-height:0;}
-  .panel-resumen{flex:1; min-height:0;}
+  .panel-lista{width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:none; min-height:0;}
+  .panel-plano{min-height:0;}
+  .panel-resumen{min-height:0;}
   .panel-lista, .panel-plano, .panel-resumen{display:none;}
   .panel-lista.mobile-active, .panel-plano.mobile-active, .panel-resumen.mobile-active{display:block;}
   .tabs{display:none;}
+  /* El calendario mensual embebido puede ocupar más alto que lo que queda
+     de pantalla, sobre todo en celulares. Antes 'main' tenía que repartirse
+     el espacio sobrante con flex y quedaba en 0px, escondiendo las reservas
+     por completo. Ahora #pantallaPorDia hace scroll como una página normal:
+     el calendario, la lista y todo lo demás simplemente se acomodan uno
+     debajo del otro y siempre son visibles bajando el dedo. */
+  #pantallaPorDia{overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  main{flex:none; display:block; overflow:visible; min-height:120px;}
   .bottom-nav{
     display:flex; border-top:1px solid var(--border); background:var(--panel);
-    flex-shrink:0;
+    flex-shrink:0; position:sticky; bottom:0; z-index:50;
   }
   .bottom-nav button{
     flex:1; padding:10px 4px 12px; background:transparent; color:var(--text-dim);
@@ -663,7 +671,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.9</div>
+  <div class="version-tag">v3.10</div>
 </div>
 
 <div class="overlay" id="overlay">
