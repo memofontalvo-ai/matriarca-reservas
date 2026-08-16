@@ -203,6 +203,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .badge.cancelada{background:var(--cancelled-bg); color:var(--cancelled);}
 .badge.solicitud{background:rgba(180,120,255,0.16); color:#c79bff;}
 .badge.pendiente_aprobacion{background:rgba(232,163,61,0.16); color:#e8a33d;}
+.badge.turno-badge{background:var(--panel-raised); color:var(--text-dim); border:1px solid var(--border);}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
   padding:2px 7px; border-radius:999px;
@@ -702,7 +703,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.12</div>
+  <div class="version-tag">v3.13</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1018,7 +1019,7 @@ reservasRef.get().then(snap => {
 
 /* ============ STATE ============ */
 let fechaActual = new Date('2026-08-14T12:00:00');
-let turnoActivo = 'cena';
+let turnoActivo = 'todos';
 let vistaActual = 'lista';
 let editandoId = null;
 let mesaPreseleccionada = null;
@@ -1040,9 +1041,10 @@ function renderHeader(){
     `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${HORARIOS[grupoDeFecha(d)].label}</span>`;
 
   const grupo = HORARIOS[grupoDeFecha(d)];
-  const turnos = [['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
+  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
   document.getElementById('turnosBar').innerHTML = turnos.map(([key,label])=>{
-    const cfg = grupo[key];
+    // "Todos" siempre está disponible; los demás dependen del horario del día.
+    const cfg = key==='todos' ? {activo:true} : grupo[key];
     const off = !cfg.activo;
     const active = turnoActivo===key && !off;
     return `<button class="turno-pill ${off?'off':''} ${active?'active':''}" ${off?'disabled':`onclick="setTurno('${key}')"`}>
@@ -1060,7 +1062,8 @@ function reservasDelTurno(){
   // La vista "por día" solo muestra reservas ya resueltas: no incluye las que
   // siguen en el flujo de solicitud/aprobación del cliente (esas viven en
   // la pantalla "Solicitudes" hasta que el cliente las apruebe).
-  let rs = reservas.filter(r=>r.fecha===iso && r.turno===turnoActivo && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  if(turnoActivo !== 'todos') rs = rs.filter(r=>r.turno===turnoActivo);
   if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=30);
   return rs;
 }
@@ -1155,7 +1158,7 @@ function renderCalendarioInline(){
 function seleccionarDiaInline(d){
   fechaActual = new Date(calInlineAno, calInlineMes, d, 12);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(!grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   renderAll();
@@ -1168,7 +1171,16 @@ function toggleFiltroEspecialesSolicitudes(){
 }
 
 function renderStats(){
-  const grupo = HORARIOS[grupoDeFecha(fechaActual)][turnoActivo];
+  const grupoDia = HORARIOS[grupoDeFecha(fechaActual)];
+  // "Todos" combina la capacidad y el horario de los 3 turnos activos ese
+  // día, en vez de usar un solo turno (que no existe como entrada aparte).
+  const grupo = turnoActivo === 'todos'
+    ? {
+        cap: ['desayuno','almuerzo','cena'].reduce((a,t)=>a+(grupoDia[t].activo?grupoDia[t].cap:0),0),
+        inicio: 'Todo el',
+        fin: 'día'
+      }
+    : grupoDia[turnoActivo];
   const rs = reservasDelTurno().filter(r=>r.estado!=='cancelada');
   const pax = rs.reduce((a,r)=>a+Number(r.pax||0),0);
   const mesasOcupadas = new Set(rs.map(r=>r.mesa).filter(Boolean)).size;
@@ -1190,8 +1202,10 @@ function renderLista(){
   if(rs.length===0){
     // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
     // lo decimos explícitamente para no confundir con "no hay nada este día".
+    // Esto solo aplica si estás viendo un turno específico — en "Todos" ya
+    // se están mirando los 3 turnos, así que si está vacío es que no hay nada.
     const iso = fechaISO(fechaActual);
-    const otrosTurnos = ['desayuno','almuerzo','cena']
+    const otrosTurnos = turnoActivo === 'todos' ? [] : ['desayuno','almuerzo','cena']
       .filter(t => t !== turnoActivo)
       .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
     if(otrosTurnos.length){
@@ -1205,6 +1219,7 @@ function renderLista(){
   const cardsHtml = rs.map(r=>{
     const mesaTxt = r.mesa ? mesaLabel(r.mesa) : '—';
     const isVip = mesaEsVip(r.mesa);
+    const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
     return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
         <div>
@@ -1212,6 +1227,7 @@ function renderLista(){
           <div class="res-nombre">${escapeHtml(r.nombre)}</div>
         </div>
         <div class="res-top-right">
+          ${turnoActivo==='todos'?`<span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}
           <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
           <span class="edit-hint">✎ Editar / Eliminar</span>
         </div>
@@ -1399,7 +1415,7 @@ function setTurno(t){ turnoActivo = t; renderAll(); }
 function cambiarDia(delta){
   fechaActual.setDate(fechaActual.getDate()+delta);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(!grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   // Aquí sí sincronizamos el calendario, porque el usuario acaba de elegir
@@ -1587,7 +1603,7 @@ function seleccionarDiaCal(d){
   }
   fechaActual = nuevaFecha;
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(!grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   cerrarCalendario();
