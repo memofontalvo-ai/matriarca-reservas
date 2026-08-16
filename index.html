@@ -123,6 +123,18 @@ header{
   display:flex; align-items:center; gap:6px; white-space:nowrap;
 }
 .clear-btn:hover{background:var(--cancelled-bg);}
+.especial-btn{
+  background:transparent; color:var(--gold-bright); font-weight:600; font-size:12px;
+  padding:9px 13px; border-radius:8px; border:1px solid var(--gold);
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.especial-btn:hover{background:rgba(201,161,90,0.12);}
+.especial-btn.activo{background:var(--gold); color:#1a1408;}
+.filtro-especiales-row{
+  display:flex; justify-content:center; padding:10px 16px 0;
+  background:var(--panel); flex-shrink:0;
+}
+.filtro-especiales-row .especial-btn{width:100%; justify-content:center; padding:11px;}
 
 /* ===== TABS + STATS BAR ===== */
 .subbar{
@@ -188,6 +200,10 @@ main{flex:1; display:flex; overflow:hidden;}
 .badge.pendiente_aprobacion{background:rgba(232,163,61,0.16); color:#e8a33d;}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
+  padding:2px 7px; border-radius:999px;
+}
+.especial-tag{
+  font-size:10px; font-weight:700; color:#1a1408; background:var(--gold);
   padding:2px 7px; border-radius:999px;
 }
 .empty-state{color:var(--text-dim); font-size:12.5px; text-align:center; padding:40px 10px;}
@@ -474,6 +490,8 @@ main{flex:1; display:flex; overflow:hidden;}
   .new-btn span{display:none;}
   .clear-btn span{display:none;}
   .clear-btn{padding:9px 10px;}
+  .especial-btn span{display:none;}
+  .especial-btn{padding:9px 10px;}
   .subbar{padding:8px 14px;}
   .stats{display:none;}
   main{flex-direction:column;}
@@ -548,6 +566,9 @@ main{flex:1; display:flex; overflow:hidden;}
       <div class="date-label" id="dateLabelSolicitudes" onclick="abrirCalendario('solicitudes')"></div>
       <button onclick="cambiarDiaSolicitudes(1)">›</button>
     </div>
+    <div class="filtro-especiales-row">
+      <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()">⭐ Reservas especiales (30+ personas)</button>
+    </div>
     <div id="alertaAtrasadas"></div>
     <div class="solicitudes-panel" id="panelSolicitudes"></div>
   </div>
@@ -561,6 +582,7 @@ main{flex:1; display:flex; overflow:hidden;}
       </div>
       <div class="turnos" id="turnosBar"></div>
       <button class="new-btn" onclick="abrirModal()">+ <span>Nueva reserva</span></button>
+      <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()">⭐ <span>Especiales (30+)</span></button>
       <button class="clear-btn" onclick="confirmarVaciarTurno()" title="Eliminar todas las reservas de este turno">🗑 <span>Vaciar turno</span></button>
     </header>
 
@@ -593,7 +615,7 @@ main{flex:1; display:flex; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.4</div>
+  <div class="version-tag">v3.5</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -921,12 +943,29 @@ function renderHeader(){
 }
 
 /* ============ RENDER: STATS ============ */
+let filtroEspecialesPorDia = false;
+let filtroEspecialesSolicitudes = false;
+
 function reservasDelTurno(){
   const iso = fechaISO(fechaActual);
   // La vista "por día" solo muestra reservas ya resueltas: no incluye las que
   // siguen en el flujo de solicitud/aprobación del cliente (esas viven en
   // la pantalla "Solicitudes" hasta que el cliente las apruebe).
-  return reservas.filter(r=>r.fecha===iso && r.turno===turnoActivo && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  let rs = reservas.filter(r=>r.fecha===iso && r.turno===turnoActivo && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=30);
+  return rs;
+}
+
+function toggleFiltroEspecialesDia(){
+  filtroEspecialesPorDia = !filtroEspecialesPorDia;
+  document.getElementById('btnFiltroEspecialesDia').classList.toggle('activo', filtroEspecialesPorDia);
+  renderAll();
+}
+
+function toggleFiltroEspecialesSolicitudes(){
+  filtroEspecialesSolicitudes = !filtroEspecialesSolicitudes;
+  document.getElementById('btnFiltroEspecialesSol').classList.toggle('activo', filtroEspecialesSolicitudes);
+  renderSolicitudesScreen();
 }
 
 function renderStats(){
@@ -969,6 +1008,7 @@ function renderLista(){
       </div>
       <div class="res-meta">
         <span>${r.pax} pax</span>
+        ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
         <span>Mesa ${mesaTxt}</span>
         ${isVip?`<span class="vip-tag">VIP</span>`:''}
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
@@ -1331,11 +1371,12 @@ function renderSolicitudesScreen(){
   }
 
   // Solo lo del día que se está viendo en esta pantalla
-  const delDia = todas.filter(r=>r.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  let delDia = todas.filter(r=>r.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=30);
 
   const el = document.getElementById('panelSolicitudes');
   if(delDia.length === 0){
-    el.innerHTML = `<div class="solicitudes-empty">✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.</div>`;
+    el.innerHTML = `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (30+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
     return;
   }
 
@@ -1360,6 +1401,7 @@ function renderSolicitudesScreen(){
       </div>
       <div class="sc-meta">
         <span>${r.pax} pax</span>
+        ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
         ${r.celular?`<span>${r.celular}</span>`:''}
         ${r.mesa?`<span>Mesa ${mesaLabel(r.mesa)}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
