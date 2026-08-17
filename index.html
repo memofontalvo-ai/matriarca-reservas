@@ -752,7 +752,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.18</div>
+  <div class="version-tag">v3.19</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1522,7 +1522,6 @@ function renderResumen(){
 
   const rsHoy = reservas.filter(r=>r.fecha===iso && r.estado!=='cancelada');
   const vipCount = rsHoy.filter(r=>mesaEsVip(r.mesa)).length;
-  const walkins = rsHoy.filter(r=>r.estado==='walkin').length;
   const pendientes = rsHoy.filter(r=>r.estado==='pendiente').length;
   const pctDia = totalCapDia? Math.round(totalPaxDia/totalCapDia*100):0;
 
@@ -1531,7 +1530,6 @@ function renderResumen(){
       <div class="kpi"><div class="label">Ocupación del día</div><div class="value">${pctDia}%</div><div class="sub">${totalPaxDia} de ${totalCapDia} pax</div></div>
       <div class="kpi"><div class="label">Reservas activas</div><div class="value">${rsHoy.length}</div><div class="sub">${pendientes} pendientes</div></div>
       <div class="kpi"><div class="label">Mesas VIP ocupadas</div><div class="value">${vipCount}</div><div class="sub">de 12 mesas VIP</div></div>
-      <div class="kpi"><div class="label">Walk-ins</div><div class="value">${walkins}</div><div class="sub">sin reserva previa</div></div>
     </div>
     <div class="section-title">Ocupación por turno</div>
     ${barsHtml}
