@@ -136,6 +136,20 @@ header{
 }
 .filtro-especiales-row .especial-btn{width:100%; justify-content:center; padding:11px;}
 
+/* ===== RESUMEN DE SOLICITUDES DEL DÍA (arriba de la lista) ===== */
+.resumen-sol-dia{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+  padding:12px 16px 0; background:var(--panel);
+}
+.resumen-sol-card{
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:10px;
+  padding:10px 6px; text-align:center;
+}
+.resumen-sol-card.total{background:rgba(230,180,90,0.14); border-color:var(--gold);}
+.resumen-sol-num{font-size:20px; font-weight:800; color:var(--text);}
+.resumen-sol-card.total .resumen-sol-num{color:var(--gold-bright);}
+.resumen-sol-label{font-size:10px; color:var(--text-dim); text-transform:uppercase; font-weight:700; margin-top:2px;}
+
 /* ===== TABS + STATS BAR ===== */
 .subbar{
   background:var(--panel); border-bottom:1px solid var(--border);
@@ -738,6 +752,8 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
       <div class="cal-aviso-navegando" id="calSolAvisoNavegando" style="display:none;"></div>
     </div>
 
+    <div class="resumen-sol-dia" id="resumenSolicitudesDia" style="display:none;"></div>
+
     <div class="filtro-especiales-row">
       <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()">⭐ Reservas especiales (30+ personas)</button>
     </div>
@@ -835,7 +851,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.24</div>
+  <div class="version-tag">v3.25</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1799,18 +1815,21 @@ function renderCalendarioSolInline(){
   const selISO = fechaISO(fechaSolicitudes);
 
   // Todo lo que alguna vez pasó por el flujo de solicitud/aprobación,
-  // filtrado al mes que se está mirando.
+  // agrupado por la fecha en que LLEGÓ la solicitud (no la fecha de la
+  // reserva que pidió), filtrado al mes que se está mirando.
   const solicitudesDelMes = reservas.filter(r => {
     const pasoPorFlujo = r.pasoPorSolicitud === true || r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.aprobadaPorCliente !== undefined;
     if(!pasoPorFlujo) return false;
-    const [y,m] = r.fecha.split('-').map(Number);
+    const fSol = fechaSolicitudEfectiva(r);
+    if(!fSol) return false;
+    const [y,m] = fSol.split('-').map(Number);
     return y===calSolInlineAno && m===(calSolInlineMes+1);
   });
   const diasPendientes = new Set(
-    solicitudesDelMes.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion').map(r=>r.fecha)
+    solicitudesDelMes.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion').map(fechaSolicitudEfectiva)
   );
   const diasGestionados = new Set(
-    solicitudesDelMes.filter(r=>r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion').map(r=>r.fecha)
+    solicitudesDelMes.filter(r=>r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion').map(fechaSolicitudEfectiva)
   );
 
   let html = '';
@@ -2004,6 +2023,18 @@ function formatearFechaCorta(iso){
   return `${DIAS[fecha.getDay()]} ${d} de ${MESES[m-1]}`;
 }
 
+function fechaSolicitudEfectiva(r){
+  // La fecha que manda para AGRUPAR una solicitud en esta pantalla es la
+  // fecha en que LLEGÓ la solicitud (cuando el cliente la envió, o cuando
+  // el staff la mandó a aprobar) — NO la fecha de la reserva que pidió.
+  // Si alguien pide hoy una mesa para el sábado, esa tarjeta debe aparecer
+  // en el día de HOY en esta pantalla; el sábado es donde vivirá la
+  // reserva ya aprobada, dentro de "Por día".
+  // Para registros viejos que no tengan este campo, usamos la fecha de la
+  // reserva como respaldo (mejor eso que perder el registro).
+  return r.fechaSolicitud || r.fecha;
+}
+
 function renderSolicitudesScreen(){
   // Historial completo: todo lo que alguna vez pasó por el flujo de
   // solicitud/aprobación del cliente, sin importar en qué quedó ni la fecha.
@@ -2025,11 +2056,11 @@ function renderSolicitudesScreen(){
     `${DIAS[fechaSolicitudes.getDay()]} ${fechaSolicitudes.getDate()} de ${MESES[fechaSolicitudes.getMonth()]}` +
     (iso===hoyISO ? `<span class="grupo">Hoy</span>` : '');
 
-  // Aviso de atrasadas: activas de fechas ANTERIORES a hoy, sin importar qué día se esté viendo ahora
-  const atrasadas = activas.filter(r=>r.fecha < hoyISO);
+  // Aviso de atrasadas: activas cuya SOLICITUD llegó antes de hoy y sigue sin gestionar/aprobar
+  const atrasadas = activas.filter(r=>fechaSolicitudEfectiva(r) < hoyISO);
   const alertaEl = document.getElementById('alertaAtrasadas');
   if(atrasadas.length > 0){
-    const fechaMasAntigua = atrasadas.map(r=>r.fecha).sort()[0];
+    const fechaMasAntigua = atrasadas.map(r=>fechaSolicitudEfectiva(r)).sort()[0];
     alertaEl.innerHTML = `<div class="alerta-atrasadas" onclick="irAFechaAtrasada('${fechaMasAntigua}')">
       ⚠ Tienes <b>${atrasadas.length}</b> solicitud${atrasadas.length===1?'':'es'} atrasada${atrasadas.length===1?'':'s'} de días anteriores sin gestionar o sin aprobar — toca para revisar la más antigua
     </div>`;
@@ -2037,8 +2068,27 @@ function renderSolicitudesScreen(){
     alertaEl.innerHTML = '';
   }
 
+  // Todo lo que LLEGÓ ese día (sin el filtro de especiales todavía —
+  // el resumen de arriba cuenta el total real del día, no lo filtrado)
+  const delDiaTotal = todas.filter(r=>fechaSolicitudEfectiva(r)===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud').length;
+  const aprobadasHoy = delDiaTotal.filter(r=>r.aprobadaPorCliente===true).length;
+  const resumenEl = document.getElementById('resumenSolicitudesDia');
+  if(resumenEl){
+    if(delDiaTotal.length === 0){
+      resumenEl.style.display = 'none';
+    } else {
+      resumenEl.style.display = 'grid';
+      resumenEl.innerHTML = `
+        <div class="resumen-sol-card"><div class="resumen-sol-num">${delDiaTotal.length}</div><div class="resumen-sol-label">Recibidas</div></div>
+        <div class="resumen-sol-card"><div class="resumen-sol-num">${respondidas}</div><div class="resumen-sol-label">Respondidas</div></div>
+        <div class="resumen-sol-card total"><div class="resumen-sol-num">${aprobadasHoy}</div><div class="resumen-sol-label">Aprobadas</div></div>
+      `;
+    }
+  }
+
   // Solo lo del día que se está viendo en esta pantalla
-  let delDia = todas.filter(r=>r.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  let delDia = delDiaTotal;
   if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=30);
 
   const el = document.getElementById('panelSolicitudes');
@@ -2482,6 +2532,17 @@ function enviarParaAprobacion(){
     aprobadaPorCliente: false,
     pasoPorSolicitud: true,
   };
+
+  // La fecha de "solicitud" (cuándo entró al flujo de aprobación) no se
+  // debe pisar si esta reserva ya tenía una — por ejemplo si originalmente
+  // llegó por WhatsApp (solicitud.html) y el staff apenas la está enviando
+  // a aprobación ahora. Solo se asigna hoy si es la primera vez que entra
+  // a este flujo.
+  const reservaExistente = editandoId ? reservas.find(r => r.id === editandoId) : null;
+  if(!reservaExistente || !reservaExistente.fechaSolicitud){
+    const hoy = new Date();
+    data.fechaSolicitud = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+  }
 
   const promesa = editandoId
     ? reservasRef.doc(editandoId).update(data).then(()=>editandoId)
