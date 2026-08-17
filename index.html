@@ -887,7 +887,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.35</div>
+  <div class="version-tag">v3.36</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1346,6 +1346,25 @@ function grupoDeFecha(d){
   if(dia===0) return 'domingo';
   if(dia===5||dia===6) return 'viesab';
   return 'lunjue';
+}
+
+function turnoRealDeAhora(){
+  // "Todos" es un filtro de visualización, no un turno real de servicio —
+  // nunca se puede guardar como el turno de una reserva. Si ese es el
+  // filtro activo al crear una reserva nueva, calculamos cuál turno
+  // corresponde según la hora actual (o el primero activo del día si no
+  // cae en ningún rango horario), en vez de guardar "todos" literalmente.
+  const ahora = new Date();
+  const grupo = HORARIOS[grupoDeFecha(ahora)];
+  const horaActual = ahora.getHours()*60 + ahora.getMinutes();
+  for(const t of ['desayuno','almuerzo','cena']){
+    const cfg = grupo[t];
+    if(!cfg.activo) continue;
+    const [hI,mI] = cfg.inicio.split(':').map(Number);
+    const [hF,mF] = cfg.fin.split(':').map(Number);
+    if(horaActual >= hI*60+mI && horaActual <= hF*60+mF) return t;
+  }
+  return ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
 }
 
 let reservas = [];
@@ -2365,13 +2384,13 @@ function abrirModal(id, mesaId){
     // se mueve editándola (ver fechaReservaEditBlock arriba).
     const hoyDate = new Date();
     modalFecha = fechaISO(hoyDate);
-    modalTurno = turnoActivo;
+    modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     canalNuevoBlock.style.display = 'block';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'none';
     document.getElementById('modalTitle').textContent = 'Nueva reserva';
-    document.getElementById('modalSub').textContent = `${turnoActivo.charAt(0).toUpperCase()+turnoActivo.slice(1)} · ${modalFecha} (hoy)`;
+    document.getElementById('modalSub').textContent = `${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha} (hoy)`;
     document.getElementById('fHora').value = '';
     document.getElementById('fPax').value = '';
     document.getElementById('fNombre').value = '';
