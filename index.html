@@ -858,7 +858,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.30</div>
+  <div class="version-tag">v3.31</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -898,6 +898,17 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
 
     <div id="formCompletoBlock">
+    <div class="field" id="fechaReservaEditBlock" style="display:none;">
+      <label>Fecha y turno de la reserva <span class="fecha-solicitud-hint">(el día que el cliente va a venir — esto sí lo puedes mover)</span></label>
+      <div class="field-row">
+        <input type="date" id="fFechaReservaEdit" style="flex:1;">
+        <select id="fTurnoReservaEdit" style="flex:1;">
+          <option value="desayuno">Desayuno</option>
+          <option value="almuerzo">Almuerzo</option>
+          <option value="cena">Cena</option>
+        </select>
+      </div>
+    </div>
     <div class="field">
       <label>Estado</label>
       <div class="estado-select" id="estadoSelect">
@@ -1309,38 +1320,25 @@ function grupoDeFecha(d){
 }
 
 let reservas = [];
-const RESERVAS_SEED = [
-  {fecha:'2026-08-14', turno:'cena', hora:'19:00', mesa:'VG-A', nombre:'Bryan Pedroza', celular:'300 377 5490', pax:15, abono:1775500, menu:'Menú 1', obs:'', estado:'confirmada', canal:'WhatsApp'},
-  {fecha:'2026-08-14', turno:'cena', hora:'18:00', mesa:'G28', nombre:'Fernando Fiorillo', celular:'323 234 8173', pax:15, abono:0, menu:'', obs:'Sr. Sergio', estado:'confirmada', canal:'Teléfono'},
-  {fecha:'2026-08-14', turno:'cena', hora:'20:30', mesa:'G26', nombre:'Suramérica Comercial SAS - Dollarcity', celular:'311 220 2033', pax:20, abono:0, menu:'', obs:'Factura electrónica, ver mesa', estado:'pendiente', canal:'WhatsApp'},
-  {fecha:'2026-08-14', turno:'cena', hora:'19:30', mesa:'G33', nombre:'Edwin Ruiz Barrios', celular:'314 562 5280', pax:16, abono:200000, menu:'', obs:'Mesas frente a la tarima', estado:'confirmada', canal:'WhatsApp'},
-  {fecha:'2026-08-14', turno:'cena', hora:'20:00', mesa:'G42', nombre:'Fany Lincet', celular:'300 576 1258', pax:5, abono:0, menu:'', obs:'Ver mesa', estado:'pendiente', canal:'Teléfono'},
-  {fecha:'2026-08-14', turno:'almuerzo', hora:'13:30', mesa:'G8', nombre:'Leonard Tours', celular:'304 642 3185', pax:11, abono:1000000, menu:'', obs:'Menú / Sra. Tommy', estado:'confirmada', canal:'WhatsApp'},
-  {fecha:'2026-08-14', turno:'almuerzo', hora:'13:00', mesa:'G9', nombre:'Julissa Heredia Muriel', celular:'301 342 5101', pax:8, abono:0, menu:'', obs:'Sin abono', estado:'pendiente', canal:'Teléfono'},
-];
 
 // Conexión en tiempo real a Firestore: cualquier cambio (de este dispositivo
 // o de otro) se refleja automáticamente en la app.
 const reservasRef = db.collection('reservas');
 
-reservasRef.get().then(snap => {
-  if (snap.empty) {
-    // Primera vez: sembramos los datos de ejemplo en Firestore.
-    const batch = db.batch();
-    RESERVAS_SEED.forEach(r => batch.set(reservasRef.doc(), r));
-    return batch.commit();
-  }
-}).then(() => {
-  reservasRef.onSnapshot(snap => {
-    reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    actualizarEstadoConexion(true);
-    renderAll();
-  }, err => {
-    console.error('Error de conexión en reservas:', err);
-    actualizarEstadoConexion(false);
-  });
-}).catch(err => {
-  console.error('Error conectando con Firestore:', err);
+// NOTA IMPORTANTE: antes, si esta colección quedaba vacía (por ejemplo,
+// porque Guillermo borró varios días de reservas ya procesadas), la app
+// volvía a sembrar automáticamente 7 reservas de ejemplo/prueba que
+// quedaron aquí desde el desarrollo (Bryan Pedroza, Fernando Fiorillo,
+// etc.). Eso hacía parecer que reservas ya eliminadas "reaparecían" — en
+// realidad eran estos datos de prueba resucitando. Se quitó por completo:
+// cuando se borra algo, se borra, y la base de datos puede quedar vacía
+// sin que nada la vuelva a llenar sola.
+reservasRef.onSnapshot(snap => {
+  reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  actualizarEstadoConexion(true);
+  renderAll();
+}, err => {
+  console.error('Error de conexión en reservas:', err);
   actualizarEstadoConexion(false);
   document.getElementById('panelLista').innerHTML =
     '<div class="empty-state">No se pudo conectar con la base de datos.<br>Revisa tu conexión e intenta de nuevo.</div>';
@@ -2280,6 +2278,15 @@ function abrirModal(id, mesaId){
     document.getElementById('modalSub').textContent = r.turno
       ? `${r.turno.charAt(0).toUpperCase()+r.turno.slice(1)} · ${r.fecha}`
       : 'Esperando que el cliente llene el formulario';
+    // La fecha/turno REAL de la reserva (el día que el cliente viene) sí
+    // se puede mover — solo al editar, nunca al crearla de cero.
+    if(r.fecha){
+      document.getElementById('fechaReservaEditBlock').style.display = 'block';
+      document.getElementById('fFechaReservaEdit').value = r.fecha;
+      document.getElementById('fTurnoReservaEdit').value = r.turno || 'cena';
+    } else {
+      document.getElementById('fechaReservaEditBlock').style.display = 'none';
+    }
     document.getElementById('fHora').value = r.hora;
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
@@ -2319,13 +2326,20 @@ function abrirModal(id, mesaId){
       comprobanteBlock.innerHTML = '';
     }
   } else {
-    modalFecha = fechaISO(fechaActual);
+    // La fecha de una reserva NUEVA siempre arranca en HOY, sin importar
+    // qué día estés mirando en el calendario de "Por día" — ese calendario
+    // es solo para navegar reservas ya existentes, no debe influir en algo
+    // que se está creando de cero. Si luego resulta que es para otro día,
+    // se mueve editándola (ver fechaReservaEditBlock arriba).
+    const hoyDate = new Date();
+    modalFecha = fechaISO(hoyDate);
     modalTurno = turnoActivo;
+    document.getElementById('fechaReservaEditBlock').style.display = 'none';
     canalNuevoBlock.style.display = 'block';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'none';
     document.getElementById('modalTitle').textContent = 'Nueva reserva';
-    document.getElementById('modalSub').textContent = `${turnoActivo.charAt(0).toUpperCase()+turnoActivo.slice(1)} · ${fechaISO(fechaActual)}`;
+    document.getElementById('modalSub').textContent = `${turnoActivo.charAt(0).toUpperCase()+turnoActivo.slice(1)} · ${modalFecha} (hoy)`;
     document.getElementById('fHora').value = '';
     document.getElementById('fPax').value = '';
     document.getElementById('fNombre').value = '';
@@ -2576,9 +2590,19 @@ document.getElementById('overlaySalon').addEventListener('click', e=>{
 function guardarReserva(){
   const nombre = document.getElementById('fNombre').value.trim();
   if(!nombre){ alert('Ingresa el nombre del cliente.'); return; }
+  // Si el bloque de "Fecha y turno de la reserva" está visible (solo pasa
+  // al editar), usamos lo que el staff haya puesto ahí para mover la
+  // reserva de día. Si no, se usa modalFecha/modalTurno tal cual (fijo en
+  // hoy para una reserva nueva, sin que el staff pueda tocarlo ahí).
+  let fechaFinal = modalFecha, turnoFinal = modalTurno;
+  const fechaReservaEditBlock = document.getElementById('fechaReservaEditBlock');
+  if(fechaReservaEditBlock.style.display !== 'none'){
+    fechaFinal = document.getElementById('fFechaReservaEdit').value || modalFecha;
+    turnoFinal = document.getElementById('fTurnoReservaEdit').value || modalTurno;
+  }
   const data = {
-    fecha: modalFecha,
-    turno: modalTurno,
+    fecha: fechaFinal,
+    turno: turnoFinal,
     hora: document.getElementById('fHora').value || '00:00',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
