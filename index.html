@@ -187,6 +187,17 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
   font-size:10px; font-weight:700; color:#e8a33d; border:1px solid #e8a33d;
   padding:2px 7px; border-radius:999px;
 }
+.btn-ver-comprobante{
+  font-size:10px; font-weight:700; color:var(--confirmed); border:1px solid var(--confirmed);
+  background:transparent; padding:2px 8px; border-radius:999px; cursor:pointer;
+}
+.modal-comprobante{
+  background:rgba(71,184,129,0.08); border:1px solid var(--confirmed); border-radius:10px;
+  padding:12px 14px; margin-top:-6px; margin-bottom:16px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.modal-comprobante-txt{font-size:12.5px; color:var(--confirmed); font-weight:600;}
+.modal-comprobante .btn-ver-comprobante{padding:6px 12px; font-size:11.5px;}
 .res-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
 .res-top-right{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
@@ -752,7 +763,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.19</div>
+  <div class="version-tag">v3.21</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -838,6 +849,8 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
         </select>
       </div>
     </div>
+
+    <div id="modalComprobanteBlock" style="display:none;"></div>
 
     <div class="field"><label>Observaciones</label><textarea id="fObs" placeholder="Notas operativas..."></textarea></div>
 
@@ -1345,6 +1358,7 @@ function renderLista(){
         ${isVip?`<span class="vip-tag">VIP</span>`:''}
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
         ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
+        ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
       </div>
       ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
       ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
@@ -1446,6 +1460,20 @@ function renderResumenTurnoHTML(rsTodas){
       </div>
     </div>
   `;
+}
+
+function verComprobante(id){
+  const r = reservas.find(x => x.id === id);
+  if(!r || !r.comprobanteAbono){ return; }
+  // Abrimos la imagen (guardada como base64 en el propio documento) en una
+  // pestaña nueva, envuelta en una página simple para que se vea completa.
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Comprobante de pago</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>body{margin:0; background:#12151a; display:flex; align-items:center; justify-content:center; min-height:100vh;}
+    img{max-width:100%; height:auto; display:block;}</style></head>
+    <body><img src="${r.comprobanteAbono}"></body></html>`);
+  win.document.close();
 }
 
 function estadoLabel(e){
@@ -1877,6 +1905,7 @@ function renderSolicitudesScreen(){
         ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabel(r.mesa))}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
+        ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
       </div>
       ${r.obs?`<div class="sc-obs">${escapeHtml(r.obs)}</div>`:''}
       ${hint}
@@ -1983,6 +2012,20 @@ function abrirModal(id, mesaId){
     document.getElementById('fObs').value = r.obs;
     estadoSeleccionado = r.estado;
     btnEliminar.style.display = 'block';
+    // El comprobante de pago queda amarrado a esta reserva en la base de
+    // datos (campo comprobanteAbono). Si existe, mostramos aquí un acceso
+    // directo para verlo, sin importar por qué pantalla se abrió el modal.
+    const comprobanteBlock = document.getElementById('modalComprobanteBlock');
+    if(r.comprobanteAbono){
+      comprobanteBlock.style.display = 'block';
+      comprobanteBlock.innerHTML = `<div class="modal-comprobante">
+        <span class="modal-comprobante-txt">🧾 Comprobante de pago guardado</span>
+        <button type="button" class="btn-ver-comprobante" onclick='verComprobante(${JSON.stringify(r.id)})'>Ver imagen</button>
+      </div>`;
+    } else {
+      comprobanteBlock.style.display = 'none';
+      comprobanteBlock.innerHTML = '';
+    }
   } else {
     modalFecha = fechaISO(fechaActual);
     modalTurno = turnoActivo;
@@ -2004,6 +2047,8 @@ function abrirModal(id, mesaId){
     document.getElementById('fWhatsContacto').value = '';
     estadoSeleccionado = 'confirmada';
     btnEliminar.style.display = 'none';
+    document.getElementById('modalComprobanteBlock').style.display = 'none';
+    document.getElementById('modalComprobanteBlock').innerHTML = '';
   }
   actualizarEstadoUI();
   overlay.classList.add('open');
