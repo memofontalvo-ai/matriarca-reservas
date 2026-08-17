@@ -847,7 +847,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 
       <div class="config-mensaje-bloque">
         <div class="config-mensaje-titulo">✅ Mensaje de aprobación</div>
-        <div class="config-mensaje-sub">Se envía cuando ya armaste la reserva y le pides al cliente que la revise y apruebe. Usa <code>{nombre}</code> y <code>{link}</code> igual que arriba.</div>
+        <div class="config-mensaje-sub">Se envía cuando ya armaste la reserva y le pides al cliente que la revise y apruebe. Además de <code>{nombre}</code> y <code>{link}</code>, aquí también puedes usar <code>{fecha}</code>, <code>{hora}</code>, <code>{pax}</code>, <code>{mesa}</code>, <code>{abono}</code> y <code>{menu}</code> — se llenan solos con los datos reales de cada reserva, para que le quede el detalle completo en el texto del WhatsApp aunque no vuelva a entrar a la app.</div>
         <textarea id="msgTexto_aprobacion" class="config-mensaje-textarea" rows="12"></textarea>
         <div class="config-mensaje-acciones">
           <button class="btn-config-restaurar" onclick="restaurarMensaje('aprobacion')">Restaurar original</button>
@@ -858,7 +858,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.28</div>
+  <div class="version-tag">v3.29</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1216,6 +1216,14 @@ La Matriarca Barranquilla ✨
 
 Tenemos disponibilidad para tu solicitud de reserva en La Matriarca Barranquilla. 🍽️❤️
 
+📋 *Detalles de tu reserva:*
+📅 Fecha: {fecha}
+🕒 Hora: {hora}
+👥 Personas: {pax}
+🪑 Mesa/Zona: {mesa}
+💰 Abono: {abono}
+🍽️ Menú: {menu}
+
 Ahora solo falta que revises los detalles y, si todo está correcto, apruebes tu reserva aquí:
 
 🔗 REVISAR Y APROBAR MI RESERVA
@@ -1246,8 +1254,23 @@ mensajesConfigRef.get().then(snap => {
   }, err => console.error('Error de conexión en configuración de mensajes:', err));
 }).catch(err => console.error('Error conectando configuración de mensajes:', err));
 
-function armarMensaje(plantilla, nombre, link){
-  return plantilla.replace(/\{nombre\}/g, nombre || '').replace(/\{link\}/g, link || '');
+function armarMensaje(plantilla, valores){
+  // valores es un objeto: {nombre, link, fecha, hora, pax, mesa, abono, menu, ...}
+  // Cualquier placeholder {clave} en la plantilla que no venga en "valores"
+  // simplemente se deja en blanco, para no romper mensajes más simples
+  // (como el de solicitud, que solo usa {nombre} y {link}).
+  let msg = plantilla;
+  for(const clave in valores){
+    msg = msg.replace(new RegExp(`\\{${clave}\\}`, 'g'), valores[clave] !== undefined && valores[clave] !== null ? valores[clave] : '');
+  }
+  return msg;
+}
+
+function formatearFechaLarga(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const fecha = new Date(y, m-1, d, 12);
+  return `${DIAS[fecha.getDay()]} ${d} de ${MESES[m-1]}`;
 }
 
 function guardarMensaje(tipo, valor){
@@ -2371,7 +2394,7 @@ function enviarSolicitudWhatsapp(){
     pasoPorSolicitud: true,
     fechaSolicitud: fechaHoy,
   }).then(docRef => {
-    const mensaje = armarMensaje(MENSAJES.solicitud, contacto, urlFormularioSolicitud(docRef.id));
+    const mensaje = armarMensaje(MENSAJES.solicitud, { nombre: contacto, link: urlFormularioSolicitud(docRef.id) });
     const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
     if(ventana){ ventana.location.href = url; } else { window.open(url, '_blank'); }
     cerrarModal();
@@ -2639,7 +2662,16 @@ function enviarParaAprobacion(){
   promesa.then(id => {
     let digitos = celular.replace(/\D/g,'');
     if(digitos.length === 10) digitos = '57' + digitos;
-    const mensaje = armarMensaje(MENSAJES.aprobacion, nombre, urlAprobacion(id));
+    const mensaje = armarMensaje(MENSAJES.aprobacion, {
+      nombre,
+      link: urlAprobacion(id),
+      fecha: formatearFechaLarga(data.fecha),
+      hora: data.hora,
+      pax: data.pax,
+      mesa: data.mesa ? mesaLabel(data.mesa) : 'Por confirmar',
+      abono: data.abono > 0 ? ('$' + Number(data.abono).toLocaleString('es-CO')) : 'Sin abono',
+      menu: data.menu || 'Por definir',
+    });
     const waUrl = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
     if(ventana){ ventana.location.href = waUrl; } else { window.open(waUrl, '_blank'); }
     cerrarModal();
