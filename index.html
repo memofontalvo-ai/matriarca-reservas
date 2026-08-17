@@ -725,7 +725,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.15</div>
+  <div class="version-tag">v3.16</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1040,7 +1040,11 @@ reservasRef.get().then(snap => {
 });
 
 /* ============ STATE ============ */
-let fechaActual = new Date('2026-08-14T12:00:00');
+// Siempre arranca en la fecha real de hoy — antes quedó fija en una fecha
+// de prueba (14 de agosto) y nunca se actualizó, así que la app siempre
+// abría ahí sin importar qué día fuera en realidad.
+let fechaActual = new Date();
+fechaActual.setHours(12,0,0,0); // mediodía para evitar líos de huso horario al comparar fechas
 let turnoActivo = 'todos';
 let vistaActual = 'lista';
 let editandoId = null;
