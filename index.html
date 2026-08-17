@@ -228,6 +228,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .badge.cancelada{background:var(--cancelled-bg); color:var(--cancelled);}
 .badge.solicitud{background:rgba(180,120,255,0.16); color:#c79bff;}
 .badge.pendiente_aprobacion{background:rgba(232,163,61,0.16); color:#e8a33d;}
+.badge.mensaje_enviado{background:rgba(154,163,178,0.16); color:#9aa3b2;}
 .badge.turno-badge{background:var(--panel-raised); color:var(--text-dim); border:1px solid var(--border);}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
@@ -289,6 +290,11 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .solicitud-card-global.card-por-aprobar .sc-fecha{color:#e8a33d;}
 .solicitud-card-global.card-aprobada{border-color:var(--confirmed); opacity:.85;}
 .solicitud-card-global.card-aprobada .sc-fecha{color:var(--confirmed);}
+.solicitud-card-global.card-mensaje-enviado{border-color:#9aa3b2; opacity:.85;}
+.mensaje-enviado-hint{
+  margin-top:8px; padding-top:8px; border-top:1px dashed rgba(154,163,178,0.3);
+  font-size:11px; color:#9aa3b2; font-weight:600; line-height:1.4;
+}
 .historial-aprobada-hint{
   margin-top:8px; padding-top:8px; border-top:1px dashed rgba(71,184,129,0.3);
   font-size:11px; color:var(--confirmed); font-weight:600; line-height:1.4;
@@ -494,6 +500,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .modal .modal-sub{font-size:12px; color:var(--text-dim); margin-bottom:18px;}
 .field{margin-bottom:13px;}
 .field label{font-size:11.5px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.3px;}
+.fecha-solicitud-hint{text-transform:none; font-weight:400; color:var(--text-dim); letter-spacing:0;}
 .field input, .field select, .field textarea{
   width:100%; background:var(--panel-alt); border:1px solid var(--border); color:var(--text);
   padding:9px 11px; border-radius:8px; font-size:13.5px;
@@ -851,7 +858,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.25</div>
+  <div class="version-tag">v3.28</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -938,6 +945,11 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
 
     <div id="modalComprobanteBlock" style="display:none;"></div>
+
+    <div class="field" id="fechaSolicitudBlock" style="display:none;">
+      <label>Fecha de solicitud <span class="fecha-solicitud-hint">(cuándo llegó el pedido del cliente, no la fecha de la reserva)</span></label>
+      <input type="date" id="fFechaSolicitud">
+    </div>
 
     <div class="field"><label>Observaciones</label><textarea id="fObs" placeholder="Notas operativas..."></textarea></div>
 
@@ -1265,7 +1277,6 @@ function renderConfigMensajes(){
   if(document.activeElement !== solEl) solEl.value = MENSAJES.solicitud;
   if(document.activeElement !== aprEl) aprEl.value = MENSAJES.aprobacion;
 }
-
 
 function grupoDeFecha(d){
   const dia = d.getDay(); // 0=domingo
@@ -1658,7 +1669,7 @@ function cerrarComprobanteViewer(){
 }
 
 function estadoLabel(e){
-  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', solicitud:'Solicitud', pendiente_aprobacion:'Por aprobar'}[e]||e;
+  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar'}[e]||e;
 }
 function mesaLabel(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return m.id;
@@ -1826,10 +1837,10 @@ function renderCalendarioSolInline(){
     return y===calSolInlineAno && m===(calSolInlineMes+1);
   });
   const diasPendientes = new Set(
-    solicitudesDelMes.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion').map(fechaSolicitudEfectiva)
+    solicitudesDelMes.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='mensaje_enviado').map(fechaSolicitudEfectiva)
   );
   const diasGestionados = new Set(
-    solicitudesDelMes.filter(r=>r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion').map(fechaSolicitudEfectiva)
+    solicitudesDelMes.filter(r=>r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='mensaje_enviado').map(fechaSolicitudEfectiva)
   );
 
   let html = '';
@@ -2044,7 +2055,7 @@ function renderSolicitudesScreen(){
     r.aprobadaPorCliente !== undefined
   );
 
-  const activas = todas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion');
+  const activas = todas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='mensaje_enviado');
   const badge = document.getElementById('solicitudesBadge');
   badge.textContent = activas.length;
   badge.classList.toggle('zero', activas.length===0);
@@ -2071,7 +2082,9 @@ function renderSolicitudesScreen(){
   // Todo lo que LLEGÓ ese día (sin el filtro de especiales todavía —
   // el resumen de arriba cuenta el total real del día, no lo filtrado)
   const delDiaTotal = todas.filter(r=>fechaSolicitudEfectiva(r)===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
-  const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud').length;
+  // "Respondidas" = el cliente ya contestó y llenó el formulario (dejó de
+  // estar solo en "mensaje enviado"), sin importar en qué quedó después.
+  const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud' && r.estado!=='mensaje_enviado').length;
   const aprobadasHoy = delDiaTotal.filter(r=>r.aprobadaPorCliente===true).length;
   const resumenEl = document.getElementById('resumenSolicitudesDia');
   if(resumenEl){
@@ -2099,14 +2112,33 @@ function renderSolicitudesScreen(){
   }
 
   const cardsHtml = delDia.map(r => {
+    const esMensajeEnviado = r.estado === 'mensaje_enviado';
     const esSinGestionar = r.estado === 'solicitud';
     const esPorAprobar = r.estado === 'pendiente_aprobacion';
     const yaAprobada = r.aprobadaPorCliente === true;
-    const claseColor = esPorAprobar ? 'card-por-aprobar' : (esSinGestionar ? 'card-solicitud' : 'card-aprobada');
+    const claseColor = esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : (esSinGestionar ? 'card-solicitud' : 'card-aprobada'));
     let hint = '';
-    if(esSinGestionar) hint = `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
+    if(esMensajeEnviado) hint = `<div class="mensaje-enviado-hint">📨 Le mandamos el link — esperando que el cliente llene el formulario</div>`;
+    else if(esSinGestionar) hint = `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
     else if(esPorAprobar) hint = `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`;
     else if(yaAprobada) hint = `<div class="historial-aprobada-hint">✓ Aprobada por el cliente — ya está en Reservas por día</div>`;
+    // Si todavía no hay respuesta del cliente, no hay fecha/turno/hora que
+    // mostrar — solo el contacto al que se le escribió.
+    if(esMensajeEnviado){
+      return `
+      <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+        <div class="sc-top">
+          <div>
+            <div class="sc-nombre">${escapeHtml(r.nombre) || '(sin nombre de contacto)'}</div>
+          </div>
+          <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
+        </div>
+        <div class="sc-meta">
+          ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
+        </div>
+        ${hint}
+      </div>`;
+    }
     return `
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="sc-top">
@@ -2139,9 +2171,10 @@ function renderSolicitudesScreen(){
 
   const sinGestionar = delDia.filter(r=>r.estado==='solicitud');
   const porAprobar = delDia.filter(r=>r.estado==='pendiente_aprobacion');
+  const mensajesEnviados = delDia.filter(r=>r.estado==='mensaje_enviado');
 
-  const vipSols = delDia.filter(r=>r.vipSolicitada);
-  const generalSols = delDia.filter(r=>!r.vipSolicitada);
+  const vipSols = delDia.filter(r=>r.vipSolicitada && r.estado!=='mensaje_enviado');
+  const generalSols = delDia.filter(r=>!r.vipSolicitada && r.estado!=='mensaje_enviado');
   const vipPax = vipSols.reduce((a,r)=>a+Number(r.pax||0),0);
   const generalPax = generalSols.reduce((a,r)=>a+Number(r.pax||0),0);
 
@@ -2154,6 +2187,9 @@ function renderSolicitudesScreen(){
       </div>
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>Sin aprobar todavía</span><span>${noAprobadas.length} · ${noAprobadasPax} pax</span></div>
+      </div>
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head"><span>📨 Mensaje enviado, sin respuesta</span><span>${mensajesEnviados.length}</span></div>
       </div>
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>⚠ Sin gestionar</span><span>${sinGestionar.length} · ${sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
@@ -2217,8 +2253,10 @@ function abrirModal(id, mesaId){
     canalNuevoBlock.style.display = 'none';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'block';
-    document.getElementById('modalTitle').textContent = 'Editar reserva';
-    document.getElementById('modalSub').textContent = `${r.turno.charAt(0).toUpperCase()+r.turno.slice(1)} · ${r.fecha}`;
+    document.getElementById('modalTitle').textContent = r.estado==='mensaje_enviado' ? 'Solicitud: mensaje enviado' : 'Editar reserva';
+    document.getElementById('modalSub').textContent = r.turno
+      ? `${r.turno.charAt(0).toUpperCase()+r.turno.slice(1)} · ${r.fecha}`
+      : 'Esperando que el cliente llene el formulario';
     document.getElementById('fHora').value = r.hora;
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
@@ -2230,6 +2268,19 @@ function abrirModal(id, mesaId){
     document.getElementById('fObs').value = r.obs;
     estadoSeleccionado = r.estado;
     btnEliminar.style.display = 'block';
+    // Solo mostramos este campo para reservas que pasaron por el flujo de
+    // solicitud/aprobación (donde tiene sentido registrar cuándo llegó el
+    // pedido). Si el registro es viejo y no tiene fechaSolicitud guardada,
+    // mostramos la fecha de la reserva como punto de partida editable —
+    // así el staff puede corregirla a mano si recuerda la fecha real.
+    const esDelFlujoSolicitud = r.pasoPorSolicitud === true || r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.aprobadaPorCliente !== undefined;
+    const fechaSolicitudBlock = document.getElementById('fechaSolicitudBlock');
+    if(esDelFlujoSolicitud){
+      fechaSolicitudBlock.style.display = 'block';
+      document.getElementById('fFechaSolicitud').value = r.fechaSolicitud || r.fecha;
+    } else {
+      fechaSolicitudBlock.style.display = 'none';
+    }
     // El comprobante de pago queda amarrado a esta reserva en la base de
     // datos (campo comprobanteAbono). Si existe, mostramos aquí un acceso
     // directo para verlo, sin importar por qué pantalla se abrió el modal.
@@ -2267,6 +2318,7 @@ function abrirModal(id, mesaId){
     btnEliminar.style.display = 'none';
     document.getElementById('modalComprobanteBlock').style.display = 'none';
     document.getElementById('modalComprobanteBlock').innerHTML = '';
+    document.getElementById('fechaSolicitudBlock').style.display = 'none';
   }
   actualizarEstadoUI();
   overlay.classList.add('open');
@@ -2282,8 +2334,10 @@ function elegirCanalNuevo(tipo){
   }
 }
 
-function urlFormularioSolicitud(){
-  return new URL('solicitud.html', location.href).href;
+function urlFormularioSolicitud(id){
+  const url = new URL('solicitud.html', location.href);
+  if(id) url.searchParams.set('id', id);
+  return url.href;
 }
 
 function enviarSolicitudWhatsapp(){
@@ -2294,11 +2348,38 @@ function enviarSolicitudWhatsapp(){
   let digitos = telefono.replace(/\D/g,'');
   if(digitos.length === 10) digitos = '57' + digitos; // asume celular colombiano
 
-  const mensaje = armarMensaje(MENSAJES.solicitud, contacto, urlFormularioSolicitud());
+  // Abrimos la pestaña YA, en el mismo clic (si esperamos a que termine de
+  // guardar en Firebase, Safari ya no lo cuenta como "acción directa del
+  // usuario" y bloquea el pop-up en silencio).
+  const ventana = window.open('', '_blank');
+  if(ventana){ ventana.document.write('<body style="background:#12151a;color:#8b93a3;font-family:sans-serif;padding:40px;text-align:center;">Preparando el link para el cliente...</body>'); }
 
-  const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
-  window.open(url, '_blank');
-  cerrarModal();
+  const hoy = new Date();
+  const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+
+  // Se crea el registro DESDE que se manda el primer mensaje, no cuando el
+  // cliente responde — así queda trazado todo el proceso, incluso si el
+  // cliente nunca contesta. El formulario (solicitud.html) va a completar
+  // este MISMO documento cuando el cliente lo llene, en vez de crear uno
+  // nuevo aparte.
+  reservasRef.add({
+    fecha: '', turno: '', hora: '', pax: 0,
+    nombre: contacto, celular: telefono,
+    mesa: '', abono: 0, menu: '', obs: '',
+    canal: 'WhatsApp (mensaje enviado)',
+    estado: 'mensaje_enviado',
+    pasoPorSolicitud: true,
+    fechaSolicitud: fechaHoy,
+  }).then(docRef => {
+    const mensaje = armarMensaje(MENSAJES.solicitud, contacto, urlFormularioSolicitud(docRef.id));
+    const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
+    if(ventana){ ventana.location.href = url; } else { window.open(url, '_blank'); }
+    cerrarModal();
+  }).catch(err => {
+    console.error('Error creando el registro de solicitud:', err);
+    if(ventana) ventana.close();
+    alert('No se pudo iniciar la solicitud. Revisa tu conexión e intenta de nuevo.');
+  });
 }
 
 function actualizarEstadoUI(){
@@ -2486,6 +2567,13 @@ function guardarReserva(){
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
   };
+  // Si el bloque de "Fecha de solicitud" está visible, guardamos lo que
+  // el staff haya puesto ahí (permite corregir a mano registros viejos
+  // que no traían este dato, o ajustar la fecha real si se equivocó).
+  if(document.getElementById('fechaSolicitudBlock').style.display !== 'none'){
+    const valorFechaSol = document.getElementById('fFechaSolicitud').value;
+    if(valorFechaSol) data.fechaSolicitud = valorFechaSol;
+  }
   const promesa = editandoId
     ? reservasRef.doc(editandoId).update(data)
     : reservasRef.add(data);
