@@ -725,7 +725,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.16</div>
+  <div class="version-tag">v3.17</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1236,9 +1236,9 @@ function renderLista(){
       .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
     if(otrosTurnos.length){
       const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
-      el.innerHTML = `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
+      el.innerHTML = `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>` + renderResumenTurnoHTML(rsTodas);
     } else {
-      el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
+      el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>` + renderResumenTurnoHTML(rsTodas);
     }
     return;
   }
