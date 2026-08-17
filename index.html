@@ -117,6 +117,21 @@ header{
   padding:9px 16px; border-radius:8px; display:flex; align-items:center; gap:6px;
 }
 .new-btn:hover{background:var(--gold-bright);}
+
+/* ===== BOTÓN FLOTANTE GLOBAL: NUEVA RESERVA ===== */
+/* Visible siempre, sin importar en cuál de las 4 pestañas estés parado
+   (Solicitudes, Por día, Salones, Config) — es el punto donde arranca
+   todo el proceso, así que no puede depender de en qué pantalla estás. */
+.fab-nueva-reserva{
+  position:fixed; right:18px; bottom:86px; z-index:60;
+  width:56px; height:56px; border-radius:50%;
+  background:var(--gold); color:#1a1408;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,0.45);
+  border:none;
+}
+.fab-nueva-reserva:active{background:var(--gold-bright); transform:scale(0.96);}
+.fab-icon{font-size:30px; font-weight:400; line-height:1;}
 .clear-btn{
   background:transparent; color:var(--cancelled); font-weight:600; font-size:12px;
   padding:9px 13px; border-radius:8px; border:1px solid var(--cancelled);
@@ -735,6 +750,10 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </button>
   </div>
 
+  <button class="fab-nueva-reserva" onclick="abrirModal()" title="Nueva reserva">
+    <span class="fab-icon">+</span>
+  </button>
+
   <div id="pantallaSolicitudes">
     <div class="date-nav date-nav-solicitudes">
       <button onclick="cambiarDiaSolicitudes(-1)">‹</button>
@@ -776,7 +795,6 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
         <button onclick="cambiarDia(1)">›</button>
       </div>
       <div class="turnos" id="turnosBar"></div>
-      <button class="new-btn" onclick="abrirModal()">+ <span>Nueva reserva</span></button>
       <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()">⭐ <span>Especiales (30+)</span></button>
       <button class="clear-btn" onclick="confirmarVaciarTurno()" title="Eliminar todas las reservas de este turno">🗑 <span>Vaciar turno</span></button>
     </header>
@@ -858,7 +876,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.31</div>
+  <div class="version-tag">v3.32</div>
 </div>
 
 <div class="overlay" id="overlay">
