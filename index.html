@@ -887,7 +887,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.34</div>
+  <div class="version-tag">v3.35</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -2135,7 +2135,10 @@ function renderSolicitudesScreen(){
   // "Respondidas" = el cliente ya contestó y llenó el formulario (dejó de
   // estar solo en "mensaje enviado"), sin importar en qué quedó después.
   const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud' && r.estado!=='mensaje_enviado').length;
-  const aprobadasHoy = delDiaTotal.filter(r=>r.aprobadaPorCliente===true).length;
+  // "Aprobadas" = terminó confirmada, sin importar si fue el cliente
+  // aprobando por el link o tú confirmándola directo por teléfono — las
+  // dos formas terminan en el mismo lugar: una reserva lista y confirmada.
+  const aprobadasHoy = delDiaTotal.filter(r=>r.aprobadaPorCliente===true || r.estado==='confirmada').length;
   const resumenEl = document.getElementById('resumenSolicitudesDia');
   if(resumenEl){
     if(delDiaTotal.length === 0){
@@ -2193,7 +2196,7 @@ function renderSolicitudesScreen(){
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="sc-top">
         <div>
-          <div class="sc-fecha">${escapeHtml(r.turno)}</div>
+          <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
           <div class="sc-hora">${escapeHtml(r.hora)}</div>
           <div class="sc-nombre">${escapeHtml(r.nombre)}</div>
         </div>
