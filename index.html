@@ -858,7 +858,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.29</div>
+  <div class="version-tag">v3.30</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -2596,6 +2596,16 @@ function guardarReserva(){
   if(document.getElementById('fechaSolicitudBlock').style.display !== 'none'){
     const valorFechaSol = document.getElementById('fFechaSolicitud').value;
     if(valorFechaSol) data.fechaSolicitud = valorFechaSol;
+  } else if(!editandoId){
+    // Reserva nueva creada de cero (por teléfono, presencial, etc.) — el
+    // día en que se ORIGINA el proceso queda fijo en hoy automáticamente.
+    // No es un campo que el staff pueda escribir o cambiar: es el momento
+    // real en que se está haciendo la gestión, sin importar para qué
+    // fecha sea la reserva en sí (eso lo decide "fecha" arriba, navegando
+    // el calendario, que es un dato totalmente aparte).
+    const hoy = new Date();
+    data.fechaSolicitud = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+    data.pasoPorSolicitud = true;
   }
   const promesa = editandoId
     ? reservasRef.doc(editandoId).update(data)
