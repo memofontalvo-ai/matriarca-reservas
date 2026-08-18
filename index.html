@@ -946,7 +946,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.40</div>
+  <div class="version-tag">v3.41</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1079,7 +1079,6 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
       <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Elegida para esta reserva</div>
       <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
       <div class="legend-item"><span class="legend-dot" style="background:#c0392b;"></span>Ocupada (otra reserva)</div>
-      <div class="legend-item"><span class="legend-dot" style="background:#555; opacity:.5;"></span>Sin vincular</div>
     </div>
     <div class="mesa-picker-footer">
       <div class="mesa-picker-seleccion" id="mesaPickerSeleccion">Ninguna mesa elegida</div>
@@ -1925,19 +1924,19 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef){
       if (m){
         const prefType = pref[mkey] || null;
         const codigo = codeForPlano(m, prefType);
-        if(m.ref){
-          const r = porMesaRef[m.ref.trim().toLowerCase()];
-          let estadoCls = 'p-libre';
-          let guestName = '';
-          if(r){
-            estadoCls = r.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
-            guestName = (r.nombre||'').split(' ')[0];
-          }
-          const clickJs = r ? `abrirModal(${JSON.stringify(r.id)})` : `abrirModal(null,${JSON.stringify(m.ref)})`;
-          inner = `<div class="plano-mesa-core ${estadoCls}" onclick='${clickJs}' title="${escapeHtml(m.ref)}${m.cap?' · cap '+m.cap:''}">${codigo}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
-        } else {
-          inner = `<div class="plano-mesa-core p-sinvincular" title="Sin vincular todavía — hazlo en Salones">${codigo}</div>`;
+        // El código de cada mesa (PAMA1, MB38, etc.) YA es su identificador —
+        // no hace falta vincular nada a mano. Si alguna vez se puso un "ref"
+        // manual, ese tiene prioridad; si no, se usa el código tal cual.
+        const idMesa = (m.ref && m.ref.trim()) ? m.ref.trim() : codigo;
+        const reserva = porMesaRef[idMesa.toLowerCase()];
+        let estadoCls = 'p-libre';
+        let guestName = '';
+        if(reserva){
+          estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
+          guestName = (reserva.nombre||'').split(' ')[0];
         }
+        const clickJs = reserva ? `abrirModal(${JSON.stringify(reserva.id)})` : `abrirModal(null,${JSON.stringify(idMesa)})`;
+        inner = `<div class="plano-mesa-core ${estadoCls}" onclick='${clickJs}' title="${escapeHtml(idMesa)}${m.cap?' · cap '+m.cap:''}">${codigo}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
       }
       cells += `<div class="plano-cell" style="${pos}">${inner}</div>`;
     }
@@ -1966,7 +1965,6 @@ function renderPlano(){
     <div class="legend-item"><span class="legend-dot" style="background:var(--confirmed)"></span>Confirmada</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
-    <div class="legend-item"><span class="legend-dot" style="background:#555; opacity:.5;"></span>Sin vincular</div>
   </div>`;
 
   const mesas = PLANO_MAESTRO.mesas || {};
@@ -2026,16 +2024,13 @@ function buildZoneGridPicker(key, cfg, mesas, pref, ocupadasPorOtro){
       if (m){
         const prefType = pref[mkey] || null;
         const codigo = codeForPlano(m, prefType);
-        if(m.ref){
-          const refLower = m.ref.trim().toLowerCase();
-          const elegida = mesaSeleccionTemp.includes(m.ref);
-          const ocupada = !elegida && ocupadasPorOtro[refLower];
-          const cls = elegida ? 'p-elegida' : (ocupada ? 'p-ocupada-otra' : 'p-libre');
-          const clickJs = ocupada ? '' : `onclick='toggleMesaSeleccion(${JSON.stringify(m.ref)})'`;
-          inner = `<div class="plano-mesa-core ${cls}" ${clickJs} title="${escapeHtml(m.ref)}${m.cap?' · cap '+m.cap:''}">${codigo}</div>`;
-        } else {
-          inner = `<div class="plano-mesa-core p-sinvincular" title="Sin vincular todavía — hazlo en Salones">${codigo}</div>`;
-        }
+        const idMesa = (m.ref && m.ref.trim()) ? m.ref.trim() : codigo;
+        const idLower = idMesa.toLowerCase();
+        const elegida = mesaSeleccionTemp.includes(idMesa);
+        const ocupada = !elegida && ocupadasPorOtro[idLower];
+        const cls = elegida ? 'p-elegida' : (ocupada ? 'p-ocupada-otra' : 'p-libre');
+        const clickJs = ocupada ? '' : `onclick='toggleMesaSeleccion(${JSON.stringify(idMesa)})'`;
+        inner = `<div class="plano-mesa-core ${cls}" ${clickJs} title="${escapeHtml(idMesa)}${m.cap?' · cap '+m.cap:''}">${codigo}</div>`;
       }
       cells += `<div class="plano-cell" style="${pos}">${inner}</div>`;
     }
