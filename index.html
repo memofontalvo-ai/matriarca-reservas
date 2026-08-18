@@ -964,7 +964,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.42</div>
+  <div class="version-tag">v3.43</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1005,7 +1005,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 
     <div id="formCompletoBlock">
     <div class="field" id="fechaReservaEditBlock" style="display:none;">
-      <label>Fecha y turno de la reserva <span class="fecha-solicitud-hint">(el día que el cliente va a venir — esto sí lo puedes mover)</span></label>
+      <label>Fecha y turno de la reserva <span class="fecha-solicitud-hint">(el día que el cliente va a venir)</span></label>
       <div class="field-row">
         <input type="date" id="fFechaReservaEdit" style="flex:1;">
         <select id="fTurnoReservaEdit" style="flex:1;">
@@ -2750,6 +2750,15 @@ function elegirCanalNuevo(tipo){
   if(tipo === 'telefono'){
     document.getElementById('fCanal').value = 'Teléfono';
     document.getElementById('formCompletoBlock').style.display = 'block';
+    // Al tomar la reserva por teléfono, el staff tiene que poder decir para
+    // qué día y turno es el evento (puede ser hoy, mañana, el sábado que
+    // viene, etc.) — no se puede asumir "hoy" a la fuerza. El día en que se
+    // ORIGINÓ la llamada (fechaSolicitud) se sigue guardando aparte y
+    // siempre como hoy, automático, sin que esto lo afecte.
+    document.getElementById('fechaReservaEditBlock').style.display = 'block';
+    document.getElementById('fFechaReservaEdit').value = modalFecha;
+    document.getElementById('fTurnoReservaEdit').value = modalTurno;
+    document.getElementById('turnoInvalidoAviso').style.display = 'none';
   } else {
     document.getElementById('whatsappBlock').style.display = 'block';
   }
@@ -2814,6 +2823,21 @@ document.getElementById('estadoSelect').addEventListener('click', e=>{
   estadoSeleccionado = btn.dataset.val;
   actualizarEstadoUI();
 });
+
+// Si el staff cambia la fecha/turno del evento arriba en el formulario
+// (por ejemplo, tomando por teléfono una reserva para otro día), el
+// subtítulo del modal debe reflejarlo al momento, para que no se quede
+// diciendo "(hoy)" cuando ya no es para hoy.
+function actualizarSubtituloModalDesdeCampos(){
+  const fecha = document.getElementById('fFechaReservaEdit').value;
+  const turno = document.getElementById('fTurnoReservaEdit').value;
+  if(!fecha || !turno) return;
+  const hoyISO = fechaISO(new Date());
+  const turnoLabel = turno.charAt(0).toUpperCase()+turno.slice(1);
+  document.getElementById('modalSub').textContent = `${turnoLabel} · ${fecha}${fecha===hoyISO ? ' (hoy)' : ''}`;
+}
+document.getElementById('fFechaReservaEdit').addEventListener('change', actualizarSubtituloModalDesdeCampos);
+document.getElementById('fTurnoReservaEdit').addEventListener('change', actualizarSubtituloModalDesdeCampos);
 
 function cerrarModal(){
   document.getElementById('overlay').classList.remove('open');
