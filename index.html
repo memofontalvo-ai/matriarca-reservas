@@ -964,7 +964,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.43</div>
+  <div class="version-tag">v3.44</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -2232,10 +2232,10 @@ function renderCalendarioSolInline(){
     return y===calSolInlineAno && m===(calSolInlineMes+1);
   });
   const diasPendientes = new Set(
-    solicitudesDelMes.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='mensaje_enviado').map(fechaSolicitudEfectiva)
+    solicitudesDelMes.filter(requiereGestion).map(fechaSolicitudEfectiva)
   );
   const diasGestionados = new Set(
-    solicitudesDelMes.filter(r=>r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='mensaje_enviado').map(fechaSolicitudEfectiva)
+    solicitudesDelMes.filter(r=>!requiereGestion(r)).map(fechaSolicitudEfectiva)
   );
 
   let html = '';
@@ -2429,6 +2429,16 @@ function formatearFechaCorta(iso){
   return `${DIAS[fecha.getDay()]} ${d} de ${MESES[m-1]}`;
 }
 
+function requiereGestion(r){
+  // "Necesita atención" = todavía no queda resuelta del todo: llegó por
+  // WhatsApp sin gestionar, está esperando que el cliente apruebe, se le
+  // mandó el link y no ha contestado, O el staff la tomó por teléfono y la
+  // dejó en estado "Pendiente" (todavía no la confirma). "Confirmada" y
+  // "Cancelada" sí cuentan como ya resueltas, sin importar el canal.
+  return r.estado==='solicitud' || r.estado==='pendiente_aprobacion' ||
+    r.estado==='mensaje_enviado' || r.estado==='pendiente';
+}
+
 function fechaSolicitudEfectiva(r){
   // La fecha que manda para AGRUPAR una solicitud en esta pantalla es la
   // fecha en que LLEGÓ la solicitud (cuando el cliente la envió, o cuando
@@ -2450,7 +2460,7 @@ function renderSolicitudesScreen(){
     r.aprobadaPorCliente !== undefined
   );
 
-  const activas = todas.filter(r=>r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='mensaje_enviado');
+  const activas = todas.filter(requiereGestion);
   const badge = document.getElementById('solicitudesBadge');
   badge.textContent = activas.length;
   badge.classList.toggle('zero', activas.length===0);
@@ -2513,12 +2523,17 @@ function renderSolicitudesScreen(){
     const esMensajeEnviado = r.estado === 'mensaje_enviado';
     const esSinGestionar = r.estado === 'solicitud';
     const esPorAprobar = r.estado === 'pendiente_aprobacion';
+    // Tomada directo (por teléfono u otro canal) pero el staff la dejó en
+    // "Pendiente" — todavía no la confirma. Necesita el mismo tipo de
+    // atención que una solicitud sin gestionar, aunque llegó por otra vía.
+    const esPendienteInterno = r.estado === 'pendiente';
     const yaAprobada = r.aprobadaPorCliente === true;
-    const claseColor = esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : (esSinGestionar ? 'card-solicitud' : 'card-aprobada'));
+    const claseColor = esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : ((esSinGestionar || esPendienteInterno) ? 'card-solicitud' : 'card-aprobada'));
     let hint = '';
     if(esMensajeEnviado) hint = `<div class="mensaje-enviado-hint">📨 Le mandamos el link — esperando que el cliente llene el formulario</div>`;
     else if(esSinGestionar) hint = `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
     else if(esPorAprobar) hint = `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`;
+    else if(esPendienteInterno) hint = `<div class="solicitud-hint">⏳ Pendiente por confirmar</div>`;
     else if(yaAprobada) hint = `<div class="historial-aprobada-hint">✓ Aprobada por el cliente — ya está en Reservas por día</div>`;
     // Si todavía no hay respuesta del cliente, no hay fecha/turno/hora que
     // mostrar — solo el contacto al que se le escribió.
