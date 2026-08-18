@@ -964,7 +964,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.44</div>
+  <div class="version-tag">v3.45</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -2840,13 +2840,17 @@ document.getElementById('estadoSelect').addEventListener('click', e=>{
 });
 
 // Si el staff cambia la fecha/turno del evento arriba en el formulario
-// (por ejemplo, tomando por teléfono una reserva para otro día), el
-// subtítulo del modal debe reflejarlo al momento, para que no se quede
-// diciendo "(hoy)" cuando ya no es para hoy.
+// (por ejemplo, tomando por teléfono una reserva para otro día), esto debe
+// quedar reflejado tanto en el subtítulo visible como en modalFecha/
+// modalTurno — las variables que usa el selector de mesas para saber qué
+// día/turno consultar y qué mesas ya están ocupadas. Antes solo se
+// actualizaba el texto y el plano se quedaba mirando el día/turno viejo.
 function actualizarSubtituloModalDesdeCampos(){
   const fecha = document.getElementById('fFechaReservaEdit').value;
   const turno = document.getElementById('fTurnoReservaEdit').value;
   if(!fecha || !turno) return;
+  modalFecha = fecha;
+  modalTurno = turno;
   const hoyISO = fechaISO(new Date());
   const turnoLabel = turno.charAt(0).toUpperCase()+turno.slice(1);
   document.getElementById('modalSub').textContent = `${turnoLabel} · ${fecha}${fecha===hoyISO ? ' (hoy)' : ''}`;
