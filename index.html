@@ -428,6 +428,32 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .legend-item{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted);}
 .legend-dot{width:10px; height:10px; border-radius:3px;}
 
+/* ===== PLANO REAL (día/turno sobre el plano maestro) ===== */
+.plano-vacio{
+  text-align:center; padding:40px 20px; color:var(--text-muted); font-size:13.5px; line-height:1.6;
+}
+.plano-canvas-app{
+  position:relative; width:100%; aspect-ratio: 1079 / 760; border-radius:10px;
+  border:1px solid var(--border); background:#fbf8f1; overflow:hidden;
+}
+.plano-zoneblock{
+  position:absolute; display:flex; align-items:center; justify-content:center; text-align:center;
+  font-size:8px; font-weight:700; color:rgba(0,0,0,0.55); line-height:1.1; padding:2px;
+}
+.plano-gridzone{position:absolute; display:grid; gap:0;}
+.plano-cell{border:1px solid rgba(18,71,74,0.18); position:relative;}
+.plano-mesa-core{
+  position:absolute; left:10%; top:10%; right:10%; bottom:10%;
+  background:#0a2f31; border:1px solid #444; border-radius:2px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  font-size:6px; font-weight:800; color:#fff; cursor:pointer; overflow:hidden;
+}
+.plano-mesa-core.p-libre{background:#0a2f31; border-color:#444;}
+.plano-mesa-core.p-ocupada{background:var(--confirmed); color:#0c2417; border-color:var(--confirmed);}
+.plano-mesa-core.p-pendiente{background:var(--pending); color:#062a33; border-color:var(--pending);}
+.plano-mesa-core.p-sinvincular{background:#555; opacity:.5; cursor:default;}
+.plano-guest{font-size:5px; font-weight:600; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
 /* ===== RESUMEN ===== */
 .resumen-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:24px;}
 .kpi{background:var(--panel-alt); border:1px solid var(--border-soft); border-radius:var(--radius-lg); padding:18px;}
@@ -892,7 +918,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.38</div>
+  <div class="version-tag">v3.39</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -1206,6 +1232,20 @@ horariosConfigRef.get().then(snap => {
     }
   }, err => console.error('Error de conexión en configuración de horarios:', err));
 }).catch(err => console.error('Error conectando configuración de horarios:', err));
+
+// Plano maestro (el mismo que se edita en salones.html): lo usamos en la
+// pestaña "Plano" de Por día para mostrar la ocupación real de cada
+// día/turno sobre la misma distribución visual, no un simple listado.
+let PLANO_MAESTRO = null;
+db.collection('configuracion').doc('planoMesas').onSnapshot(snap => {
+  if(snap.exists && snap.data().json){
+    try { PLANO_MAESTRO = JSON.parse(snap.data().json); }
+    catch(e){ console.error('Plano maestro con formato inválido:', e); }
+  } else {
+    PLANO_MAESTRO = null;
+  }
+  if(vistaActual==='plano') renderPlano();
+}, err => console.error('Error de conexión con el plano maestro:', err));
 
 function actualizarCapacidad(grupoKey, turnoKey, valor){
   const cap = Math.max(0, Math.round(Number(valor)) || 0);
@@ -1764,40 +1804,122 @@ function findMesa(id){
 }
 
 /* ============ RENDER: PLANO ============ */
+/* ============ PLANO REAL (día/turno actual sobre el plano maestro) ============ */
+const ZONES_PLANO = {
+  A: { left: 16, top: 7.5, width: 59, height: 37.61, cols: 9, rows: 5 },
+  C: { left: 56.5, top: 47.77, width: 39.4, height: 28.83, cols: 4, rows: 5 }
+};
+const DISABLED_CELLS_PLANO = new Set(['A-4-6','A-4-7','A-4-8']);
+
+function codeForPlano(m, prefType){
+  const zonaPart = 'M' + (m.zona || '');
+  const prefPart = prefType ? ('P' + prefType) : '';
+  return prefPart + zonaPart + m.num;
+}
+function parseKeyPlano(key){
+  const parts = key.split('-');
+  return { zone: parts[0], r: parseInt(parts[1],10), c: parseInt(parts[2],10) };
+}
+function buildBackgroundPlano(){
+  const z = [
+    { l:6.02, t:9.02, w:8.80, h:28.57, bg:'#ecc9a8', label:'BARRA' },
+    { l:76.0, t:8.27, w:19.93, h:31.58, bg:'#6b6b6b', label:'TARIMA', color:'#fff' },
+    { l:6.02, t:45.11, w:17.15, h:28.57, bg:'#e3a838', label:'SALÓN PUERTA DE ORO' },
+    { l:23.17, t:45.11, w:9.73, h:28.57, bg:'#5a9e6f' },
+    { l:32.90, t:45.11, w:6.49, h:28.57, bg:'#c9c9c9' },
+    { l:39.39, t:45.11, w:8.80, h:28.57, bg:'#5a9e6f' },
+    { l:48.19, t:45.11, w:7.41, h:28.57, bg:'#ecc9a8', label:'BARRA' },
+    { l:12.97, t:73.68, w:26.41, h:16.54, bg:'#8ba888', label:'SALÓN CURRAMBA' },
+    { l:39.39, t:73.68, w:16.22, h:16.54, bg:'#c98c6d', label:'SALÓN LA ARENOSA' },
+    { l:56.5, t:78, w:18, h:12, bg:'#a9b8c4', label:'LOBBY 1' },
+    { l:76.9, t:78, w:18.5, h:12, bg:'#a9b8c4', label:'LOBBY 2' }
+  ];
+  return z.map(b => `<div class="plano-zoneblock" style="left:${b.l}%; top:${b.t}%; width:${b.w}%; height:${b.h}%; background:${b.bg}; color:${b.color||'rgba(0,0,0,0.55)'};">${b.label||''}</div>`).join('');
+}
+function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef){
+  const secondary = new Set();
+  Object.keys(mesas).forEach(mkey => {
+    const mm = mesas[mkey];
+    if (mm.span){
+      const p = parseKeyPlano(mkey);
+      if (p.zone !== key) return;
+      const count = mm.span.count || 2;
+      for (let i = 1; i < count; i++){
+        const sr = mm.span.dir === 'v' ? p.r + i : p.r;
+        const sc = mm.span.dir === 'h' ? p.c + i : p.c;
+        secondary.add(key+'-'+sr+'-'+sc);
+      }
+    }
+  });
+  let cells = '';
+  for (let r = 0; r < cfg.rows; r++){
+    for (let c = 0; c < cfg.cols; c++){
+      const mkey = key+'-'+r+'-'+c;
+      if (secondary.has(mkey)) continue;
+      if (DISABLED_CELLS_PLANO.has(mkey)){
+        cells += `<div class="plano-cell" style="grid-column:${c+1}/span 1; grid-row:${r+1}/span 1;"></div>`;
+        continue;
+      }
+      const m = mesas[mkey];
+      const spanCount = (m && m.span) ? (m.span.count || 2) : 1;
+      const colSpan = (m && m.span && m.span.dir === 'h') ? spanCount : 1;
+      const rowSpan = (m && m.span && m.span.dir === 'v') ? spanCount : 1;
+      const pos = `grid-column:${c+1}/span ${colSpan}; grid-row:${r+1}/span ${rowSpan};`;
+      let inner = '';
+      if (m){
+        const prefType = pref[mkey] || null;
+        const codigo = codeForPlano(m, prefType);
+        if(m.ref){
+          const r = porMesaRef[m.ref.trim().toLowerCase()];
+          let estadoCls = 'p-libre';
+          let guestName = '';
+          if(r){
+            estadoCls = r.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
+            guestName = (r.nombre||'').split(' ')[0];
+          }
+          const clickJs = r ? `abrirModal(${JSON.stringify(r.id)})` : `abrirModal(null,${JSON.stringify(m.ref)})`;
+          inner = `<div class="plano-mesa-core ${estadoCls}" onclick='${clickJs}' title="${escapeHtml(m.ref)}${m.cap?' · cap '+m.cap:''}">${codigo}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
+        } else {
+          inner = `<div class="plano-mesa-core p-sinvincular" title="Sin vincular todavía — hazlo en Salones">${codigo}</div>`;
+        }
+      }
+      cells += `<div class="plano-cell" style="${pos}">${inner}</div>`;
+    }
+  }
+  return `<div class="plano-gridzone" style="left:${cfg.left}%; top:${cfg.top}%; width:${cfg.width}%; height:${cfg.height}%; grid-template-columns:repeat(${cfg.cols},1fr); grid-template-rows:repeat(${cfg.rows},1fr);">${cells}</div>`;
+}
+
 function renderPlano(){
+  if(!PLANO_MAESTRO){
+    document.getElementById('panelPlano').innerHTML = `
+      <div class="plano-vacio">
+        Todavía no hay un plano maestro configurado.<br>
+        Ve a <b>Salones</b> para diseñar la distribución del restaurante.
+      </div>`;
+    return;
+  }
   const rs = reservasDelTurno().filter(r=>r.estado!=='cancelada');
-  const porMesa = {};
-  rs.forEach(r=>{ if(r.mesa) porMesa[r.mesa]=r; });
+  const porMesaRef = {};
+  rs.forEach(r=>{ if(r.mesa) porMesaRef[r.mesa.trim().toLowerCase()]=r; });
 
   const legend = `<div class="legend">
     <div class="legend-item"><span class="legend-dot" style="background:var(--confirmed)"></span>Confirmada</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
-    <div class="legend-item"><span class="legend-dot" style="background:var(--panel-alt); border:1px solid var(--border);"></span>Libre</div>
-    <div class="legend-item"><span class="legend-dot" style="border:1.5px dashed var(--gold); background:transparent;"></span>Zona VIP</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#555; opacity:.5;"></span>Sin vincular</div>
   </div>`;
 
-  const groups = SALONES.map(s=>{
-    const mesasHtml = s.mesas.map(m=>{
-      const r = porMesa[m.id];
-      let cls = 'libre';
-      if(r) cls = r.estado==='pendiente' ? 'pendiente' : 'ocupada';
-      const vipCls = s.vip ? 'vip' : '';
-      const guestName = r ? (r.nombre.split(' ')[0]) : '';
-      return `<div class="mesa ${cls} ${vipCls}" onclick='${r?`abrirModal(${JSON.stringify(r.id)})`:`abrirModal(null,${JSON.stringify(m.id)})`}' title="${escapeHtml(m.id)}${m.cap>0?' · cap '+m.cap:''}">
-        <div class="num">${escapeHtml(m.id)}</div>
-        ${m.cap>0?`<div class="cap">${m.cap}p</div>`:''}
-        ${guestName?`<div class="guest">${escapeHtml(guestName)}</div>`:''}
-      </div>`;
-    }).join('');
-    const ocupadas = s.mesas.filter(m=>porMesa[m.id]).length;
-    return `<div class="salon-group">
-      <div class="salon-head ${s.vip?'vip':''}">${s.vip?'<span class="crown">♛</span> ':''}${s.nombre} <span class="count">(${ocupadas}/${s.mesas.length})</span></div>
-      <div class="mesas-grid">${mesasHtml}</div>
-    </div>`;
-  }).join('');
+  const mesas = PLANO_MAESTRO.mesas || {};
+  const pref = PLANO_MAESTRO.pref || {};
+  const canvasHtml = `<div class="plano-canvas-app">
+    ${buildBackgroundPlano()}
+    ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
+    ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
+  </div>`;
 
-  document.getElementById('panelPlano').innerHTML = legend + groups;
+  document.getElementById('panelPlano').innerHTML = legend + canvasHtml;
 }
+
 
 /* ============ RENDER: RESUMEN ============ */
 function renderResumen(){
