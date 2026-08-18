@@ -652,6 +652,18 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 }
 .config-mensaje-textarea:focus{border-color:var(--gold); outline:none;}
 .config-mensaje-acciones{display:flex; align-items:center; gap:10px; margin-top:12px;}
+
+.config-peligro-bloque{
+  background:rgba(200,60,60,0.08); border:1px solid #b23a3a; border-radius:12px;
+  padding:16px; margin-bottom:16px;
+}
+.config-peligro-titulo{font-size:14px; font-weight:700; color:#e5636a; margin-bottom:6px;}
+.btn-borrar-todo{
+  width:100%; background:transparent; border:1.5px solid #b23a3a; color:#e5636a;
+  font-weight:700; font-size:13.5px; padding:12px; border-radius:8px;
+}
+.btn-borrar-todo:active{background:rgba(200,60,60,0.15);}
+
 .btn-config-guardar{
   background:var(--gold); color:#1a1408; font-weight:700; font-size:13px;
   padding:9px 16px; border-radius:8px; border:none;
@@ -943,10 +955,16 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
           <span class="config-mensaje-ok" id="msgGuardado_aprobacion" style="display:none;">✓ Guardado</span>
         </div>
       </div>
+
+      <div class="config-peligro-bloque">
+        <div class="config-peligro-titulo">⚠ Zona de peligro</div>
+        <div class="config-mensaje-sub">Borra TODAS las reservas de TODOS los días guardadas en la base de datos — pasadas y futuras. Úsalo solo si necesitas dejar el sistema completamente en cero para empezar de nuevo. No borra tus salones ni la configuración de mensajes/horarios, solo las reservas.</div>
+        <button class="btn-borrar-todo" onclick="resetearTodasLasReservas()">🗑 Borrar TODAS las reservas</button>
+      </div>
     </div>
   </div>
 
-  <div class="version-tag">v3.41</div>
+  <div class="version-tag">v3.42</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -3104,6 +3122,39 @@ function eliminarReservaDirecta(id, nombre){
   reservasRef.doc(id).delete().catch(err => {
     console.error('Error eliminando reserva:', err);
     alert('No se pudo eliminar la reserva. Revisa tu conexión e intenta de nuevo.');
+  });
+}
+
+function resetearTodasLasReservas(){
+  const escrito = prompt('Esto borra TODAS las reservas de TODOS los días, sin excepción, y no se puede deshacer.\n\nPara confirmar, escribe la palabra BORRAR (en mayúsculas) y toca Aceptar:');
+  if(escrito !== 'BORRAR'){
+    if(escrito !== null) alert('No coincide con "BORRAR" — no se borró nada.');
+    return;
+  }
+  reservasRef.get().then(snap => {
+    if(snap.empty){
+      alert('La base de datos de reservas ya está vacía.');
+      return;
+    }
+    // Firestore permite máximo 500 operaciones por lote, así que dividimos
+    // en grupos de 450 por seguridad si hubiera muchísimas reservas.
+    const docs = snap.docs;
+    const grupos = [];
+    for(let i=0; i<docs.length; i+=450) grupos.push(docs.slice(i, i+450));
+    let promesa = Promise.resolve();
+    grupos.forEach(grupo => {
+      promesa = promesa.then(() => {
+        const batch = db.batch();
+        grupo.forEach(d => batch.delete(d.ref));
+        return batch.commit();
+      });
+    });
+    return promesa;
+  }).then(() => {
+    alert('Listo — se borraron todas las reservas. La base de datos de reservas quedó en cero.');
+  }).catch(err => {
+    console.error('Error al resetear reservas:', err);
+    alert('No se pudo completar el borrado. Revisa tu conexión e intenta de nuevo.');
   });
 }
 
