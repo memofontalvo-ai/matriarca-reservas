@@ -195,18 +195,19 @@ header{
 .stat .max{color:var(--text-dim);}
 
 /* ===== MAIN LAYOUT ===== */
-/* min-height:0 es necesario para que un hijo flex pueda encogerse por debajo
-   de su contenido y así habilitar el scroll interno (overflow-y:auto) en
-   panel-lista/panel-plano/panel-resumen. Antes tenía overflow:hidden aquí,
-   lo que recortaba y ocultaba el contenido cuando el calendario mensual
-   (siempre visible ahora) dejaba poco espacio vertical disponible. */
-main{flex:1; display:flex; min-height:0; overflow:hidden;}
-.panel-lista{
-  width:380px; flex-shrink:0; border-right:1px solid var(--border);
-  overflow-y:auto; padding:14px; min-height:0;
-}
-.panel-plano{flex:1; overflow-y:auto; padding:18px; min-height:0;}
-.panel-resumen{flex:1; overflow-y:auto; padding:20px; min-height:0;}
+/* "Por día" ahora funciona igual en computador que en celular: un solo panel
+   visible a la vez (Lista / Plano / Resumen, controlado por las pestañas de
+   arriba), sin scroll propio — toda la pantalla scrollea de una sola pieza
+   (ver #pantallaPorDia más abajo). Antes en computador se veían las tres
+   columnas al mismo tiempo, cada una con su propio scroll interno; eso, sumado
+   al bloque de calendario que nunca se encoge, era lo que generaba el efecto
+   de "dos scrolls" y contenido que no se alcanzaba a bajar del todo. */
+main{flex:none; display:block; overflow:visible; min-height:0;}
+.panel-lista, .panel-plano, .panel-resumen{display:none; min-height:0; overflow-y:visible;}
+.panel-lista.mobile-active, .panel-plano.mobile-active, .panel-resumen.mobile-active{display:block;}
+.panel-lista{width:100%; padding:14px;}
+.panel-plano{padding:18px;}
+.panel-resumen{padding:20px;}
 
 /* ===== RESERVATION CARDS ===== */
 .res-card{
@@ -305,17 +306,19 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
   background:var(--panel); border-bottom:1px solid var(--border); padding:14px 20px; flex-shrink:0;
 }
 #pantallaSolicitudes, #pantallaPorDia, #pantallaSalones, #pantallaConfig{display:flex; flex-direction:column; flex:1; min-height:0;}
-/* En Solicitudes, el calendario mensual (arriba) no se encoge (flex-shrink:0)
-   y la lista de tarjetas (abajo) sí tiene su propio scroll interno — pero en
-   ventanas de computador no muy altas, el calendario solo ya puede ocupar
-   toda la altura disponible y esconder la lista por completo sin dejar
-   ninguna forma de bajar. Dejamos que la pantalla entera también scrollee
-   como respaldo, en cualquier tamaño de pantalla (antes esto solo estaba
-   activado para celular).*/
-#pantallaSolicitudes{overflow-y:auto; -webkit-overflow-scrolling:touch;}
+/* Las 4 pantallas (Solicitudes, Por día, Salones, Config) scrollean como una
+   sola pieza cada una — sin scrolls anidados adentro. Antes cada pantalla
+   tenía su lista/panel interno con su propio overflow-y:auto por separado,
+   lo que generaba DOS scrolls metidos uno dentro del otro en computador (uno
+   en la pantalla completa y otro adentro del panel): se sentía trabado y a
+   veces no dejaba bajar del todo. Ahora es igual en cualquier tamaño de
+   pantalla — un solo scroll por pantalla, como en celular pero más grande. */
+#pantallaSolicitudes, #pantallaPorDia, #pantallaSalones, #pantallaConfig{overflow-y:auto; -webkit-overflow-scrolling:touch;}
 
 /* ===== SOLICITUDES SCREEN ===== */
-.solicitudes-panel{flex:1; overflow-y:auto; padding:16px; min-height:0;}
+/* La lista de tarjetas NO tiene su propio scroll — solo scrollea la
+   pantalla completa (#pantallaSolicitudes, arriba). */
+.solicitudes-panel{flex:none; overflow-y:visible; padding:16px; min-height:0;}
 .solicitudes-empty{color:var(--text-dim); font-size:13px; text-align:center; padding:60px 20px; line-height:1.6;}
 .solicitud-card-global{
   background:var(--panel-alt); border:1.5px solid #c79bff; border-radius:var(--radius);
@@ -647,8 +650,11 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
 .btn-aprobacion:hover{background:rgba(232,163,61,0.24);}
 
 /* ===== SALONES Y MESAS ===== */
-.salones-panel{flex:1; overflow-y:auto; padding:16px; min-height:0;}
-.config-panel{flex:1; overflow-y:auto; padding:16px; min-height:0;}
+/* Igual que en Solicitudes: sin scroll propio, solo scrollea la pantalla
+   completa (#pantallaSalones / #pantallaConfig, más arriba), para evitar
+   el doble scroll en computador. */
+.salones-panel{flex:none; overflow-y:visible; padding:16px; min-height:0;}
+.config-panel{flex:none; overflow-y:visible; padding:16px; min-height:0;}
 
 /* ===== CONFIGURACIÓN: MENSAJES DE WHATSAPP ===== */
 .config-mensaje-bloque{
@@ -764,32 +770,12 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
   .especial-btn{padding:9px 10px;}
   .subbar{padding:8px 14px;}
   .stats{display:none;}
-  main{flex-direction:column;}
-  .panel-lista{width:100%; border-right:none; border-bottom:1px solid var(--border); max-height:none; min-height:0;}
-  .panel-plano{min-height:0;}
-  .panel-resumen{min-height:0;}
-  .panel-lista, .panel-plano, .panel-resumen{display:none;}
-  .panel-lista.mobile-active, .panel-plano.mobile-active, .panel-resumen.mobile-active{display:block;}
+  /* En celular se navega Lista/Plano/Resumen con la barra inferior en vez
+     de las pestañas de arriba (que sí se usan en computador) — el resto del
+     comportamiento (un panel visible a la vez, un solo scroll por pantalla)
+     ya es igual en cualquier tamaño de pantalla, ver reglas generales arriba. */
   .tabs{display:none;}
-  /* El calendario mensual embebido puede ocupar más alto que lo que queda
-     de pantalla, sobre todo en celulares. Antes 'main' tenía que repartirse
-     el espacio sobrante con flex y quedaba en 0px, escondiendo las reservas
-     por completo. Ahora #pantallaPorDia hace scroll como una página normal:
-     el calendario, la lista y todo lo demás simplemente se acomodan uno
-     debajo del otro y siempre son visibles bajando el dedo. */
-  /* El calendario mensual embebido puede ocupar más alto que lo que queda
-     de pantalla, sobre todo en celulares. Antes cada pantalla (Solicitudes,
-     Por día, Salones) tenía que repartirse el espacio sobrante con flex y
-     el bloque de abajo quedaba en 0px o casi, escondiendo el contenido.
-     Ahora LAS TRES pantallas hacen scroll como una página normal: todo se
-     acomoda uno debajo del otro y siempre es visible bajando el dedo, sin
-     scrolls anidados que confundan (esto se corrigió en "Por día" antes,
-     pero faltaba aplicarlo también aquí — mismo arreglo, un solo lugar).*/
-  #pantallaSolicitudes, #pantallaPorDia, #pantallaSalones, #pantallaConfig{
-    overflow-y:auto; -webkit-overflow-scrolling:touch;
-  }
-  .solicitudes-panel, .salones-panel, .config-panel{flex:none; min-height:0; overflow-y:visible;}
-  main{flex:none; display:block; overflow:visible; min-height:120px;}
+  main{min-height:120px;}
   .bottom-nav{
     display:flex; border-top:1px solid var(--border); background:var(--panel);
     flex-shrink:0; position:sticky; bottom:0; z-index:50;
@@ -982,7 +968,7 @@ main{flex:1; display:flex; min-height:0; overflow:hidden;}
     </div>
   </div>
 
-  <div class="version-tag">v3.47</div>
+  <div class="version-tag">v3.49</div>
 </div>
 
 <div class="overlay" id="overlay">
