@@ -1082,7 +1082,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.57</div>
+<div class="version-tag">v3.58</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -1455,9 +1455,17 @@ function crearUsuario(){
     cargarUsuariosConfig();
   }).catch(err => {
     console.error('Error creando usuario:', err);
-    errEl.textContent = err.code === 'auth/email-already-in-use'
-      ? 'Ese usuario ya existe — elige otro.'
-      : 'No se pudo crear el usuario. Revisa los datos e intenta de nuevo.';
+    // Mostramos el motivo real en vez de un mensaje genérico — así se sabe
+    // de una vez si es la contraseña, el usuario repetido, o algo que hay
+    // que activar en el panel de Firebase (lo más probable la primera vez).
+    const mensajes = {
+      'auth/email-already-in-use': 'Ese usuario ya existe — elige otro.',
+      'auth/weak-password': 'La contraseña es muy débil — usa al menos 6 caracteres.',
+      'auth/invalid-email': 'El usuario tiene caracteres que no se pueden usar. Prueba con solo letras y números.',
+      'auth/operation-not-allowed': 'Falta activar el inicio de sesión por correo/contraseña en Firebase Console (Authentication → Sign-in method → Correo electrónico/contraseña → Habilitar). Actívalo y vuelve a intentar.',
+      'auth/network-request-failed': 'No hay conexión a internet en este momento.',
+    };
+    errEl.textContent = mensajes[err.code] || `No se pudo crear el usuario (${err.code || 'error desconocido'}): ${err.message || ''}`;
   }).finally(() => {
     btn.disabled = false; btn.textContent = 'Crear usuario';
   });
