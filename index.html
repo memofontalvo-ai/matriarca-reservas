@@ -551,6 +551,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   align-items:center; justify-content:center; z-index:100; padding:16px;
 }
 .overlay.open{display:flex;}
+/* Este modal en particular tiene que poder abrirse DESDE la pantalla de
+   login (para crear el primer usuario administrador) — #loginScreen tiene
+   z-index:999, más alto que el de un overlay normal (100), así que sin
+   esto el modal se abría pero quedaba tapado detrás de la pantalla negra
+   de login, sin verse ni poder tocarse. */
+#overlayUsuario{z-index:1002;}
 
 /* ===== BOTÓN "ASIGNAR MESA" (abre el plano visual) ===== */
 .btn-elegir-mesa{
@@ -769,9 +775,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   padding:8px; gap:6px;
 }
+/* En vez de adivinar un porcentaje fijo de la pantalla para la imagen (que
+   dejaba espacio negro sin usar en pantallas más altas), la imagen ahora
+   crece con flex para llenar TODO el espacio que le sobre después de
+   acomodar el formulario de abajo (que sí tiene tamaño fijo) — sin
+   recortarse ni deformarse, gracias a object-fit:contain. */
 .login-banner{
-  width:auto; max-width:100%; max-height:64vh; max-height:64dvh;
-  flex-shrink:1; min-height:0; object-fit:contain; display:block;
+  flex:1 1 0; min-height:0; width:100%; align-self:stretch;
+  object-fit:contain; display:block;
 }
 .login-box{
   width:100%; max-width:340px; flex-shrink:0; background:rgba(18,21,26,0.92);
@@ -1071,7 +1082,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.56</div>
+<div class="version-tag">v3.57</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
