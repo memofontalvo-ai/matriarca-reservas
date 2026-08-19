@@ -760,24 +760,28 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 
 /* ===== LOGIN ===== */
-/* Antes esto era una imagen de fondo de pantalla completa (cover) con el
-   formulario flotando encima. Ahora es una sola página normal que se puede
-   bajar con el dedo: el flyer completo arriba (tal cual, sin recortar) y el
-   formulario de usuario/contraseña debajo, como pidió Guillermo. */
+/* Todo cabe en una sola pantalla, sin bajar el dedo: el flyer arriba se
+   encoge automáticamente (manteniendo su forma, sin recortarse ni
+   deformarse) hasta el espacio que le sobre después de acomodar el
+   formulario abajo — que siempre se ve completo y del mismo tamaño. */
 #loginScreen{
-  position:fixed; inset:0; z-index:999; overflow-y:auto; background:#000;
-  display:flex; flex-direction:column; align-items:center; padding:0 0 32px;
+  position:fixed; inset:0; z-index:999; overflow:hidden; background:#000;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:8px; gap:6px;
 }
-.login-banner{width:100%; max-width:480px; display:block;}
+.login-banner{
+  width:auto; max-width:100%; max-height:64vh; max-height:64dvh;
+  flex-shrink:1; min-height:0; object-fit:contain; display:block;
+}
 .login-box{
-  width:100%; max-width:340px; background:rgba(18,21,26,0.92); margin-top:24px;
-  border:1px solid var(--border); border-radius:16px; padding:28px 24px; box-shadow:0 10px 40px rgba(0,0,0,0.5);
+  width:100%; max-width:340px; flex-shrink:0; background:rgba(18,21,26,0.92);
+  border:1px solid var(--border); border-radius:16px; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,0.5);
 }
-.login-title{color:var(--gold-bright); font-size:15px; font-weight:700; text-align:center; margin-bottom:18px; letter-spacing:0.5px;}
-.login-field{margin-bottom:14px;}
-.login-field label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:5px;}
+.login-title{color:var(--gold-bright); font-size:14px; font-weight:700; text-align:center; margin-bottom:14px; letter-spacing:0.5px;}
+.login-field{margin-bottom:10px;}
+.login-field label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:4px;}
 .login-field input{
-  width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--border);
+  width:100%; padding:9px 12px; border-radius:10px; border:1px solid var(--border);
   background:var(--panel-alt); color:var(--text); font-size:14px;
 }
 .login-pass-wrap{position:relative;}
@@ -787,13 +791,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   color:var(--text-dim); cursor:pointer; font-size:16px; padding:4px;
 }
 .login-btn{
-  width:100%; padding:12px; border-radius:10px; border:none; background:var(--gold-bright);
-  color:#1a1400; font-weight:700; font-size:14px; cursor:pointer; margin-top:4px;
+  width:100%; padding:11px; border-radius:10px; border:none; background:var(--gold-bright);
+  color:#1a1400; font-weight:700; font-size:14px; cursor:pointer; margin-top:2px;
 }
 .login-btn:disabled{opacity:0.6; cursor:not-allowed;}
-.login-error{color:#e57373; font-size:12.5px; text-align:center; margin-top:10px; min-height:16px;}
-.login-forgot{display:block; text-align:center; font-size:12px; color:var(--text-dim); margin-top:14px; text-decoration:underline; cursor:pointer; background:none; border:none;}
-.login-bootstrap{display:block; text-align:center; font-size:12px; color:var(--gold-bright); margin-top:10px; text-decoration:underline; cursor:pointer; background:none; border:none;}
+.login-error{color:#e57373; font-size:12px; text-align:center; margin-top:8px; min-height:14px;}
+.login-forgot{display:block; text-align:center; font-size:11.5px; color:var(--text-dim); margin-top:10px; text-decoration:underline; cursor:pointer; background:none; border:none;}
+.login-bootstrap{display:block; text-align:center; font-size:11.5px; color:var(--gold-bright); margin-top:8px; text-decoration:underline; cursor:pointer; background:none; border:none;}
 
 @media (max-width: 860px){
   header{padding:12px 14px; gap:10px;}
@@ -1067,7 +1071,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.54</div>
+<div class="version-tag">v3.56</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
