@@ -1197,7 +1197,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.67</div>
+<div class="version-tag">v3.68</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -3349,9 +3349,14 @@ function renderSolicitudesScreen(){
   }).join('');
 
   // Resumen del día que se está viendo: aprobadas vs no, VIP vs general
+  // "Aprobada" = terminó confirmada, sin importar si fue el cliente
+  // aprobando por el link (aprobadaPorCliente===true) o el staff
+  // confirmándola directo por teléfono (estado==='confirmada' sin haber
+  // pasado por ese campo) — mismo criterio que ya se usa arriba en las
+  // tarjetas resumen de "Recibidas/Respondidas/Aprobadas".
   const totalPax = delDia.reduce((a,r)=>a+Number(r.pax||0),0);
-  const aprobadas = delDia.filter(r=>r.aprobadaPorCliente===true);
-  const noAprobadas = delDia.filter(r=>r.aprobadaPorCliente!==true);
+  const aprobadas = delDia.filter(r=>r.aprobadaPorCliente===true || r.estado==='confirmada');
+  const noAprobadas = delDia.filter(r=>!(r.aprobadaPorCliente===true || r.estado==='confirmada'));
   const aprobadasPax = aprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
   const noAprobadasPax = noAprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
 
