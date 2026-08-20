@@ -1197,7 +1197,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.68</div>
+<div class="version-tag">v3.69</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -2320,8 +2320,12 @@ function renderCalendarioInline(){
   // canceladas) para marcar el mes visible — tiene que ser exactamente el
   // mismo criterio que usa la lista del día, si no el número del calendario
   // no va a coincidir con lo que realmente se ve al entrar a ese día.
+  // Si hay un turno específico activo (Desayuno/Almuerzo/Cena), el
+  // calendario respeta ese filtro y solo suma ese turno — así el número de
+  // cada día refleja exactamente lo que se está viendo, no siempre el total.
   const reservasDelMes = reservas.filter(r => {
     if(r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='cancelada') return false;
+    if(turnoActivo !== 'todos' && r.turno !== turnoActivo) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && m===(calInlineMes+1);
   });
