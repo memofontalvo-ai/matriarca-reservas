@@ -1013,7 +1013,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
       <div class="cal-days cal-days-inline" id="calInlineDays"></div>
       <div class="cal-inline-leyenda">
-        <span><span class="cal-dot-leyenda" style="border-radius:4px; width:14px; background:var(--gold-bright);"></span> Total de reservas ese día</span>
+        <span><span class="cal-dot-leyenda" style="border-radius:4px; width:14px; background:var(--gold-bright);"></span> Total de personas ese día</span>
         <span><span class="cal-star-leyenda">⭐</span> Incluye reserva especial (30+)</span>
       </div>
       <div class="cal-aviso-navegando" id="calAvisoNavegando" style="display:none;"></div>
@@ -1110,7 +1110,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.61</div>
+<div class="version-tag">v3.62</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -1984,10 +1984,10 @@ function renderCalendarioInline(){
   });
   const diasConReserva = new Set(reservasDelMes.map(r=>r.fecha));
   const diasConEspecial = new Set(reservasDelMes.filter(r=>Number(r.pax)>=30).map(r=>r.fecha));
-  // Conteo real de reservas por día, para mostrarlo como número en vez de
-  // solo un punto — así se ve de un vistazo cuántas hay ese día.
+  // Total de PERSONAS (suma de pax de todas las reservas), no cantidad de
+  // reservas — así el número refleja cuánta gente hay ese día en total.
   const conteoPorDia = {};
-  reservasDelMes.forEach(r => { conteoPorDia[r.fecha] = (conteoPorDia[r.fecha] || 0) + 1; });
+  reservasDelMes.forEach(r => { conteoPorDia[r.fecha] = (conteoPorDia[r.fecha] || 0) + (Number(r.pax) || 0); });
 
   let html = '';
   const diasMesAnterior = new Date(calInlineAno, calInlineMes, 0).getDate();
