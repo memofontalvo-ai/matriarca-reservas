@@ -142,10 +142,19 @@ img{max-width:100%; display:block;}
   backdrop-filter:blur(6px);
 }
 .btn-acceso-equipo:active{background:var(--panel-alt);}
+
+/* Número de versión — mismo criterio que app.html: siempre visible, fijo
+   arriba, para poder confirmar de un vistazo cuál quedó publicada. */
+.version-tag{
+  position:fixed; top:14px; left:14px; z-index:50; font-size:10px; color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace; pointer-events:none; opacity:.85;
+  background:rgba(19,21,25,0.55); padding:3px 8px; border-radius:6px;
+}
 </style>
 </head>
 <body style="background:#0a0b0d;">
 
+<div class="version-tag">v1.0</div>
 <a href="app.html" class="btn-acceso-equipo" aria-label="Acceso del equipo">⚙️</a>
 
 <section class="hero">
