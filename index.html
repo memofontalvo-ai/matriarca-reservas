@@ -102,7 +102,7 @@ img{display:block;max-width:100%}
 
 /* CARRUSEL */
 .seccion-carrusel{
-  display:none;
+  display:block;
   padding:10px 0 26px;
 }
 .seccion-carrusel.tiene-slides{display:block}
@@ -285,7 +285,7 @@ img{display:block;max-width:100%}
 </head>
 
 <body style="background:#090a0c;">
-<div class="version-tag">v1.2</div>
+<div class="version-tag">v1.3</div>
 <a href="app.html" class="btn-acceso-equipo" aria-label="Acceso del equipo">⚙️</a>
 
 <main class="page">
@@ -321,7 +321,7 @@ img{display:block;max-width:100%}
   </section>
 
   <nav class="quick-links" aria-label="Accesos rápidos">
-    <a class="quick-card" href="https://sede-bquilla.lamatriarca.com/menu/lunch/" target="_blank" rel="noopener">
+    <a class="quick-card" href="https://sede-bquilla.lamatriarca.com" target="_blank" rel="noopener">
       <span class="quick-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
           <path d="M4 4.5c3.4 0 5.5.7 8 2.4 2.5-1.7 4.6-2.4 8-2.4v14.3c-3.4 0-5.7.7-8 2.2-2.3-1.5-4.6-2.2-8-2.2z"/><path d="M12 6.9V21"/>
@@ -467,6 +467,9 @@ function iniciarCarrusel() {
   if (!slides.length) {
     seccion.classList.remove('tiene-slides');
     if (intervaloCarrusel) clearInterval(intervaloCarrusel);
+    document.getElementById('carruselPrev').style.display = 'none';
+    document.getElementById('carruselNext').style.display = 'none';
+    dotsWrap.innerHTML = '';
     return;
   }
 
