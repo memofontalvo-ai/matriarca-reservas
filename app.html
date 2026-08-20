@@ -711,10 +711,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .config-panel{flex:none; overflow-y:visible; padding:16px; min-height:0;}
 
 /* ===== CONFIGURACIÓN: MENSAJES DE WHATSAPP ===== */
+/* Grupos: cada uno junta los bloques que pertenecen al mismo tema (mensajes,
+   carrusel, usuarios) bajo un encabezado propio, en vez de una sola lista
+   larga de bloques sueltos sin relación visible entre ellos. */
+.config-grupo{margin-bottom:28px;}
+.config-grupo-titulo{
+  font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--text-dim); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border-soft);
+}
 .config-mensaje-bloque{
   background:var(--panel-alt); border:1px solid var(--border); border-radius:12px;
   padding:16px; margin-bottom:16px;
 }
+.config-grupo .config-mensaje-bloque:last-child{margin-bottom:0;}
 .config-mensaje-titulo{font-size:14px; font-weight:700; color:var(--gold-bright); margin-bottom:6px;}
 .config-mensaje-sub{font-size:11.5px; color:var(--text-dim); line-height:1.55; margin-bottom:12px;}
 .config-mensaje-sub code{
@@ -728,6 +737,28 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .config-mensaje-textarea:focus{border-color:var(--gold); outline:none;}
 .config-mensaje-acciones{display:flex; align-items:center; gap:10px; margin-top:12px;}
+
+/* Carrusel de eventos: cuadrícula de fotos ya montadas, cada una con su
+   botón de borrar encima — así Guillermo ve de una vez qué hay puesto,
+   sin tener que abrir nada para saberlo. */
+.carrusel-config-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:6px 0 12px;}
+.carrusel-config-item{position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; border:1px solid var(--border);}
+.carrusel-config-item img{width:100%; height:100%; object-fit:cover; display:block;}
+.carrusel-config-borrar{
+  position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%;
+  background:rgba(20,10,10,0.75); color:#f5b5b5; font-size:12px; display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,0.15);
+}
+.carrusel-config-mover{
+  position:absolute; bottom:4px; display:flex; gap:3px;
+}
+.carrusel-config-mover button{
+  width:20px; height:20px; border-radius:5px; background:rgba(20,20,24,0.75); color:var(--text);
+  font-size:10px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.12);
+}
+.carrusel-config-mover button:disabled{opacity:0.3;}
+.carrusel-config-mover .mover-izq{left:4px;}
+.carrusel-config-mover .mover-der{right:4px;}
 
 .config-peligro-bloque{
   background:rgba(200,60,60,0.08); border:1px solid #b23a3a; border-radius:12px;
@@ -1084,56 +1115,69 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
   <div id="pantallaConfig" style="display:none;">
     <div class="config-panel">
-      <div class="config-mensaje-bloque">
-        <div class="config-mensaje-titulo">📨 Mensaje de solicitud</div>
-        <div class="config-mensaje-sub">Se envía cuando le pides al cliente que llene el formulario de reserva. Usa <code>{nombre}</code> y <code>{link}</code> donde quieras que aparezca el nombre del contacto y el link — se rellenan solos al enviar.</div>
-        <textarea id="msgTexto_solicitud" class="config-mensaje-textarea" rows="12"></textarea>
-        <div class="config-mensaje-acciones">
-          <button class="btn-config-restaurar" onclick="restaurarMensaje('solicitud')">Restaurar original</button>
-          <button class="btn-config-guardar" onclick="guardarMensaje('solicitud', document.getElementById('msgTexto_solicitud').value)">Guardar</button>
-          <span class="config-mensaje-ok" id="msgGuardado_solicitud" style="display:none;">✓ Guardado</span>
+
+      <!-- ===== GRUPO: MENSAJES AUTOMÁTICOS ===== -->
+      <div class="config-grupo">
+        <div class="config-grupo-titulo">💬 Mensajes automáticos</div>
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">📨 Mensaje de solicitud</div>
+          <div class="config-mensaje-sub">Se envía cuando le pides al cliente que llene el formulario de reserva. Usa <code>{nombre}</code> y <code>{link}</code> donde quieras que aparezca el nombre del contacto y el link — se rellenan solos al enviar.</div>
+          <textarea id="msgTexto_solicitud" class="config-mensaje-textarea" rows="12"></textarea>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-restaurar" onclick="restaurarMensaje('solicitud')">Restaurar original</button>
+            <button class="btn-config-guardar" onclick="guardarMensaje('solicitud', document.getElementById('msgTexto_solicitud').value)">Guardar</button>
+            <span class="config-mensaje-ok" id="msgGuardado_solicitud" style="display:none;">✓ Guardado</span>
+          </div>
+        </div>
+
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">✅ Mensaje de aprobación</div>
+          <div class="config-mensaje-sub">Se envía cuando ya armaste la reserva y le pides al cliente que la revise y apruebe. Además de <code>{nombre}</code> y <code>{link}</code>, aquí también puedes usar <code>{fecha}</code>, <code>{hora}</code>, <code>{pax}</code>, <code>{mesa}</code>, <code>{abono}</code> y <code>{menu}</code> — se llenan solos con los datos reales de cada reserva, para que le quede el detalle completo en el texto del WhatsApp aunque no vuelva a entrar a la app.</div>
+          <textarea id="msgTexto_aprobacion" class="config-mensaje-textarea" rows="12"></textarea>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-restaurar" onclick="restaurarMensaje('aprobacion')">Restaurar original</button>
+            <button class="btn-config-guardar" onclick="guardarMensaje('aprobacion', document.getElementById('msgTexto_aprobacion').value)">Guardar</button>
+            <span class="config-mensaje-ok" id="msgGuardado_aprobacion" style="display:none;">✓ Guardado</span>
+          </div>
         </div>
       </div>
 
-      <div class="config-mensaje-bloque">
-        <div class="config-mensaje-titulo">✅ Mensaje de aprobación</div>
-        <div class="config-mensaje-sub">Se envía cuando ya armaste la reserva y le pides al cliente que la revise y apruebe. Además de <code>{nombre}</code> y <code>{link}</code>, aquí también puedes usar <code>{fecha}</code>, <code>{hora}</code>, <code>{pax}</code>, <code>{mesa}</code>, <code>{abono}</code> y <code>{menu}</code> — se llenan solos con los datos reales de cada reserva, para que le quede el detalle completo en el texto del WhatsApp aunque no vuelva a entrar a la app.</div>
-        <textarea id="msgTexto_aprobacion" class="config-mensaje-textarea" rows="12"></textarea>
-        <div class="config-mensaje-acciones">
-          <button class="btn-config-restaurar" onclick="restaurarMensaje('aprobacion')">Restaurar original</button>
-          <button class="btn-config-guardar" onclick="guardarMensaje('aprobacion', document.getElementById('msgTexto_aprobacion').value)">Guardar</button>
-          <span class="config-mensaje-ok" id="msgGuardado_aprobacion" style="display:none;">✓ Guardado</span>
+      <!-- ===== GRUPO: CARRUSEL DE EVENTOS ===== -->
+      <div class="config-grupo">
+        <div class="config-grupo-titulo">🎠 Carrusel de eventos</div>
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-sub">Estas son las fotos que ven los clientes en el carrusel de <code>reservasbq.com</code>, antes de tocar "Reserva con nosotros". Sube la imagen ya lista (con su propio texto y diseño) — no se le agrega nada más encima. Se actualiza sola en la página pública apenas la guardes aquí.</div>
+          <div id="listaCarrusel" class="carrusel-config-grid"></div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="abrirModalSlide()">+ Agregar foto</button>
+          </div>
         </div>
       </div>
 
-      <div class="config-mensaje-bloque">
-        <div class="config-mensaje-titulo">🎠 Carrusel de eventos (página pública)</div>
-        <div class="config-mensaje-sub">Estas son las fotos y textos que ven los clientes en el carrusel de <code>reservasbq.com</code>, antes de tocar "Reserva con nosotros". Se actualizan solas en la página pública apenas las guardes aquí — no hace falta subir ningún archivo nuevo al repositorio.</div>
-        <div id="listaCarrusel" style="margin:10px 0;"></div>
-        <div class="config-mensaje-acciones">
-          <button class="btn-config-guardar" onclick="abrirModalSlide()">+ Agregar evento</button>
+      <!-- ===== GRUPO: USUARIOS Y ACCESOS ===== -->
+      <div class="config-grupo">
+        <div class="config-grupo-titulo">👤 Usuarios y accesos</div>
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">Usuarios y contraseñas</div>
+          <div class="config-mensaje-sub">Cada usuario que crees puede iniciar sesión con su propio usuario y contraseña. Sus iniciales quedan marcadas automáticamente en cada reserva que cree o edite, para llevar el control de quién hizo qué.</div>
+          <div id="listaUsuarios" style="margin:10px 0;"></div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="abrirModalUsuario()">+ Crear usuario</button>
+          </div>
+        </div>
+
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">🔑 Mi contraseña</div>
+          <div class="config-mensaje-sub">Cambia la contraseña de la cuenta con la que iniciaste sesión ahora mismo.</div>
+          <div class="field"><label>Nueva contraseña</label><input type="text" id="fMiNuevaPass" placeholder="Mínimo 6 caracteres" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text); font-size:14px;"></div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="cambiarMiPassword()">Actualizar contraseña</button>
+            <span class="config-mensaje-ok" id="miPassGuardado" style="display:none;">✓ Actualizada</span>
+          </div>
         </div>
       </div>
 
-      <div class="config-mensaje-bloque">
-        <div class="config-mensaje-titulo">👤 Usuarios y contraseñas</div>
-        <div class="config-mensaje-sub">Cada usuario que crees puede iniciar sesión con su propio correo y contraseña. Sus iniciales quedan marcadas automáticamente en cada reserva que cree o edite, para llevar el control de quién hizo qué.</div>
-        <div id="listaUsuarios" style="margin:10px 0;"></div>
-        <div class="config-mensaje-acciones">
-          <button class="btn-config-guardar" onclick="abrirModalUsuario()">+ Crear usuario</button>
-        </div>
-      </div>
-
-      <div class="config-mensaje-bloque">
-        <div class="config-mensaje-titulo">🔑 Mi contraseña</div>
-        <div class="config-mensaje-sub">Cambia la contraseña de la cuenta con la que iniciaste sesión ahora mismo.</div>
-        <div class="field"><label>Nueva contraseña</label><input type="text" id="fMiNuevaPass" placeholder="Mínimo 6 caracteres" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text); font-size:14px;"></div>
-        <div class="config-mensaje-acciones">
-          <button class="btn-config-guardar" onclick="cambiarMiPassword()">Actualizar contraseña</button>
-          <span class="config-mensaje-ok" id="miPassGuardado" style="display:none;">✓ Actualizada</span>
-        </div>
-      </div>
-
+      <!-- ===== ZONA DE PELIGRO (fuera de los grupos, a propósito) ===== -->
       <div class="config-peligro-bloque">
         <div class="config-peligro-titulo">⚠ Zona de peligro</div>
         <div class="config-mensaje-sub">Borra TODAS las reservas de TODOS los días guardadas en la base de datos — pasadas y futuras. Úsalo solo si necesitas dejar el sistema completamente en cero para empezar de nuevo. No borra tus salones ni la configuración de mensajes/horarios, solo las reservas.</div>
@@ -1148,7 +1192,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.64</div>
+<div class="version-tag">v3.65</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -1359,16 +1403,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 <div class="overlay" id="overlaySlide">
   <div class="modal">
-    <h3 id="tituloModalSlide">Nuevo evento del carrusel</h3>
-    <div class="modal-sub">Esta foto y este texto se ven en la página pública de reservas. Elige una foto horizontal, de buena luz — se comprime automáticamente para que cargue rápido en el celular del cliente.</div>
+    <h3>Agregar foto al carrusel</h3>
+    <div class="modal-sub">Sube la imagen tal cual va a verse — ya con su texto y diseño si lo tiene. Se comprime automáticamente para que cargue rápido en el celular del cliente.</div>
     <div class="field">
       <label>Foto</label>
       <input type="file" id="fSlideArchivo" accept="image/*" onchange="previsualizarSlide(this)">
-      <img id="fSlidePreview" style="display:none; width:100%; margin-top:10px; border-radius:10px; max-height:180px; object-fit:cover;">
+      <img id="fSlidePreview" style="display:none; width:100%; margin-top:10px; border-radius:10px; max-height:220px; object-fit:cover;">
     </div>
-    <div class="field"><label>Etiqueta pequeña (ej. "Viernes · 8:00 pm" o "Todo el mes")</label><input type="text" id="fSlideTag" placeholder="Ej. Viernes · 8:00 pm"></div>
-    <div class="field"><label>Título</label><input type="text" id="fSlideTitulo" placeholder="Ej. Vallenato en vivo"></div>
-    <div class="field"><label>Descripción corta</label><textarea id="fSlideDesc" rows="2" placeholder="Ej. Parranda vallenata todos los viernes desde las 8:00 pm."></textarea></div>
     <div class="login-error" id="slideModalError"></div>
     <div class="modal-actions modal-actions-wrap">
       <button class="btn btn-ghost" onclick="cerrarModalSlide()">Cancelar</button>
@@ -1636,12 +1677,13 @@ function crearUsuario(){
 
 // ===== CARRUSEL DE EVENTOS (página pública reservasbq.com) =====
 // Se guarda en Firestore como un solo documento (configuracion/carrusel)
-// con un arreglo de diapositivas. La página pública (index.html) lo lee
-// sin necesitar sesión iniciada — por eso las reglas de Firestore deben
+// con un arreglo de fotos. La página pública (index.html) lo lee sin
+// necesitar sesión iniciada — por eso las reglas de Firestore deben
 // permitir lectura pública de ESTE documento en particular (ver nota que
-// le doy a Guillermo en el chat).
+// le doy a Guillermo en el chat). A propósito NO se pide título ni texto:
+// la foto ya trae su propio diseño e información, así que aquí solo se
+// sube, se reordena o se borra — nada más.
 let carruselCache = [];
-let editandoSlideId = null;
 let slideImgBase64Temp = null;
 
 function cargarCarruselConfig(){
@@ -1651,46 +1693,26 @@ function cargarCarruselConfig(){
     const data = doc.exists ? doc.data() : {};
     carruselCache = (data.slides || []).slice().sort((a,b) => (a.orden||0)-(b.orden||0));
     if(carruselCache.length === 0){
-      el.innerHTML = '<div class="config-mensaje-sub">Todavía no has agregado ningún evento — la página pública muestra 3 ejemplos genéricos mientras tanto.</div>';
+      el.innerHTML = '<div class="config-mensaje-sub">Todavía no has subido ninguna foto — la página pública muestra 3 ejemplos genéricos mientras tanto.</div>';
       return;
     }
     el.innerHTML = carruselCache.map((s, i) => `
-      <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; margin-bottom:8px;">
-        <img src="${s.img}" style="width:52px; height:52px; border-radius:8px; object-fit:cover; flex-shrink:0;">
-        <div style="flex:1; min-width:0;">
-          <div style="font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.titulo||'')}</div>
-          <div style="font-size:11.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(s.tag||'')}</div>
-        </div>
-        <div style="display:flex; gap:4px; flex-shrink:0;">
-          <button class="btn-config-restaurar" onclick="moverSlide(${i},-1)" ${i===0?'disabled style="opacity:.35;"':''} title="Subir">↑</button>
-          <button class="btn-config-restaurar" onclick="moverSlide(${i},1)" ${i===carruselCache.length-1?'disabled style="opacity:.35;"':''} title="Bajar">↓</button>
-          <button class="btn-config-restaurar" onclick='abrirModalSlide(${JSON.stringify(s.id)})'>Editar</button>
-          <button class="btn btn-danger" style="padding:6px 10px; font-size:12px;" onclick='eliminarSlide(${JSON.stringify(s.id)})'>Borrar</button>
+      <div class="carrusel-config-item">
+        <img src="${s.img}">
+        <button class="carrusel-config-borrar" onclick='eliminarSlide(${JSON.stringify(s.id)})' title="Borrar">✕</button>
+        <div class="carrusel-config-mover">
+          <button class="mover-izq" onclick="moverSlide(${i},-1)" ${i===0?'disabled':''} title="Mover antes">‹</button>
+          <button class="mover-der" onclick="moverSlide(${i},1)" ${i===carruselCache.length-1?'disabled':''} title="Mover después">›</button>
         </div>
       </div>`).join('');
   });
 }
 
-function abrirModalSlide(id){
-  editandoSlideId = id || null;
+function abrirModalSlide(){
   slideImgBase64Temp = null;
-  document.getElementById('tituloModalSlide').textContent = id ? 'Editar evento del carrusel' : 'Nuevo evento del carrusel';
   document.getElementById('fSlideArchivo').value = '';
   document.getElementById('slideModalError').textContent = '';
-  const preview = document.getElementById('fSlidePreview');
-  if(id){
-    const s = carruselCache.find(x => x.id === id);
-    document.getElementById('fSlideTag').value = s.tag || '';
-    document.getElementById('fSlideTitulo').value = s.titulo || '';
-    document.getElementById('fSlideDesc').value = s.desc || '';
-    slideImgBase64Temp = s.img || null;
-    if(s.img){ preview.src = s.img; preview.style.display = 'block'; } else { preview.style.display = 'none'; }
-  } else {
-    document.getElementById('fSlideTag').value = '';
-    document.getElementById('fSlideTitulo').value = '';
-    document.getElementById('fSlideDesc').value = '';
-    preview.style.display = 'none';
-  }
+  document.getElementById('fSlidePreview').style.display = 'none';
   document.getElementById('overlaySlide').classList.add('open');
 }
 function cerrarModalSlide(){
@@ -1700,8 +1722,8 @@ function cerrarModalSlide(){
 // Comprime la foto en el navegador antes de guardarla: la reduce a un
 // ancho máximo de 1000px y la vuelve JPEG de calidad media. Así cada foto
 // pesa unos 100-180KB en vez de varios MB — importante porque Firestore no
-// deja guardar más de 1MB por documento, y todas las diapositivas viven en
-// el mismo documento.
+// deja guardar más de 1MB por documento, y todas las fotos viven en el
+// mismo documento.
 function previsualizarSlide(input){
   const file = input.files[0];
   if(!file) return;
@@ -1730,26 +1752,18 @@ function previsualizarSlide(input){
 }
 
 function guardarSlide(){
-  const tag = document.getElementById('fSlideTag').value.trim();
-  const titulo = document.getElementById('fSlideTitulo').value.trim();
-  const desc = document.getElementById('fSlideDesc').value.trim();
   const errEl = document.getElementById('slideModalError');
   errEl.textContent = '';
-  if(!titulo || !slideImgBase64Temp){ errEl.textContent = 'Falta la foto o el título.'; return; }
+  if(!slideImgBase64Temp){ errEl.textContent = 'Elige una foto primero.'; return; }
 
   const btn = document.getElementById('btnGuardarSlide');
   btn.disabled = true; btn.textContent = 'Guardando…';
 
   const nuevaLista = carruselCache.slice();
-  if(editandoSlideId){
-    const idx = nuevaLista.findIndex(s => s.id === editandoSlideId);
-    if(idx > -1) nuevaLista[idx] = {...nuevaLista[idx], tag, titulo, desc, img: slideImgBase64Temp};
-  } else {
-    nuevaLista.push({
-      id: 'slide_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
-      tag, titulo, desc, img: slideImgBase64Temp, orden: nuevaLista.length,
-    });
-  }
+  nuevaLista.push({
+    id: 'slide_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    img: slideImgBase64Temp, orden: nuevaLista.length,
+  });
 
   db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(() => {
     cerrarModalSlide();
@@ -1763,7 +1777,7 @@ function guardarSlide(){
 }
 
 function eliminarSlide(id){
-  if(!confirm('¿Borrar este evento del carrusel de la página pública?')) return;
+  if(!confirm('¿Borrar esta foto del carrusel de la página pública?')) return;
   const nuevaLista = carruselCache.filter(s => s.id !== id).map((s, i) => ({...s, orden: i}));
   db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(cargarCarruselConfig);
 }
