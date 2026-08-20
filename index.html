@@ -528,10 +528,18 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .cal-days-inline .cal-day{
   aspect-ratio:auto; height:44px; flex-direction:column; gap:1px; position:relative;
 }
-.cal-day-marcas{display:flex; gap:2px; height:6px; align-items:center; justify-content:center;}
-.cal-dot-marca{width:5px; height:5px; border-radius:50%; background:var(--confirmed);}
-.cal-dot-marca.pendiente{background:#e8a33d;}
-.cal-star-marca{font-size:9px; line-height:1;}
+.cal-day-marcas{display:flex; align-items:center; justify-content:center; height:14px;}
+/* Contador de reservas por día: reemplaza el punto verde anterior por el
+   número real de reservas — así se ve de un vistazo cuántas hay, no solo
+   que "hay algo". Va en una etiqueta pequeña propia, debajo del número del
+   día, para que nunca se monte encima ni se vea apretado. */
+.cal-day-count{
+  font-size:9px; font-weight:700; line-height:1; font-family:'JetBrains Mono',monospace;
+  color:#0a0f14; background:var(--gold-bright); border-radius:6px;
+  padding:1.5px 5px; white-space:nowrap;
+}
+.cal-day-count.especial{background:linear-gradient(135deg, var(--gold-bright), #ffd76a); box-shadow:0 0 0 1px rgba(255,215,106,0.5);}
+.cal-day.selected .cal-day-count{background:#1a1408; color:var(--gold-bright);}
 .cal-inline-leyenda{
   display:flex; justify-content:center; gap:16px; margin-top:10px;
   font-size:10.5px; color:var(--text-dim);
@@ -1005,8 +1013,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
       <div class="cal-days cal-days-inline" id="calInlineDays"></div>
       <div class="cal-inline-leyenda">
-        <span><span class="cal-dot-leyenda"></span> Día con reservas</span>
-        <span><span class="cal-star-leyenda">⭐</span> Tiene reserva especial (30+)</span>
+        <span><span class="cal-dot-leyenda" style="border-radius:4px; width:14px; background:var(--gold-bright);"></span> Total de reservas ese día</span>
+        <span><span class="cal-star-leyenda">⭐</span> Incluye reserva especial (30+)</span>
       </div>
       <div class="cal-aviso-navegando" id="calAvisoNavegando" style="display:none;"></div>
     </div>
@@ -1102,7 +1110,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.60</div>
+<div class="version-tag">v3.61</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -1976,6 +1984,10 @@ function renderCalendarioInline(){
   });
   const diasConReserva = new Set(reservasDelMes.map(r=>r.fecha));
   const diasConEspecial = new Set(reservasDelMes.filter(r=>Number(r.pax)>=30).map(r=>r.fecha));
+  // Conteo real de reservas por día, para mostrarlo como número en vez de
+  // solo un punto — así se ve de un vistazo cuántas hay ese día.
+  const conteoPorDia = {};
+  reservasDelMes.forEach(r => { conteoPorDia[r.fecha] = (conteoPorDia[r.fecha] || 0) + 1; });
 
   let html = '';
   const diasMesAnterior = new Date(calInlineAno, calInlineMes, 0).getDate();
@@ -1990,9 +2002,10 @@ function renderCalendarioInline(){
     if(iso===selISO) cls += ' selected';
     const tieneReserva = diasConReserva.has(iso);
     const tieneEspecial = diasConEspecial.has(iso);
-    const marca = tieneEspecial
-      ? `<span class="cal-star-marca">⭐</span>`
-      : (tieneReserva ? `<span class="cal-dot-marca"></span>` : '<span></span>');
+    const total = conteoPorDia[iso] || 0;
+    const marca = tieneReserva
+      ? `<span class="cal-day-count${tieneEspecial ? ' especial' : ''}">${tieneEspecial ? '⭐ ' : ''}${total}</span>`
+      : '';
     html += `<div class="${cls}" onclick="seleccionarDiaInline(${d})">${d}<div class="cal-day-marcas">${marca}</div></div>`;
   }
   const totalCeldas = offset + diasEnMes;
