@@ -257,6 +257,15 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .res-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright);}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;}
+/* Fila fija de "identificación" (código, hora de solicitud, iniciales de
+   quien la tomó): siempre abajo del todo y pegada a la derecha, separada
+   de los demás datos — así la tarjeta se ve ordenada sin importar cuántos
+   datos tenga arriba (mesa, celular, comprobante, etc.), en vez de que
+   estas tres cosas queden saltando de posición según lo que quepa. */
+.res-firma, .sc-firma{
+  display:flex; justify-content:flex-end; align-items:center; gap:8px;
+  margin-top:8px; padding-top:8px; border-top:1px dashed var(--border);
+}
 .badge{
   font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px;
   text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap;
@@ -1197,7 +1206,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.70</div>
+<div class="version-tag">v3.71</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -2458,10 +2467,13 @@ function renderLista(){
         ${isVip?`<span class="vip-tag">VIP</span>`:''}
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
         ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
-        ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
-        ${r.ultimoEditorIniciales?`<span title="Última vez editada por ${escapeHtml(r.ultimoEditorNombre||'')}">✎ ${escapeHtml(r.ultimoEditorIniciales)}</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
       </div>
+      ${(r.codigoReserva || r.ultimoEditorIniciales) ? `
+      <div class="res-firma">
+        ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
+        ${r.ultimoEditorIniciales?`<span title="Última vez editada por ${escapeHtml(r.ultimoEditorNombre||'')}">✎ ${escapeHtml(r.ultimoEditorIniciales)}</span>`:''}
+      </div>` : ''}
       ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
       ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
     </div>`;
@@ -3333,9 +3345,12 @@ function renderSolicitudesScreen(){
         </div>
         <div class="sc-meta">
           ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
+        </div>
+        ${(r.codigoReserva || formatearHoraSolicitud(r.horaSolicitud)) ? `
+        <div class="sc-firma">
           ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
           ${formatearHoraSolicitud(r.horaSolicitud)?`<span title="Hora en que llegó la solicitud">🕒 ${formatearHoraSolicitud(r.horaSolicitud)}</span>`:''}
-        </div>
+        </div>` : ''}
         ${hint}
       </div>`;
     }
@@ -3355,11 +3370,14 @@ function renderSolicitudesScreen(){
         ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabel(r.mesa))}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
+        ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
+      </div>
+      ${(r.codigoReserva || formatearHoraSolicitud(r.horaSolicitud) || r.ultimoEditorIniciales) ? `
+      <div class="sc-firma">
         ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
         ${formatearHoraSolicitud(r.horaSolicitud)?`<span title="Hora en que llegó la solicitud">🕒 ${formatearHoraSolicitud(r.horaSolicitud)}</span>`:''}
         ${r.ultimoEditorIniciales?`<span title="Última vez editada por ${escapeHtml(r.ultimoEditorNombre||'')}">✎ ${escapeHtml(r.ultimoEditorIniciales)}</span>`:''}
-        ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
-      </div>
+      </div>` : ''}
       ${r.obs?`<div class="sc-obs">${escapeHtml(r.obs)}</div>`:''}
       ${hint}
     </div>`;
