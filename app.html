@@ -308,6 +308,24 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .estado-conexion.desconectado{color:var(--cancelled);}
 .estado-conexion.desconectado .estado-conexion-dot{background:var(--cancelled); box-shadow:0 0 0 3px rgba(229,99,106,0.2);}
 
+/* ===== USUARIOS EN LÍNEA (solo visible para Administrador) ===== */
+.usuarios-en-linea{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:8px 12px; font-size:11px; background:var(--panel-alt);
+  border-bottom:1px solid var(--border); flex-shrink:0;
+}
+.usuarios-en-linea-label{color:var(--text-dim); font-weight:600; white-space:nowrap;}
+.usuarios-en-linea-lista{display:flex; gap:6px; flex-wrap:wrap;}
+.usuario-en-linea-chip{
+  display:inline-flex; align-items:center; gap:5px;
+  background:var(--panel-raised); border:1px solid var(--border); border-radius:20px;
+  padding:3px 9px 3px 7px; font-size:11px; font-weight:700; color:var(--text);
+}
+.usuario-en-linea-chip .punto{
+  width:6px; height:6px; border-radius:50%; background:var(--confirmed);
+  box-shadow:0 0 0 2px rgba(71,184,129,0.25); flex-shrink:0;
+}
+
 /* ===== APP TOGGLE (Solicitudes / Por día / Salones) ===== */
 .app-toggle{
   display:flex; background:var(--panel); border-bottom:1px solid var(--border);
@@ -1060,6 +1078,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <span class="estado-conexion-dot"></span>
     <span id="estadoConexionTexto">Conectando con la base de datos...</span>
   </div>
+  <div class="usuarios-en-linea" id="usuariosEnLineaBox" style="display:none;">
+    <span class="usuarios-en-linea-label">🟢 En línea ahora:</span>
+    <div class="usuarios-en-linea-lista" id="usuariosEnLineaLista"></div>
+  </div>
   <div class="app-toggle">
     <button id="toggleSolicitudes" class="app-toggle-btn" onclick="cambiarVistaApp('solicitudes')">
       <span class="app-toggle-icon">🔔</span>
@@ -1254,7 +1276,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.72</div>
+<div class="version-tag">v3.73</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1696,18 +1718,108 @@ auth.onAuthStateChanged(user => {
       aplicarRestriccionesRol();
       cargarUsuariosConfig();
       cargarCarruselConfig();
+      iniciarPresencia();
     });
   } else {
     usuarioActual = null;
+    detenerPresencia();
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appRoot').style.display = 'none';
     revisarBootstrapPrimerUsuario();
   }
 });
 
+// ===== USUARIOS EN LÍNEA (visible solo para Administrador) =====
+// Cada usuario que tiene sesión abierta va "avisando" cada 25 segundos que
+// sigue activo, guardando un registro en Firestore con la hora exacta de
+// su último aviso (configuracion/presencia, un documento por persona).
+// El administrador escucha ese documento en tiempo real y considera "en
+// línea" a cualquiera cuyo último aviso sea de hace menos de 50 segundos —
+// así, si alguien cierra la pestaña sin avisar (no hay forma de detectarlo
+// al instante en Firestore como sí existe en Realtime Database), en menos
+// de un minuto deja de aparecer como conectado en vez de quedarse ahí para
+// siempre.
+let intervaloPresencia = null;
+let listenerPresenciaAdmin = null;
+const VENTANA_EN_LINEA_MS = 50000;
+
+function refPresenciaMia(){
+  return db.collection('configuracion').doc('presencia').collection('usuarios').doc(usuarioActual.uid);
+}
+
+function avisarPresencia(){
+  if(!usuarioActual) return;
+  refPresenciaMia().set({
+    nombre: usuarioActual.nombre,
+    iniciales: usuarioActual.iniciales,
+    rol: usuarioActual.rol,
+    ultimoAviso: Date.now(),
+  }).catch(()=>{});
+}
+
+function iniciarPresencia(){
+  detenerPresencia();
+  avisarPresencia();
+  intervaloPresencia = setInterval(avisarPresencia, 25000);
+  // Si vuelve a la pestaña después de tenerla en segundo plano, avisa de
+  // una vez en vez de esperar hasta 25 segundos.
+  document.addEventListener('visibilitychange', avisarPresenciaSiVisible);
+  // Intento de "avisar que me fui" al cerrar la pestaña o el navegador —
+  // no es 100% garantizado (el navegador puede cerrarse de golpe sin dar
+  // tiempo), pero ayuda a que desaparezca más rápido en los casos normales.
+  window.addEventListener('pagehide', intentarBorrarPresenciaAlSalir);
+
+  if(usuarioActual.rol === 'admin') iniciarEscuchaPresenciaAdmin();
+}
+
+function intentarBorrarPresenciaAlSalir(){
+  if(usuarioActual) refPresenciaMia().delete().catch(()=>{});
+}
+
+function avisarPresenciaSiVisible(){
+  if(document.visibilityState === 'visible') avisarPresencia();
+}
+
+function detenerPresencia(){
+  if(intervaloPresencia){ clearInterval(intervaloPresencia); intervaloPresencia = null; }
+  document.removeEventListener('visibilitychange', avisarPresenciaSiVisible);
+  window.removeEventListener('pagehide', intentarBorrarPresenciaAlSalir);
+  if(listenerPresenciaAdmin){ listenerPresenciaAdmin(); listenerPresenciaAdmin = null; }
+  const box = document.getElementById('usuariosEnLineaBox');
+  if(box) box.style.display = 'none';
+}
+
+function iniciarEscuchaPresenciaAdmin(){
+  const box = document.getElementById('usuariosEnLineaBox');
+  const lista = document.getElementById('usuariosEnLineaLista');
+  if(!box || !lista) return;
+  box.style.display = 'flex';
+  if(listenerPresenciaAdmin) listenerPresenciaAdmin();
+  listenerPresenciaAdmin = db.collection('configuracion').doc('presencia').collection('usuarios')
+    .onSnapshot(snap => {
+      const ahora = Date.now();
+      const enLinea = snap.docs
+        .filter(d => d.id !== usuarioActual.uid)
+        .map(d => d.data())
+        .filter(u => u.ultimoAviso && (ahora - u.ultimoAviso) < VENTANA_EN_LINEA_MS)
+        .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||''));
+      if(enLinea.length === 0){
+        lista.innerHTML = '<span style="color:var(--text-dim);">nadie más por ahora</span>';
+        return;
+      }
+      lista.innerHTML = enLinea.map(u => `
+        <span class="usuario-en-linea-chip">
+          <span class="punto"></span>${escapeHtml(u.iniciales||'')} — ${escapeHtml(u.nombre||'')}
+        </span>`).join('');
+    }, err => console.warn('No se pudo leer presencia:', err));
+}
+
 function cerrarSesion(){
   if(!confirm('¿Cerrar sesión?')) return;
-  auth.signOut();
+  refPresenciaMia().delete().catch(()=>{}).finally(() => {
+    detenerPresencia();
+    auth.signOut();
+  });
 }
 
 function abrirModalUsuario(){
