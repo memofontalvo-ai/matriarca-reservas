@@ -1197,7 +1197,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.69</div>
+<div class="version-tag">v3.70</div>
 
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -3258,7 +3258,20 @@ function renderSolicitudesScreen(){
 
   // Todo lo que LLEGÓ ese día (sin el filtro de especiales todavía —
   // el resumen de arriba cuenta el total real del día, no lo filtrado)
-  const delDiaTotal = todas.filter(r=>fechaSolicitudEfectiva(r)===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  // Orden: por llegada, la más RECIENTE arriba — así se puede dar
+  // seguimiento fácil a lo que acaba de entrar. Antes esto se ordenaba por
+  // "hora" (la hora de la reserva en sí, ej. 8pm), que no tiene nada que
+  // ver con el orden en que llegaron las solicitudes — por eso se veían
+  // mezcladas sin ningún criterio real de seguimiento.
+  const delDiaTotal = todas.filter(r=>fechaSolicitudEfectiva(r)===iso).sort((a,b)=>{
+    // Los registros viejos sin horaSolicitud (de antes de este cambio) se
+    // van al final, para no intercalarse sin sentido con los que sí tienen
+    // hora real.
+    if(!a.horaSolicitud && !b.horaSolicitud) return 0;
+    if(!a.horaSolicitud) return 1;
+    if(!b.horaSolicitud) return -1;
+    return b.horaSolicitud.localeCompare(a.horaSolicitud);
+  });
   // "Respondidas" = el cliente ya contestó y llenó el formulario (dejó de
   // estar solo en "mensaje enviado"), sin importar en qué quedó después.
   const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud' && r.estado!=='mensaje_enviado').length;
