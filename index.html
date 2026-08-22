@@ -352,7 +352,7 @@ button{font:inherit}
   padding:16px 12px 18px;
   text-align:center;
   color:#fff8f1;
-  background:linear-gradient(180deg,#C93E20,#A92C19);
+  background:transparent;
   position:relative;
   overflow:hidden;
 }
@@ -629,6 +629,96 @@ body{
 }
 #seccionCarrusel:not(.tiene-slides){
   display:none;
+}
+
+
+/* Ajuste solicitado: texto directamente sobre la imagen inferior, sin recuadro oscuro */
+.footer{
+  background:transparent !important;
+  isolation:isolate;
+}
+.footer::before{
+  left:0 !important;
+  right:0 !important;
+  top:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  height:100% !important;
+  opacity:.24 !important;
+  background-size:cover !important;
+  background-position:center !important;
+  z-index:-2;
+}
+.footer::after{
+  left:0 !important;
+  right:0 !important;
+  top:0 !important;
+  bottom:0 !important;
+  width:100% !important;
+  height:100% !important;
+  opacity:1 !important;
+  background-image:linear-gradient(rgba(181,58,42,.72),rgba(181,58,42,.72)) !important;
+  z-index:-1;
+}
+
+
+/* === Ajuste visual: tarjetas translúcidas + sombra suave === */
+.reserve-card,
+.quick,
+.info-card{
+  background:rgba(255,253,248,.78) !important;
+  border:1px solid rgba(255,255,255,.82) !important;
+  box-shadow:
+    0 12px 30px rgba(84,56,34,.12),
+    0 3px 9px rgba(84,56,34,.07) !important;
+  -webkit-backdrop-filter:blur(5px);
+  backdrop-filter:blur(5px);
+}
+
+/* Conserva el aspecto redondeado y deja percibir la textura del fondo */
+.reserve-card{ border-radius:28px !important; }
+.quick{ border-radius:24px !important; }
+.info-card{ border-radius:28px !important; }
+
+/* Sombra apenas más marcada al interactuar, sin mover el diseño */
+.quick{
+  transition:box-shadow .2s ease, background-color .2s ease;
+}
+.quick:active,
+.quick:hover{
+  background:rgba(255,253,248,.86) !important;
+  box-shadow:
+    0 15px 34px rgba(84,56,34,.15),
+    0 4px 10px rgba(84,56,34,.08) !important;
+}
+
+
+/* === Transparencia MÁS visible en las tarjetas === */
+.reserve-card,
+.quick,
+.info-card{
+  background:rgba(255,253,248,.48) !important;
+  border:1px solid rgba(255,255,255,.58) !important;
+  box-shadow:
+    0 14px 30px rgba(84,56,34,.15),
+    inset 0 1px 0 rgba(255,255,255,.45) !important;
+  -webkit-backdrop-filter:blur(2px) saturate(105%);
+  backdrop-filter:blur(2px) saturate(105%);
+}
+
+/* Más efecto cristal en los accesos rápidos */
+.quick{
+  background:rgba(255,253,248,.42) !important;
+}
+
+/* Las dos tarjetas inferiores quedan un poco más legibles */
+.info-card{
+  background:rgba(255,253,248,.52) !important;
+}
+
+/* CTA superior: transparente pero con buena lectura */
+.reserve-card{
+  background:rgba(255,253,248,.50) !important;
 }
 
 </style>
