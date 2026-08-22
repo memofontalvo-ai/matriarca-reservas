@@ -4,8 +4,23 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<meta content="#F8F1E3" name="theme-color"/>
 <title>La Matriarca Barranquilla · Reservas</title>
+
+<!-- Iconos / PWA: La Matriarca Barranquilla -->
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+
+<meta name="application-name" content="La Matriarca Barranquilla">
+<meta name="apple-mobile-web-app-title" content="Matriarca">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="msapplication-TileColor" content="#F8F1E3">
+<meta name="theme-color" content="#F8F1E3">
+
 <style>
 :root {
   --cream:#F8F1E3;
@@ -948,5 +963,14 @@ try {
   console.warn('Firebase no disponible:', err);
 }
 </script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./service-worker.js').catch(function () {});
+  });
+}
+</script>
+
 </body>
 </html>
