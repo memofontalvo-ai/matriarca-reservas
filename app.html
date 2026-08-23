@@ -573,6 +573,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   padding:1.5px 5px; white-space:nowrap;
 }
 .cal-day-count.especial{background:linear-gradient(135deg, var(--gold-bright), #ffd76a); box-shadow:0 0 0 1px rgba(255,215,106,0.5);}
+.cal-day-count.pendiente{background:#e8a33d; color:#1a1408;}
 .cal-day.selected .cal-day-count{background:#1a1408; color:var(--gold-bright);}
 .cal-inline-leyenda{
   display:flex; justify-content:center; gap:16px; margin-top:10px;
@@ -1121,8 +1122,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
       <div class="cal-days cal-days-inline" id="calSolInlineDays"></div>
       <div class="cal-inline-leyenda">
-        <span><span class="cal-dot-leyenda cal-dot-pendiente"></span> Solicitudes sin gestionar</span>
-        <span><span class="cal-dot-leyenda"></span> Solicitudes ya gestionadas</span>
+        <span><span class="cal-day-count pendiente" style="padding:1.5px 6px;">3</span> Con solicitudes sin gestionar</span>
+        <span><span class="cal-day-count" style="padding:1.5px 6px;">3</span> Ya gestionadas</span>
       </div>
       <div class="cal-aviso-navegando" id="calSolAvisoNavegando" style="display:none;"></div>
     </div>
@@ -1278,7 +1279,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.74</div>
+<div class="version-tag">v3.75</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1548,12 +1549,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 <div class="overlay" id="overlayUsuario">
   <div class="modal">
-    <h3>Nuevo usuario</h3>
-    <div class="modal-sub">Se crea con su acceso de Firebase y queda guardado para iniciar sesión. No cierra tu sesión actual.</div>
+    <h3 id="usuarioModalTitulo">Nuevo usuario</h3>
+    <div class="modal-sub" id="usuarioModalSub">Se crea con su acceso de Firebase y queda guardado para iniciar sesión. No cierra tu sesión actual.</div>
+    <input type="hidden" id="fUsuEditId" value="">
     <div class="field"><label>Nombre completo</label><input type="text" id="fUsuNombre" placeholder="Ej. María Pérez"></div>
     <div class="field"><label>Iniciales (para marcar sus reservas)</label><input type="text" id="fUsuIniciales" maxlength="4" placeholder="Ej. MP" style="text-transform:uppercase;"></div>
     <div class="field"><label>Usuario (para iniciar sesión, sin espacios)</label><input type="text" id="fUsuUsuario" placeholder="Ej. mperez" autocapitalize="none" autocorrect="off"></div>
-    <div class="field"><label>Contraseña</label><input type="text" id="fUsuPass" placeholder="Mínimo 6 caracteres"></div>
+    <div class="field" id="fUsuPassWrap"><label>Contraseña</label><input type="text" id="fUsuPass" placeholder="Mínimo 6 caracteres"></div>
     <div class="field" id="fUsuRolWrap">
       <label>Nivel de acceso</label>
       <div class="rol-opciones">
@@ -1574,7 +1576,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div class="login-error" id="usuarioModalError"></div>
     <div class="modal-actions modal-actions-wrap">
       <button class="btn btn-ghost" onclick="cerrarModalUsuario()">Cancelar</button>
-      <button class="btn btn-primary" id="btnCrearUsuario" onclick="crearUsuario()">Crear usuario</button>
+      <button class="btn btn-primary" id="btnCrearUsuario" onclick="guardarUsuario()">Crear usuario</button>
     </div>
   </div>
 </div>
@@ -1657,9 +1659,10 @@ function revisarBootstrapPrimerUsuario(){
 // ===== NIVELES DE ACCESO =====
 // Aplica lo que cada nivel puede ver/tocar, apenas se sabe quién inició
 // sesión. "admin" ve todo tal cual siempre existió. "operativo" pierde la
-// pestaña Config (y con ella crear usuarios, mensajes, zona de peligro).
-// "consulta" además pierde Salones y el botón de Nueva reserva, y queda en
-// modo solo-lectura sobre las reservas (ver detalle, no editar/borrar/enviar).
+// pestaña Config (y con ella crear usuarios, mensajes, zona de peligro) y
+// también pierde Salones, que ahora es exclusivo del administrador.
+// "consulta" además pierde el botón de Nueva reserva, y queda en modo
+// solo-lectura sobre las reservas (ver detalle, no editar/borrar/enviar).
 function aplicarRestriccionesRol(){
   if(!usuarioActual) return;
   const rol = usuarioActual.rol || 'admin';
@@ -1669,19 +1672,18 @@ function aplicarRestriccionesRol(){
   const btnNueva = document.getElementById('btnNuevaReservaHeader');
 
   if(btnConfig) btnConfig.style.display = (rol === 'admin') ? '' : 'none';
+  if(btnSalones) btnSalones.style.display = (rol === 'admin') ? '' : 'none';
   if(rol === 'consulta'){
     document.body.classList.add('rol-consulta');
-    if(btnSalones) btnSalones.style.display = 'none';
     if(btnNueva) btnNueva.style.display = 'none';
   } else {
-    if(btnSalones) btnSalones.style.display = '';
     if(btnNueva) btnNueva.style.display = '';
     if(rol === 'operativo') document.body.classList.add('rol-operativo');
   }
   // Si por algo la pestaña activa en este momento es una que este nivel ya
-  // no puede ver (por ejemplo quedó en Config y le bajaron el nivel),
-  // lo mandamos de vuelta a Solicitudes en vez de dejarlo ahí colgado.
-  if((vistaApp === 'config' && rol !== 'admin') || (vistaApp === 'salones' && rol === 'consulta')){
+  // no puede ver (por ejemplo quedó en Config o Salones y le bajaron el
+  // nivel), lo mandamos de vuelta a Solicitudes en vez de dejarlo colgado.
+  if((vistaApp === 'config' && rol !== 'admin') || (vistaApp === 'salones' && rol !== 'admin')){
     cambiarVistaApp('solicitudes');
   }
 }
@@ -1695,7 +1697,12 @@ auth.onAuthStateChanged(user => {
   if(user){
     db.collection('usuarios').doc(user.uid).get().then(doc => {
       const perfil = doc.exists ? doc.data() : {};
-      if(perfil.activo === false){
+      // Si el documento no existe (usuario eliminado desde Config) lo
+      // tratamos igual que a un desactivado: bloqueado. Antes, un
+      // documento faltante caía al mismo "admin por defecto" que usan las
+      // cuentas viejas sin campo rol, lo cual dejaba a un usuario eliminado
+      // con acceso total — este chequeo lo cierra.
+      if(!doc.exists || perfil.activo === false){
         alert('Este usuario fue desactivado. Contacta a un administrador.');
         auth.signOut();
         return;
@@ -1825,11 +1832,17 @@ function cerrarSesion(){
 }
 
 function abrirModalUsuario(){
+  document.getElementById('usuarioModalTitulo').textContent = 'Nuevo usuario';
+  document.getElementById('usuarioModalSub').textContent = 'Se crea con su acceso de Firebase y queda guardado para iniciar sesión. No cierra tu sesión actual.';
+  document.getElementById('fUsuEditId').value = '';
   document.getElementById('fUsuNombre').value = '';
   document.getElementById('fUsuIniciales').value = '';
   document.getElementById('fUsuUsuario').value = '';
+  document.getElementById('fUsuUsuario').disabled = false;
   document.getElementById('fUsuPass').value = '';
+  document.getElementById('fUsuPassWrap').style.display = 'block';
   document.getElementById('usuarioModalError').textContent = '';
+  document.getElementById('btnCrearUsuario').textContent = 'Crear usuario';
   // El primer usuario (creado desde la pantalla de login, antes de que
   // exista ninguna cuenta) siempre queda como administrador — no tendría
   // sentido dejarlo elegir "consulta" y quedarse sin poder entrar a nada.
@@ -1841,8 +1854,75 @@ function abrirModalUsuario(){
   if(radioOperativo) radioOperativo.checked = true;
   document.getElementById('overlayUsuario').classList.add('open');
 }
+
+// Edición: solo permite corregir nombre, iniciales y nivel de acceso —
+// el usuario (ligado al email interno de Firebase Auth) y la contraseña de
+// OTRA persona no se pueden cambiar desde el navegador sin un backend con
+// permisos de administrador de Firebase, así que ese campo queda bloqueado
+// y el de contraseña se oculta, con una nota explicando el porqué.
+function abrirModalEditarUsuario(uid){
+  const u = usuariosCache.find(x => x.id === uid);
+  if(!u) return;
+  document.getElementById('usuarioModalTitulo').textContent = 'Editar usuario';
+  document.getElementById('usuarioModalSub').textContent = 'El usuario y la contraseña no se pueden cambiar desde aquí — quedan ligados a la cuenta original de Firebase. Si necesita otro usuario o contraseña, desactiva esta cuenta y crea una nueva.';
+  document.getElementById('fUsuEditId').value = uid;
+  document.getElementById('fUsuNombre').value = u.nombre || '';
+  document.getElementById('fUsuIniciales').value = u.iniciales || '';
+  document.getElementById('fUsuUsuario').value = u.usuario || '';
+  document.getElementById('fUsuUsuario').disabled = true;
+  document.getElementById('fUsuPass').value = '';
+  document.getElementById('fUsuPassWrap').style.display = 'none';
+  document.getElementById('usuarioModalError').textContent = '';
+  document.getElementById('btnCrearUsuario').textContent = 'Guardar cambios';
+  document.getElementById('fUsuRolWrap').style.display = 'block';
+  const rol = u.rol || 'admin';
+  const radio = document.querySelector(`input[name="fUsuRol"][value="${rol}"]`);
+  if(radio) radio.checked = true;
+  document.getElementById('overlayUsuario').classList.add('open');
+}
 function cerrarModalUsuario(){
   document.getElementById('overlayUsuario').classList.remove('open');
+}
+
+function guardarUsuario(){
+  const editId = document.getElementById('fUsuEditId').value;
+  if(editId){ guardarEdicionUsuario(editId); return; }
+  crearUsuario();
+}
+
+function guardarEdicionUsuario(uid){
+  const nombre = document.getElementById('fUsuNombre').value.trim();
+  const iniciales = document.getElementById('fUsuIniciales').value.trim().toUpperCase();
+  const radioMarcado = document.querySelector('input[name="fUsuRol"]:checked');
+  const rol = radioMarcado ? radioMarcado.value : 'operativo';
+  const errEl = document.getElementById('usuarioModalError');
+  errEl.textContent = '';
+  if(!nombre || !iniciales){ errEl.textContent = 'Completa nombre e iniciales.'; return; }
+
+  const btn = document.getElementById('btnCrearUsuario');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  db.collection('usuarios').doc(uid).update({nombre, iniciales, rol}).then(() => {
+    cerrarModalUsuario();
+    cargarUsuariosConfig();
+  }).catch(err => {
+    console.error('Error editando usuario:', err);
+    errEl.textContent = 'No se pudo guardar el cambio.';
+  }).finally(() => {
+    btn.disabled = false; btn.textContent = 'Guardar cambios';
+  });
+}
+
+// Eliminar de verdad borra el documento en Firestore (no solo lo marca
+// inactivo). La cuenta de acceso de Firebase de esa persona queda huérfana
+// —no se puede borrar desde el navegador sin un backend—, pero sin su
+// documento en /usuarios el login la bloquea igual que a un desactivado,
+// así que en la práctica queda completamente sin acceso.
+function eliminarUsuario(uid, nombre){
+  if(!confirm(`¿Eliminar a ${nombre || 'este usuario'}? No podrá volver a iniciar sesión. Esta acción no se puede deshacer.`)) return;
+  db.collection('usuarios').doc(uid).delete().then(cargarUsuariosConfig).catch(err => {
+    console.error('Error eliminando usuario:', err);
+    alert('No se pudo eliminar el usuario.');
+  });
 }
 
 function crearUsuario(){
@@ -2041,7 +2121,9 @@ function cargarUsuariosConfig(){
             <option value="operativo" ${rol==='operativo'?'selected':''}>Operativo</option>
             <option value="admin" ${rol==='admin'?'selected':''}>Administrador</option>
           </select>
+          <button class="btn-config-restaurar" onclick='abrirModalEditarUsuario(${JSON.stringify(u.id)})'>✎ Editar</button>
           <button class="btn-config-restaurar" onclick='toggleActivoUsuario(${JSON.stringify(u.id)}, ${u.activo===false})'>${u.activo===false?'Reactivar':'Desactivar'}</button>
+          <button class="btn-config-restaurar" style="color:#e05a5a; border-color:#e05a5a;" onclick='eliminarUsuario(${JSON.stringify(u.id)}, ${JSON.stringify(u.nombre||"")})'>🗑 Eliminar</button>
         </div>
       </div>`;
     }).join('');
@@ -3210,6 +3292,14 @@ function renderCalendarioSolInline(){
   const diasGestionados = new Set(
     solicitudesDelMes.filter(r=>!requiereGestion(r)).map(fechaSolicitudEfectiva)
   );
+  // Cantidad de solicitudes por día (igual que el conteo de "Por día",
+  // pero contando solicitudes en vez de sumar pax) — así de un vistazo se
+  // ve cuántas llegaron ese día, no solo que hubo algo.
+  const conteoSolPorDia = {};
+  solicitudesDelMes.forEach(r => {
+    const fSol = fechaSolicitudEfectiva(r);
+    conteoSolPorDia[fSol] = (conteoSolPorDia[fSol] || 0) + 1;
+  });
 
   let html = '';
   const diasMesAnterior = new Date(calSolInlineAno, calSolInlineMes, 0).getDate();
@@ -3224,9 +3314,10 @@ function renderCalendarioSolInline(){
     if(iso===selISO) cls += ' selected';
     // Pendiente tiene prioridad visual: si un día tiene solicitudes sin
     // gestionar Y gestionadas, se marca en naranja para que no pase inadvertido.
-    const marca = diasPendientes.has(iso)
-      ? `<span class="cal-dot-marca pendiente"></span>`
-      : (diasGestionados.has(iso) ? `<span class="cal-dot-marca"></span>` : '<span></span>');
+    const total = conteoSolPorDia[iso] || 0;
+    const marca = total > 0
+      ? `<span class="cal-day-count${diasPendientes.has(iso) ? ' pendiente' : ''}">${total}</span>`
+      : '';
     html += `<div class="${cls}" onclick="seleccionarDiaSolInline(${d})">${d}<div class="cal-day-marcas">${marca}</div></div>`;
   }
   const totalCeldas = offset + diasEnMes;
@@ -3385,7 +3476,7 @@ let vistaApp = 'solicitudes';
 
 function irASalones(){
   const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
-  if(rol === 'consulta') return;
+  if(rol !== 'admin') return;
   window.location.href = 'salones.html';
 }
 
