@@ -256,7 +256,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
 .res-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright);}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
-.res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;}
+.res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; max-width:100%;}
+.res-meta span{overflow-wrap:anywhere; max-width:100%;}
 /* Fila fija de "identificación" (código, hora de solicitud, iniciales de
    quien la tomó): siempre abajo del todo y pegada a la derecha, separada
    de los demás datos — así la tarjeta se ve ordenada sin importar cuántos
@@ -384,7 +385,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .solicitud-card-global .sc-fecha{font-size:11.5px; color:#c79bff; font-weight:700; text-transform:capitalize;}
 .solicitud-card-global .sc-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright); margin-top:2px;}
 .solicitud-card-global .sc-nombre{font-weight:600; font-size:14px; margin-top:2px;}
-.solicitud-card-global .sc-meta{font-size:11.5px; color:var(--text-muted); margin-top:6px; display:flex; gap:10px; flex-wrap:wrap;}
+.solicitud-card-global .sc-meta{font-size:11.5px; color:var(--text-muted); margin-top:6px; display:flex; gap:10px; flex-wrap:wrap; max-width:100%;}
+.solicitud-card-global .sc-meta span{overflow-wrap:anywhere; max-width:100%;}
 .solicitud-card-global .sc-obs{font-size:11.5px; color:#c79bff; margin-top:8px; padding-top:8px; border-top:1px dashed rgba(199,155,255,0.3); line-height:1.4;}
 
 /* ===== RESUMEN DEL DÍA POR TURNO (siempre visible, no depende del filtro) ===== */
@@ -435,7 +437,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   font-size:12.5px; padding:5px 8px; background:var(--panel-alt); border-radius:6px; margin-bottom:4px;
   border-left:2px solid var(--gold);
 }
-.resumen-fila-label{color:var(--text); font-weight:600;}
+.resumen-fila-label{color:var(--text); font-weight:600; overflow-wrap:anywhere;}
 .resumen-fila-nombre{color:var(--text-dim); font-weight:400;}
 .resumen-fila-val{font-family:'JetBrains Mono',monospace; color:var(--gold-bright); font-weight:600; white-space:nowrap;}
 .resumen-vacio{border-left-color:var(--border); color:var(--text-dim); font-style:italic;}
@@ -1276,7 +1278,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.73</div>
+<div class="version-tag">v3.74</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2647,7 +2649,7 @@ function renderLista(){
     return;
   }
   const cardsHtml = rs.map(r=>{
-    const mesaTxt = r.mesa ? mesaLabel(r.mesa) : '—';
+    const mesaTxt = r.mesa ? mesaLabelCorto(r.mesa) : '—';
     const isVip = mesaEsVip(r.mesa);
     const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
     return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
@@ -2737,7 +2739,7 @@ function renderResumenTurnoHTML(rsTodas){
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
     const filas = reservas.length
       ? reservas.map(r => `<div class="resumen-fila">
-          <span class="resumen-fila-label">${escapeHtml(mesaLabel(r.mesa))} <span class="resumen-fila-nombre">· ${escapeHtml(r.nombre)}</span></span>
+          <span class="resumen-fila-label">${escapeHtml(mesaLabelCorto(r.mesa))} <span class="resumen-fila-nombre">· ${escapeHtml(r.nombre)}</span></span>
           <span class="resumen-fila-val">${r.pax} pax</span>
         </div>`).join('')
       : `<div class="resumen-fila resumen-vacio"><span>Sin reservas</span></div>`;
@@ -2799,6 +2801,17 @@ function estadoLabel(e){
 function mesaLabel(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return m.id;
   return id;
+}
+// Versión corta para tarjetas: si son varias mesas unidas ("A+B+C..."),
+// muestra solo la primera y cuántas más, para que nunca se desborde el
+// ancho de la tarjeta (eso era lo que corría toda la pantalla al lado
+// cuando una reserva tenía muchas mesas). El listado completo se ve al
+// editar la reserva, donde sí hay espacio para mostrarlas todas.
+function mesaLabelCorto(id){
+  if(!id) return '—';
+  const partes = id.split('+').map(p=>p.trim()).filter(Boolean);
+  if(partes.length<=1) return mesaLabel(id);
+  return `${mesaLabel(partes[0])} +${partes.length-1} más`;
 }
 function mesaEsVip(id){
   for(const s of SALONES) if(s.vip) for(const m of s.mesas) if(m.id===id) return true;
@@ -3570,7 +3583,7 @@ function renderSolicitudesScreen(){
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
         ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
-        ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabel(r.mesa))}</span>`:''}
+        ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
       </div>
