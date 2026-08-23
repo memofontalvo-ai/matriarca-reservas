@@ -700,6 +700,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   padding:9px 11px; border-radius:8px; font-size:13.5px;
 }
 .field textarea{resize:vertical; min-height:52px;}
+/* Celular con código de país: select fijo a la izquierda + el número
+   local a la derecha, para no adivinar el país del cliente por la
+   cantidad de dígitos (lo cual fallaba con celulares de otros países
+   usando WhatsApp por wifi en Colombia). Colombia queda seleccionada por
+   defecto en los tres formularios donde se toma un celular. */
+.celular-con-codigo{display:flex; gap:7px;}
+.celular-con-codigo select{flex:0 0 92px; width:92px; padding:9px 6px;}
+.celular-con-codigo input{flex:1; min-width:0;}
 .field-row{display:flex; gap:10px;}
 .field-row .field{flex:1;}
 .estado-select{display:flex; gap:6px; flex-wrap:wrap;}
@@ -1315,7 +1323,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.76</div>
+<div class="version-tag">v3.78</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1342,7 +1350,23 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div class="field" id="whatsappBlock" style="display:none;">
       <div class="field">
         <label>Teléfono de WhatsApp del cliente</label>
-        <input type="tel" id="fWhatsTelefono" placeholder="300 000 0000">
+        <div class="celular-con-codigo">
+          <select id="fWhatsTelefonoCod">
+            <option value="57" selected>🇨🇴 +57</option>
+            <option value="58">🇻🇪 +58</option>
+            <option value="1">🇺🇸 +1</option>
+            <option value="52">🇲🇽 +52</option>
+            <option value="507">🇵🇦 +507</option>
+            <option value="593">🇪🇨 +593</option>
+            <option value="51">🇵🇪 +51</option>
+            <option value="54">🇦🇷 +54</option>
+            <option value="56">🇨🇱 +56</option>
+            <option value="55">🇧🇷 +55</option>
+            <option value="34">🇪🇸 +34</option>
+            <option value="506">🇨🇷 +506</option>
+          </select>
+          <input type="tel" id="fWhatsTelefono" placeholder="300 000 0000">
+        </div>
       </div>
       <div class="field">
         <label>¿Con quién estás hablando? (solo para el saludo)</label>
@@ -1408,7 +1432,26 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
 
       <div class="field-row phone-two-cols">
-        <div class="field"><label>Celular de contacto</label><input type="text" id="fCelular" placeholder="300 000 0000"></div>
+        <div class="field">
+          <label>Celular de contacto</label>
+          <div class="celular-con-codigo">
+            <select id="fCelularCod">
+              <option value="57" selected>🇨🇴 +57</option>
+              <option value="58">🇻🇪 +58</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="52">🇲🇽 +52</option>
+              <option value="507">🇵🇦 +507</option>
+              <option value="593">🇪🇨 +593</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="55">🇧🇷 +55</option>
+              <option value="34">🇪🇸 +34</option>
+              <option value="506">🇨🇷 +506</option>
+            </select>
+            <input type="text" id="fCelular" placeholder="300 000 0000">
+          </div>
+        </div>
         <div class="field"><label>Cantidad de personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
       </div>
 
@@ -1662,6 +1705,43 @@ function normalizarUsuario(u){
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quita tildes
     .replace(/[^a-z0-9._-]/g,'');
 }
+
+// El código de país ahora lo elige la persona en un select (Colombia por
+// defecto) en vez de adivinarlo por la cantidad de dígitos — eso fallaba
+// con clientes que tienen WhatsApp de otro país usándolo por wifi en
+// Colombia (su número no queda en 10 dígitos, y antes se le pegaba el 57
+// igual, dañando el número). Estas dos funciones arman y luego separan el
+// celular completo ("+57 3001234567") que se guarda en Firestore.
+function armarCelularCompleto(codigo, numeroLocal){
+  const local = (numeroLocal||'').replace(/\D/g,'');
+  if(!local) return '';
+  return `+${codigo||'57'} ${local}`;
+}
+// Para precargar el formulario al editar una reserva ya guardada: separa
+// el código de país del número local. Los celulares guardados ANTES de
+// este cambio no tienen "+" al inicio — a esos se les asume 57 (Colombia),
+// que era la única opción que existía hasta ahora, para no perder el dato.
+function partirCelularGuardado(celular){
+  const texto = (celular||'').trim();
+  const match = texto.match(/^\+(\d{1,4})\s*(.*)$/);
+  if(match){
+    return { codigo: match[1], numero: match[2].replace(/\D/g,'') };
+  }
+  return { codigo: '57', numero: texto.replace(/\D/g,'') };
+}
+
+// Convierte el celular completo (código de país + número, ya elegidos por
+// la persona) en los dígitos que WhatsApp necesita. Ya no asume ningún
+// país — solo valida que haya un mínimo razonable de dígitos, para avisar
+// ANTES de abrir WhatsApp si el número quedó incompleto, en vez de mandar
+// un link roto que solo lleva a la página genérica de descarga (así se
+// veía el error: WhatsApp no encuentra a quién abrirle el chat).
+function digitosWhatsapp(celularCompleto){
+  const digitos = (celularCompleto||'').replace(/\D/g,'');
+  if(digitos.length < 8 || digitos.length > 15) return null;
+  return digitos;
+}
+
 function emailInternoDesdeUsuario(usuario){
   return normalizarUsuario(usuario) + '@lamatriarca.app';
 }
@@ -3865,7 +3945,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fHora').value = r.hora;
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
-    document.getElementById('fCelular').value = r.celular;
+    { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
     document.getElementById('fMesa').value = r.mesa;
     actualizarBotonMesa();
     document.getElementById('fCanal').value = r.canal;
@@ -3920,6 +4000,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fHora').value = '';
     document.getElementById('fPax').value = '';
     document.getElementById('fNombre').value = '';
+    document.getElementById('fCelularCod').value = '57';
     document.getElementById('fCelular').value = '';
     document.getElementById('fMesa').value = mesaId || '';
     actualizarBotonMesa();
@@ -3927,6 +4008,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fAbono').value = '';
     document.getElementById('fMenu').value = '';
     document.getElementById('fObs').value = '';
+    document.getElementById('fWhatsTelefonoCod').value = '57';
     document.getElementById('fWhatsTelefono').value = '';
     document.getElementById('fWhatsContacto').value = '';
     estadoSeleccionado = 'confirmada';
@@ -3998,12 +4080,17 @@ function urlFormularioSolicitud(id){
 }
 
 function enviarSolicitudWhatsapp(){
-  const telefono = document.getElementById('fWhatsTelefono').value.trim();
+  const cod = document.getElementById('fWhatsTelefonoCod').value;
+  const telefonoLocal = document.getElementById('fWhatsTelefono').value.trim();
   const contacto = document.getElementById('fWhatsContacto').value.trim();
-  if(!telefono){ alert('Ingresa el teléfono de WhatsApp del cliente.'); return; }
+  if(!telefonoLocal){ alert('Ingresa el teléfono de WhatsApp del cliente.'); return; }
+  const telefono = armarCelularCompleto(cod, telefonoLocal);
 
-  let digitos = telefono.replace(/\D/g,'');
-  if(digitos.length === 10) digitos = '57' + digitos; // asume celular colombiano
+  const digitos = digitosWhatsapp(telefono);
+  if(!digitos){
+    alert(`El número "${telefono}" no parece válido. Revísalo e intenta de nuevo.`);
+    return;
+  }
 
   // Abrimos la pestaña YA, en el mismo clic (si esperamos a que termine de
   // guardar en Firebase, Safari ya no lo cuenta como "acción directa del
@@ -4262,7 +4349,7 @@ function guardarReserva(){
     hora: document.getElementById('fHora').value || '00:00',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
-    celular: document.getElementById('fCelular').value.trim(),
+    celular: armarCelularCompleto(document.getElementById('fCelularCod').value, document.getElementById('fCelular').value),
     mesa: document.getElementById('fMesa').value,
     canal: document.getElementById('fCanal').value,
     abono: Number(document.getElementById('fAbono').value)||0,
@@ -4318,10 +4405,16 @@ function urlAprobacion(id){
 
 function enviarParaAprobacion(){
   const nombre = document.getElementById('fNombre').value.trim();
-  const celular = document.getElementById('fCelular').value.trim();
+  const celularLocal = document.getElementById('fCelular').value.trim();
   const mesa = document.getElementById('fMesa').value;
   if(!nombre){ alert('Ingresa el nombre del cliente.'); return; }
-  if(!celular){ alert('Ingresa el celular del cliente para poder enviarle el link de aprobación.'); return; }
+  if(!celularLocal){ alert('Ingresa el celular del cliente para poder enviarle el link de aprobación.'); return; }
+  const celular = armarCelularCompleto(document.getElementById('fCelularCod').value, celularLocal);
+  const digitosCliente = digitosWhatsapp(celular);
+  if(!digitosCliente){
+    alert(`El número "${celular}" no parece válido. Revísalo e intenta de nuevo.`);
+    return;
+  }
   if(!mesa){ if(!confirm('No has asignado mesa todavía. ¿Enviar de todas formas para que el cliente apruebe los demás datos?')) return; }
 
   // Abrimos la pestaña YA, en el mismo clic, para que el navegador no la bloquee
@@ -4370,8 +4463,6 @@ function enviarParaAprobacion(){
   });
 
   promesa.then(id => {
-    let digitos = celular.replace(/\D/g,'');
-    if(digitos.length === 10) digitos = '57' + digitos;
     const mensaje = armarMensaje(MENSAJES.aprobacion, {
       nombre,
       link: urlAprobacion(id),
@@ -4382,7 +4473,7 @@ function enviarParaAprobacion(){
       abono: data.abono > 0 ? ('$' + Number(data.abono).toLocaleString('es-CO')) : 'Sin abono',
       menu: data.menu || 'Por definir',
     });
-    const waUrl = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
+    const waUrl = `https://wa.me/${digitosCliente}?text=${encodeURIComponent(mensaje)}`;
     if(ventana){ ventana.location.href = waUrl; } else { window.open(waUrl, '_blank'); }
     cerrarModal();
   }).catch(err => {
