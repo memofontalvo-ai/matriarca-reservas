@@ -705,9 +705,16 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    cantidad de dígitos (lo cual fallaba con celulares de otros países
    usando WhatsApp por wifi en Colombia). Colombia queda seleccionada por
    defecto en los tres formularios donde se toma un celular. */
-.celular-con-codigo{display:flex; gap:7px;}
-.celular-con-codigo select{flex:0 0 92px; width:92px; padding:9px 6px;}
+.celular-con-codigo{display:flex; gap:6px;}
+.celular-con-codigo select{flex:0 0 76px; width:76px; padding:9px 4px; font-size:12.5px;}
 .celular-con-codigo input{flex:1; min-width:0;}
+/* Fila "Celular / Cantidad de personas": el celular necesita mucho más
+   ancho (código + número completo) que la cantidad de personas, que nunca
+   pasa de 3 dígitos — antes se repartían 50/50 y el celular quedaba
+   apretado mientras "personas" sobraba espacio de sobra. */
+.field-celular-completo{flex:3 1 0;}
+.field-pax-chico{flex:0 0 78px; max-width:78px;}
+.field-pax-chico input{padding-left:8px; padding-right:8px; text-align:center;}
 .field-row{display:flex; gap:10px;}
 .field-row .field{flex:1;}
 .estado-select{display:flex; gap:6px; flex-wrap:wrap;}
@@ -1054,6 +1061,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .phone-calendar-head{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;gap:8px;margin-bottom:10px;}.phone-calendar-head strong{text-align:center;text-transform:capitalize;color:#f0c25b;font-size:14px;}.phone-calendar-head button,.phone-calendar-close{background:#11151c;border:1px solid #343b47;color:#d7dbe0;border-radius:8px;padding:8px;}
 .phone-calendar-weekdays,.phone-calendar-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}.phone-calendar-weekdays span{text-align:center;font-size:9px;color:#767f8c;font-weight:700;padding:4px 0;}.phone-calendar-day{aspect-ratio:1;border-radius:8px;background:#11151c;border:1px solid transparent;color:#e7e9ec;font-size:11px;}.phone-calendar-day.today{border-color:var(--gold);}.phone-calendar-day.selected{background:var(--gold);color:#16120a;font-weight:800;}.phone-calendar-day.empty{visibility:hidden;}.phone-calendar-close{width:100%;margin-top:10px;}
 @media(max-width:390px){.reserva-modal-v372{padding:14px}.phone-date-card{flex-basis:62px;height:84px}.phone-date-detail-row{grid-template-columns:1fr}.phone-two-cols{display:grid;grid-template-columns:1fr 1fr}.phone-actions{grid-template-columns:1fr 1.2fr}}
+/* La fila de celular necesita su propia proporción (no 50/50) también en
+   pantallas angostas — esta regla, más específica, gana sobre la genérica
+   de arriba. */
+@media(max-width:390px){.field-row-celular{display:flex !important;}}
 </style>
 </head>
 <body>
@@ -1323,7 +1334,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.78</div>
+<div class="version-tag">v3.79</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1431,8 +1442,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div class="phone-section-title phone-client-title">● <span>Datos del cliente</span></div>
       <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
 
-      <div class="field-row phone-two-cols">
-        <div class="field">
+      <div class="field-row phone-two-cols field-row-celular">
+        <div class="field field-celular-completo">
           <label>Celular de contacto</label>
           <div class="celular-con-codigo">
             <select id="fCelularCod">
@@ -1452,7 +1463,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <input type="text" id="fCelular" placeholder="300 000 0000">
           </div>
         </div>
-        <div class="field"><label>Cantidad de personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
+        <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
       </div>
 
       <div class="field-row phone-two-cols">
