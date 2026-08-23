@@ -693,6 +693,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .modal-solo-lectura .modal input:disabled,
 .modal-solo-lectura .modal select:disabled,
 .modal-solo-lectura .modal textarea:disabled{opacity:0.7; cursor:default;}
+/* Reserva de un día que ya pasó: se puede seguir viendo, pero no editar ni
+   reenviar para aprobación — el evento ya ocurrió (o no), así que
+   modificarla después no tiene sentido operativo y solo generaría
+   confusión sobre qué pasó realmente ese día. */
+.modal-reserva-vencida .modal::before{
+  content:'🔒 Esta reserva ya pasó (' attr(data-fecha-vencida) ') y quedó bloqueada — no se puede editar ni reenviar para aprobación.';
+  display:block; background:rgba(224,90,90,0.12); color:#e5636a;
+  font-size:11.5px; padding:8px 12px; border-radius:8px; margin-bottom:12px; text-align:center;
+}
+.modal-reserva-vencida .modal input:disabled,
+.modal-reserva-vencida .modal select:disabled,
+.modal-reserva-vencida .modal textarea:disabled{opacity:0.7; cursor:default;}
+.modal-reserva-vencida #estadoSelect, .modal-reserva-vencida #btnElegirMesa{pointer-events:none; opacity:0.7;}
 .field label{font-size:11.5px; font-weight:600; color:var(--text-muted); display:block; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.3px;}
 .fecha-solicitud-hint{text-transform:none; font-weight:400; color:var(--text-dim); letter-spacing:0;}
 .turno-invalido-aviso{
@@ -1339,7 +1352,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.81</div>
+<div class="version-tag">v3.82</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4039,6 +4052,7 @@ function abrirModal(id, mesaId){
   }
   actualizarEstadoUI();
   aplicarModoConsultaEnModal();
+  aplicarBloqueoFechaVencida();
   overlay.classList.add('open');
 }
 
@@ -4046,6 +4060,43 @@ function abrirModal(id, mesaId){
 // datos, pero el formulario queda bloqueado: no puede escribir, guardar,
 // borrar, elegir mesa ni enviar nada por WhatsApp. Esto se aplica cada vez
 // que se abre el modal, así no hace falta duplicar la lógica en cada campo.
+// Una reserva de un día que ya pasó (comparado con la fecha de HOY) queda
+// bloqueada: no se puede editar ni reenviar para aprobación del cliente.
+// Si no se gestionó a tiempo, ya gestionarla después no tiene sentido —
+// el evento ya pasó (haya venido el cliente o no). El estado que haya
+// quedado (confirmada/pendiente/cancelada) se conserva tal cual, como
+// registro histórico.
+function reservaFechaVencida(r){
+  if(!r || !r.fecha) return false;
+  const hoyISO = fechaISO(new Date());
+  return r.fecha < hoyISO;
+}
+function aplicarBloqueoFechaVencida(){
+  const overlay = document.getElementById('overlay');
+  const r = editandoId ? reservas.find(x => x.id === editandoId) : null;
+  const vencida = !!(r && reservaFechaVencida(r));
+  overlay.classList.toggle('modal-reserva-vencida', vencida);
+  const modal = overlay.querySelector('.modal');
+  if(!modal) return;
+  if(vencida) modal.setAttribute('data-fecha-vencida', r.fecha);
+  // No pisa lo que ya haya decidido el modo consulta (que ya deja todo
+  // deshabilitado) — solo añade el bloqueo cuando el modo consulta no
+  // aplicaba pero la fecha sí ya pasó.
+  modal.querySelectorAll('input, select, textarea').forEach(el => {
+    if(vencida) el.disabled = true;
+  });
+  const btnGuardar = document.getElementById('btnGuardarReserva');
+  const btnAprobacion = modal.querySelector('.btn-aprobacion');
+  const btnAgregarMesa = modal.querySelector('.btn-agregar-mesa');
+  if(vencida){
+    if(btnGuardar) btnGuardar.style.display = 'none';
+    if(btnAprobacion) btnAprobacion.style.display = 'none';
+    if(btnAgregarMesa) btnAgregarMesa.style.display = 'none';
+  }
+  // btnEliminar se deja intacto: sigue rigiéndose solo por el rol
+  // (exclusivo de administrador), sin importar si la fecha ya pasó.
+}
+
 function aplicarModoConsultaEnModal(){
   const overlay = document.getElementById('overlay');
   const esConsulta = usuarioActual && usuarioActual.rol === 'consulta';
@@ -4351,6 +4402,11 @@ function guardarReserva(){
   // una conexión lenta) mande la reserva dos o tres veces mientras Firestore
   // todavía está procesando la primera.
   if(guardandoReserva) return;
+  // Refuerzo de seguridad: si esta es una reserva ya existente de un día
+  // que ya pasó, no se guarda ningún cambio, aunque el botón Guardar ya
+  // esté oculto para ese caso — por si se dispara de otra forma.
+  { const rExistente = editandoId ? reservas.find(x => x.id === editandoId) : null;
+    if(reservaFechaVencida(rExistente)){ alert('Esta reserva es de un día que ya pasó — quedó bloqueada y no se puede editar.'); return; } }
   const nombre = document.getElementById('fNombre').value.trim();
   if(!nombre){ alert('Ingresa el nombre del cliente.'); return; }
   // Si el bloque de "Fecha y turno de la reserva" está visible (solo pasa
@@ -4424,6 +4480,11 @@ function urlAprobacion(id){
 }
 
 function enviarParaAprobacion(){
+  // Refuerzo de seguridad, igual que con eliminarReserva: aunque el botón
+  // ya está oculto para una reserva de un día que ya pasó, esto bloquea el
+  // envío real por si se llega a invocar de otra forma.
+  { const rExistente = editandoId ? reservas.find(x => x.id === editandoId) : null;
+    if(reservaFechaVencida(rExistente)){ alert('Esta reserva es de un día que ya pasó — no se puede reenviar para aprobación.'); return; } }
   const nombre = document.getElementById('fNombre').value.trim();
   const celularLocal = document.getElementById('fCelular').value.trim();
   const mesa = document.getElementById('fMesa').value;
@@ -4611,7 +4672,7 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   }
   function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function same(a,b){return iso(a)===iso(b);}
-  function isReadOnly(){return document.getElementById('overlay').classList.contains('modal-solo-lectura');}
+  function isReadOnly(){const ov=document.getElementById('overlay'); return ov.classList.contains('modal-solo-lectura') || ov.classList.contains('modal-reserva-vencida');}
 
   function setDateValue(value){
     if(isReadOnly()) return;
