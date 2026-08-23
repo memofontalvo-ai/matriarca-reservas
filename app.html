@@ -749,11 +749,25 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 /* Grupos: cada uno junta los bloques que pertenecen al mismo tema (mensajes,
    carrusel, usuarios) bajo un encabezado propio, en vez de una sola lista
    larga de bloques sueltos sin relación visible entre ellos. */
-.config-grupo{margin-bottom:28px;}
+.config-grupo{margin-bottom:14px;}
 .config-grupo-titulo{
   font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
   color:var(--text-dim); margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border-soft);
 }
+/* Encabezado tocable de cada sección de Config: colapsada por defecto, se
+   abre solo la que se toca, en vez de mostrar de una vez el "reguero"
+   entero de mensajes + carrusel + usuarios + zona de peligro. */
+.config-grupo-header{
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:12px;
+  padding:14px 16px; cursor:pointer; font-size:13.5px; font-weight:700; color:var(--text);
+  text-align:left; font-family:inherit;
+}
+.config-grupo-header:active{border-color:var(--gold);}
+.config-grupo-header-peligro{border-color:rgba(224,90,90,0.4); color:#e05a5a;}
+.config-grupo-chevron{font-size:16px; color:var(--text-dim); transition:transform .15s;}
+.config-grupo-chevron.abierto{transform:rotate(90deg); color:var(--gold-bright);}
+.config-grupo-contenido{padding-top:14px;}
 .config-mensaje-bloque{
   background:var(--panel-alt); border:1px solid var(--border); border-radius:12px;
   padding:16px; margin-bottom:16px;
@@ -1205,7 +1219,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
       <!-- ===== GRUPO: MENSAJES AUTOMÁTICOS ===== -->
       <div class="config-grupo">
-        <div class="config-grupo-titulo">💬 Mensajes automáticos</div>
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoMensajes')">
+          <span>💬 Mensajes automáticos</span>
+          <span class="config-grupo-chevron" id="chevron_grupoMensajes">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoMensajes" style="display:none;">
         <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">📨 Mensaje de solicitud</div>
           <div class="config-mensaje-sub">Se envía cuando le pides al cliente que llene el formulario de reserva. Usa <code>{nombre}</code> y <code>{link}</code> donde quieras que aparezca el nombre del contacto y el link — se rellenan solos al enviar.</div>
@@ -1227,11 +1245,16 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <span class="config-mensaje-ok" id="msgGuardado_aprobacion" style="display:none;">✓ Guardado</span>
           </div>
         </div>
+        </div>
       </div>
 
       <!-- ===== GRUPO: CARRUSEL DE EVENTOS ===== -->
       <div class="config-grupo">
-        <div class="config-grupo-titulo">🎠 Carrusel de eventos</div>
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoCarrusel')">
+          <span>🎠 Carrusel de eventos</span>
+          <span class="config-grupo-chevron" id="chevron_grupoCarrusel">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoCarrusel" style="display:none;">
         <div class="config-mensaje-bloque">
           <div class="config-mensaje-sub">Estas son las fotos que ven los clientes en el carrusel de <code>reservasbq.com</code>, antes de tocar "Reserva con nosotros". Sube la imagen ya lista (con su propio texto y diseño) — no se le agrega nada más encima. Se actualiza sola en la página pública apenas la guardes aquí.</div>
           <div id="listaCarrusel" class="carrusel-config-grid"></div>
@@ -1239,11 +1262,16 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button class="btn-config-guardar" onclick="abrirModalSlide()">+ Agregar foto</button>
           </div>
         </div>
+        </div>
       </div>
 
       <!-- ===== GRUPO: USUARIOS Y ACCESOS ===== -->
       <div class="config-grupo">
-        <div class="config-grupo-titulo">👤 Usuarios y accesos</div>
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoUsuarios')">
+          <span>👤 Usuarios y accesos</span>
+          <span class="config-grupo-chevron" id="chevron_grupoUsuarios">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoUsuarios" style="display:none;">
         <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">Usuarios y contraseñas</div>
           <div class="config-mensaje-sub">Cada usuario que crees puede iniciar sesión con su propio usuario y contraseña. Sus iniciales quedan marcadas automáticamente en cada reserva que cree o edite, para llevar el control de quién hizo qué.</div>
@@ -1262,13 +1290,21 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <span class="config-mensaje-ok" id="miPassGuardado" style="display:none;">✓ Actualizada</span>
           </div>
         </div>
+        </div>
       </div>
 
-      <!-- ===== ZONA DE PELIGRO (fuera de los grupos, a propósito) ===== -->
-      <div class="config-peligro-bloque">
-        <div class="config-peligro-titulo">⚠ Zona de peligro</div>
-        <div class="config-mensaje-sub">Borra TODAS las reservas de TODOS los días guardadas en la base de datos — pasadas y futuras. Úsalo solo si necesitas dejar el sistema completamente en cero para empezar de nuevo. No borra tus salones ni la configuración de mensajes/horarios, solo las reservas.</div>
-        <button class="btn-borrar-todo" onclick="resetearTodasLasReservas()">🗑 Borrar TODAS las reservas</button>
+      <!-- ===== GRUPO: ZONA DE PELIGRO ===== -->
+      <div class="config-grupo">
+        <button class="config-grupo-header config-grupo-header-peligro" onclick="toggleConfigGrupo('grupoPeligro')">
+          <span>⚠ Zona de peligro</span>
+          <span class="config-grupo-chevron" id="chevron_grupoPeligro">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoPeligro" style="display:none;">
+        <div class="config-peligro-bloque">
+          <div class="config-mensaje-sub">Borra TODAS las reservas de TODOS los días guardadas en la base de datos — pasadas y futuras. Úsalo solo si necesitas dejar el sistema completamente en cero para empezar de nuevo. No borra tus salones ni la configuración de mensajes/horarios, solo las reservas.</div>
+          <button class="btn-borrar-todo" onclick="resetearTodasLasReservas()">🗑 Borrar TODAS las reservas</button>
+        </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1279,7 +1315,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.75</div>
+<div class="version-tag">v3.76</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3478,6 +3514,27 @@ function irASalones(){
   const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
   if(rol !== 'admin') return;
   window.location.href = 'salones.html';
+}
+
+// ===== ACORDEÓN DE CONFIG =====
+// Cada sección (Mensajes, Carrusel, Usuarios, Zona de peligro) empieza
+// colapsada. Al tocar un encabezado se abre solo esa sección y se cierran
+// las demás, para no tener que ver el "reguero" completo de una vez —
+// se entra directo a la que se necesita.
+function toggleConfigGrupo(id){
+  const contenido = document.getElementById(id);
+  const chevron = document.getElementById('chevron_' + id);
+  const yaAbierto = contenido.style.display !== 'none';
+  ['grupoMensajes', 'grupoCarrusel', 'grupoUsuarios', 'grupoPeligro'].forEach(otroId => {
+    const otroContenido = document.getElementById(otroId);
+    const otroChevron = document.getElementById('chevron_' + otroId);
+    if(otroContenido) otroContenido.style.display = 'none';
+    if(otroChevron) otroChevron.classList.remove('abierto');
+  });
+  if(!yaAbierto){
+    contenido.style.display = 'block';
+    if(chevron) chevron.classList.add('abierto');
+  }
 }
 
 function cambiarVistaApp(v){
