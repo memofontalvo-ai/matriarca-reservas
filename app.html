@@ -1358,7 +1358,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.85</div>
+<div class="version-tag">v3.86</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4853,6 +4853,19 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     window.toggleHoraSalidaBlock(yaTeniaSalida);
   }
 
+  // Valor sugerido por defecto al habilitar la hora de salida: 2 horas
+  // después de la hora de llegada seleccionada. Es solo un punto de
+  // partida para ayudar — la persona lo puede mover libremente a 1 hora,
+  // hora y media, 3 horas, lo que necesite.
+  function horaMasDosHoras(horaHHMM){
+    if(!horaHHMM) return '';
+    const [h,m] = horaHHMM.split(':').map(Number);
+    if(!isFinite(h) || !isFinite(m)) return '';
+    const totalMin = ((h*60+m) + 120) % (24*60);
+    const h2 = Math.floor(totalMin/60), m2 = totalMin%60;
+    return String(h2).padStart(2,'0')+':'+String(m2).padStart(2,'0');
+  }
+
   window.toggleHoraSalidaBlock = function(forzarAbrir){
     const bloque = document.getElementById('horaSalidaBlock');
     const btn = document.getElementById('btnToggleHoraSalida');
@@ -4863,6 +4876,10 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       btn.textContent = abrir ? '− Quitar hora de salida' : '+ Asignar hora de salida (opcional)';
     }
     if(abrir){
+      const fHoraSalidaEl = document.getElementById('fHoraSalida');
+      if(!fHoraSalidaEl.value){
+        fHoraSalidaEl.value = horaMasDosHoras(document.getElementById('fHora').value);
+      }
       requestAnimationFrame(initWheelsSalida);
     } else {
       document.getElementById('fHoraSalida').value = '';
