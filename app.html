@@ -260,6 +260,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .res-top-right{display:flex; flex-direction:column; align-items:flex-end; gap:4px;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
 .res-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright);}
+.res-hora-salida{font-size:11.5px; font-weight:500; color:var(--text-muted);}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; max-width:100%;}
 .res-meta span{overflow-wrap:anywhere; max-width:100%;}
@@ -1352,7 +1353,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.83</div>
+<div class="version-tag">v3.84</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1446,6 +1447,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <div class="phone-wheel-col"><label>AM/PM</label><div class="phone-wheel" id="phoneAmPmWheel"></div></div>
         </div>
         <input type="time" id="fHora" class="phone-hidden-control">
+      </div>
+
+      <div class="field">
+        <label>Hora de salida (aprox.)</label>
+        <input type="time" id="fHoraSalida">
+        <div class="whatsapp-nota" style="margin-top:6px;">
+          La define el restaurante al confirmar por teléfono o al revisar la solicitud del cliente — el cliente solo pide la hora de llegada. Sirve para saber desde qué hora vuelve a quedar libre la mesa.
+        </div>
       </div>
 
       <div class="field phone-status-section">
@@ -2882,7 +2891,7 @@ function renderLista(){
     return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
         <div>
-          <div class="res-hora">${escapeHtml(r.hora)}</div>
+          <div class="res-hora">${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
           <div class="res-nombre">${escapeHtml(r.nombre)}</div>
         </div>
         <div class="res-top-right">
@@ -3831,7 +3840,7 @@ function renderSolicitudesScreen(){
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
-          <div class="sc-hora">${escapeHtml(r.hora)}</div>
+          <div class="sc-hora">${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
           <div class="sc-nombre">${escapeHtml(r.nombre)}</div>
         </div>
         <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
@@ -3972,6 +3981,7 @@ function abrirModal(id, mesaId){
       document.getElementById('fechaReservaEditBlock').style.display = 'none';
     }
     document.getElementById('fHora').value = r.hora;
+    document.getElementById('fHoraSalida').value = r.horaSalida || '';
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
     { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
@@ -4031,6 +4041,7 @@ function abrirModal(id, mesaId){
     document.getElementById('modalTitle').textContent = 'Nueva reserva';
     document.getElementById('modalSub').textContent = `${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha} (hoy)`;
     document.getElementById('fHora').value = '';
+    document.getElementById('fHoraSalida').value = '';
     document.getElementById('fPax').value = '';
     document.getElementById('fNombre').value = '';
     document.getElementById('fCelularCod').value = '57';
@@ -4419,6 +4430,8 @@ function guardarReserva(){
   if(!paxNueva || Number(paxNueva) < 1){ alert('Ingresa la cantidad de personas de la reserva.'); return; }
   const horaNueva = document.getElementById('fHora').value;
   if(!horaNueva){ alert('Selecciona la hora de la reserva.'); return; }
+  const horaSalidaNueva = document.getElementById('fHoraSalida').value;
+  if(!horaSalidaNueva && estadoSeleccionado !== 'cancelada'){ alert('Asigna la hora de salida aproximada — la necesitas para saber desde cuándo vuelve a quedar libre la mesa.'); return; }
   const mesaNueva = document.getElementById('fMesa').value;
   if(!mesaNueva && estadoSeleccionado !== 'cancelada'){ alert('Asigna una mesa en el plano antes de guardar — es indispensable para poder recibir al cliente ese día.'); return; }
   // Si el bloque de "Fecha y turno de la reserva" está visible (solo pasa
@@ -4435,6 +4448,7 @@ function guardarReserva(){
     fecha: fechaFinal,
     turno: turnoFinal,
     hora: document.getElementById('fHora').value || '00:00',
+    horaSalida: document.getElementById('fHoraSalida').value || '',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular: armarCelularCompleto(document.getElementById('fCelularCod').value, document.getElementById('fCelular').value),
@@ -4502,10 +4516,12 @@ function enviarParaAprobacion(){
   const mesa = document.getElementById('fMesa').value;
   const pax = document.getElementById('fPax').value;
   const hora = document.getElementById('fHora').value;
+  const horaSalida = document.getElementById('fHoraSalida').value;
   if(!nombre){ alert('Ingresa el nombre completo del cliente.'); return; }
   if(!celularLocal){ alert('Ingresa el celular del cliente para poder enviarle el link de aprobación.'); return; }
   if(!pax || Number(pax) < 1){ alert('Ingresa la cantidad de personas de la reserva.'); return; }
   if(!hora){ alert('Selecciona la hora de la reserva.'); return; }
+  if(!horaSalida){ alert('Asigna la hora de salida aproximada antes de enviar — la necesitas para saber desde cuándo vuelve a quedar libre la mesa.'); return; }
   const celular = armarCelularCompleto(document.getElementById('fCelularCod').value, celularLocal);
   const digitosCliente = digitosWhatsapp(celular);
   if(!digitosCliente){
@@ -4524,6 +4540,7 @@ function enviarParaAprobacion(){
     fecha: modalFecha,
     turno: modalTurno,
     hora: document.getElementById('fHora').value || '00:00',
+    horaSalida: horaSalida || '',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular,
