@@ -267,6 +267,29 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   border-radius:12px; font-size:13.5px; font-weight:600; cursor:pointer;
 }
 .btn-descargar-informe:active{border-color:var(--gold);}
+
+/* ===== INFORME IMPRIMIBLE (overlay dentro de la misma app) ===== */
+.informe-modal{max-width:900px; width:100%; background:#fff; color:#1a1a1a; max-height:92vh; overflow-y:auto;}
+.informe-toolbar{display:flex; gap:10px; margin-bottom:16px; position:sticky; top:0; background:#fff; padding-bottom:8px;}
+.informe-header h1{font-size:19px; margin:0 0 2px; color:#1a1a1a;}
+.informe-subtitulo{color:#555; font-size:13px; margin-bottom:18px;}
+.informe-turno{margin-bottom:26px;}
+.informe-turno h2{font-size:15px; background:#f1e6cf; color:#1a1408; padding:8px 10px; border-radius:6px; margin-bottom:8px;}
+.informe-turno table{width:100%; border-collapse:collapse; font-size:11.5px; color:#1a1a1a;}
+.informe-turno th, .informe-turno td{border:1px solid #ccc; padding:5px 6px; text-align:left; vertical-align:top;}
+.informe-turno th{background:#faf6ec;}
+/* Al imprimir (o "Guardar como PDF"), solo se imprime el informe — el
+   resto de la app (que sigue detrás, cargada normalmente) queda oculto.
+   Esto es lo que evita tener que abrir una pestaña/ventana nueva: ya no
+   hay que salir de la app para imprimir, y "Cerrar" solo cierra el
+   informe sin afectar nada más. */
+@media print{
+  body *{visibility:hidden;}
+  #overlayInforme, #overlayInforme *{visibility:visible;}
+  #overlayInforme{position:absolute; inset:0; display:block; background:#fff; padding:0;}
+  #overlayInforme .informe-modal{position:static; max-width:none; max-height:none; overflow:visible; box-shadow:none; border:none; padding:12px; margin:0;}
+  .informe-toolbar{display:none;}
+}
 .btn-toggle-hora-salida{
   background:none; border:1px dashed var(--border); color:var(--text-dim);
   font-size:12.5px; padding:9px 12px; border-radius:9px; width:100%; text-align:left; cursor:pointer;
@@ -1366,7 +1389,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.89</div>
+<div class="version-tag">v3.90</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1623,6 +1646,16 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div class="modal-actions" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="document.getElementById('overlayVerObs').classList.remove('open')">Cerrar</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayInforme">
+  <div class="modal informe-modal">
+    <div class="informe-toolbar">
+      <button class="btn btn-ghost" onclick="cerrarInforme()">✕ Cerrar</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+    </div>
+    <div id="informeContenido"></div>
   </div>
 </div>
 
@@ -3194,47 +3227,25 @@ function descargarInformeDia(){
         </table>
         ${planoHtml}
       </div>`;
-  }).join('<div class="informe-salto"></div>');
+  }).join('');
 
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-  <title>Informe ${fechaLarga}</title>
-  <style>
-    body{font-family:Arial,Helvetica,sans-serif; color:#1a1a1a; margin:24px; background:#fff;}
-    h1{font-size:19px; margin-bottom:2px;}
-    .subtitulo{color:#555; font-size:13px; margin-bottom:18px;}
-    .informe-turno{margin-bottom:26px;}
-    .informe-turno h2{font-size:15px; background:#f1e6cf; padding:8px 10px; border-radius:6px; margin-bottom:8px;}
-    table{width:100%; border-collapse:collapse; font-size:11.5px;}
-    th,td{border:1px solid #ccc; padding:5px 6px; text-align:left; vertical-align:top;}
-    th{background:#faf6ec;}
-    .informe-salto{page-break-after:always;}
-    .btn-imprimir{
-      background:#e8a33d; border:none; color:#1a1408; font-weight:700; padding:10px 18px;
-      border-radius:8px; font-size:14px; cursor:pointer; margin-bottom:18px;
-    }
-    @media print{ .btn-imprimir{display:none;} }
-    /* ---- estilos del plano, copiados tal cual del panel Plano de la app ---- */
-    .plano-canvas-app{position:relative; width:100%; aspect-ratio:1079/760; border-radius:10px; border:1px solid #ccc; background:#fbf8f1; overflow:hidden;}
-    .plano-zoneblock{position:absolute; display:flex; align-items:center; justify-content:center; text-align:center; font-size:8px; font-weight:700; color:rgba(0,0,0,0.55); line-height:1.1; padding:2px;}
-    .plano-gridzone{position:absolute; display:grid; gap:0;}
-    .plano-cell{border:1px solid rgba(18,71,74,0.18); position:relative;}
-    .plano-mesa-core{position:absolute; left:10%; top:10%; right:10%; bottom:10%; background:#0a2f31; border:1px solid #444; border-radius:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:6px; font-weight:800; color:#fff; overflow:hidden;}
-    .plano-mesa-core.p-libre{background:#e6e6e6; border-color:#aaa; color:#333;}
-    .plano-mesa-core.p-ocupada{background:#2fa66b; color:#08210f; border-color:#2fa66b;}
-    .plano-mesa-core.p-pendiente{background:#e8a33d; color:#2b1c05; border-color:#e8a33d;}
-    .plano-guest{font-size:5px; font-weight:600; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  </style></head>
-  <body>
-    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
-    <h1>La Matriarca Barranquilla — Informe de reservas</h1>
-    <div class="subtitulo">${fechaLarga} · ${turnoActivo==='todos' ? 'Todos los turnos' : turnoLabels[turnoActivo]}</div>
-    ${seccionesHtml}
-  </body></html>`;
-
-  const ventana = window.open('', '_blank');
-  if(!ventana){ alert('El navegador bloqueó la ventana del informe — permite pop-ups para este sitio e intenta de nuevo.'); return; }
-  ventana.document.write(html);
-  ventana.document.close();
+  // Se muestra DENTRO de la misma app, en un overlay a pantalla completa —
+  // abrir una pestaña/ventana nueva con window.open() sacaba a la persona
+  // de la aplicación en iPhone (a veces cerrar esa pestaña cerraba todo el
+  // programa en vez de solo el informe). Así se queda siempre adentro, y
+  // "Cerrar" solo cierra el informe, nunca la app. Para imprimir o guardar
+  // como PDF, se usa window.print() con un estilo que oculta todo lo demás
+  // de la pantalla y solo imprime este contenido.
+  document.getElementById('informeContenido').innerHTML = `
+    <div class="informe-header">
+      <h1>La Matriarca Barranquilla — Informe de reservas</h1>
+      <div class="informe-subtitulo">${fechaLarga} · ${turnoLabels[turnoActivo]}</div>
+    </div>
+    ${seccionesHtml}`;
+  document.getElementById('overlayInforme').classList.add('open');
+}
+function cerrarInforme(){
+  document.getElementById('overlayInforme').classList.remove('open');
 }
 
 /* ============ RENDER: PLANO ============ */
