@@ -1366,7 +1366,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.88</div>
+<div class="version-tag">v3.89</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3158,7 +3158,7 @@ function descargarInformeDia(){
   const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
       .filter(r => r.fecha===iso && r.turno===turno && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='cancelada')
-      .sort((a,b) => a.hora.localeCompare(b.hora));
+      .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
 
     const filasHtml = rs.length ? rs.map(r => `
