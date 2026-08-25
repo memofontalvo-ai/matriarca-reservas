@@ -1366,7 +1366,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.87</div>
+<div class="version-tag">v3.88</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3141,9 +3141,16 @@ function findMesa(id){
 // las mesas ocupadas de ESE turno, para poder repartirlo al personal de
 // servicio en papel.
 function descargarInformeDia(){
+  // El informe es por turno — no tiene sentido imprimir "todo" de una vez
+  // (mezclaría desayuno, almuerzo y cena en el mismo reparto de servicio).
+  // Hay que elegir un turno puntual arriba antes de poder descargarlo.
+  if(turnoActivo === 'todos'){
+    alert('Por favor selecciona qué turno quieres descargar — Desayuno, Almuerzo o Cena — antes de generar el informe.');
+    return;
+  }
   const iso = fechaISO(fechaActual);
   const fechaLarga = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
-  const turnosAIncluir = turnoActivo === 'todos' ? ['desayuno','almuerzo','cena'] : [turnoActivo];
+  const turnosAIncluir = [turnoActivo];
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
   const mesas = PLANO_MAESTRO ? (PLANO_MAESTRO.mesas || {}) : {};
   const pref = PLANO_MAESTRO ? (PLANO_MAESTRO.pref || {}) : {};
