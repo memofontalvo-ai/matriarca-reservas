@@ -1389,7 +1389,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.90</div>
+<div class="version-tag">v3.91</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2951,9 +2951,9 @@ function renderLista(){
       .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
     if(otrosTurnos.length){
       const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
-      el.innerHTML = `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>` + renderResumenTurnoHTML(rsTodas);
+      el.innerHTML = renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
     } else {
-      el.innerHTML = `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>` + renderResumenTurnoHTML(rsTodas);
+      el.innerHTML = renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
     }
     return;
   }
@@ -2994,7 +2994,7 @@ function renderLista(){
     </div>`;
   }).join('');
 
-  el.innerHTML = cardsHtml + renderResumenTurnoHTML(rsTodas);
+  el.innerHTML = renderResumenTurnoHTML(rsTodas) + cardsHtml;
 }
 
 function renderResumenTurnoHTML(rsTodas){
