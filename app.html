@@ -261,6 +261,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .edit-hint{font-size:10px; color:var(--text-dim); font-weight:500;}
 .res-hora{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:14px; color:var(--gold-bright);}
 .res-hora-salida{font-size:11.5px; font-weight:500; color:var(--text-muted);}
+.btn-descargar-informe{
+  display:block; width:calc(100% - 32px); margin:14px 16px; padding:12px;
+  background:var(--panel-alt); border:1px solid var(--border); color:var(--gold-bright);
+  border-radius:12px; font-size:13.5px; font-weight:600; cursor:pointer;
+}
+.btn-descargar-informe:active{border-color:var(--gold);}
 .btn-toggle-hora-salida{
   background:none; border:1px dashed var(--border); color:var(--text-dim);
   font-size:12.5px; padding:9px 12px; border-radius:9px; width:100%; text-align:left; cursor:pointer;
@@ -1238,6 +1244,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div class="panel-resumen" id="panelResumen"></div>
     </main>
 
+    <button class="btn-descargar-informe" onclick="descargarInformeDia()">🖨️ Descargar informe del día</button>
+
     <div class="bottom-nav">
       <button data-view="lista" class="active" onclick="cambiarVista('lista')"><span class="icon">☰</span>Lista</button>
       <button data-view="plano" onclick="cambiarVista('plano')"><span class="icon">▦</span>Plano</button>
@@ -1358,7 +1366,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.86</div>
+<div class="version-tag">v3.87</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1595,6 +1603,27 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <div class="comprobante-viewer-overlay" id="comprobanteViewerOverlay" onclick="if(event.target===this) cerrarComprobanteViewer()">
   <button class="comprobante-viewer-cerrar" onclick="cerrarComprobanteViewer()">✕</button>
   <img id="comprobanteViewerImg" class="comprobante-viewer-img" src="" alt="Comprobante de pago">
+</div>
+
+<div class="overlay" id="overlayVerMesas">
+  <div class="modal" style="max-width:520px;">
+    <h3 id="verMesasTitulo">Mesas de la reserva</h3>
+    <div class="modal-sub">Resaltadas en dorado — el resto del plano se ve tal cual está, solo como referencia.</div>
+    <div id="verMesasCanvas" style="margin-top:12px;"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-ghost" onclick="document.getElementById('overlayVerMesas').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayVerObs">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="verObsTitulo">Observaciones</h3>
+    <div id="verObsTexto" style="margin-top:10px; white-space:pre-wrap; font-size:14px; color:var(--text); line-height:1.5;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="document.getElementById('overlayVerObs').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="calOverlay">
@@ -2919,6 +2948,8 @@ function renderLista(){
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
         ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
+        ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
+        ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
       </div>
       ${(r.codigoReserva || r.ultimoEditorIniciales) ? `
       <div class="res-firma">
@@ -3042,6 +3073,38 @@ function cerrarComprobanteViewer(){
   document.getElementById('comprobanteViewerImg').src = '';
 }
 
+// Muestra el plano completo, pero resaltando SOLO las mesas de esta
+// reserva puntual (reutiliza el mismo dibujo del plano de la pestaña
+// "Plano", armando un porMesaRef que solo contiene esta reserva en sus
+// mesas — así el resto del plano se ve libre, sin mezclar con las demás
+// reservas del turno).
+function verMesasDeReserva(id){
+  const r = reservas.find(x => x.id === id);
+  if(!r || !r.mesa) return;
+  if(!PLANO_MAESTRO){ alert('Todavía no hay un plano configurado — ve a Salones para crearlo.'); return; }
+  const porMesaRef = {};
+  r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; });
+  const mesas = PLANO_MAESTRO.mesas || {};
+  const pref = PLANO_MAESTRO.pref || {};
+  document.getElementById('verMesasCanvas').innerHTML = `<div class="plano-canvas-app">
+    ${buildBackgroundPlano()}
+    ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
+    ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
+  </div>`;
+  document.getElementById('verMesasTitulo').textContent = `Mesas de ${r.nombre}`;
+  document.getElementById('overlayVerMesas').classList.add('open');
+}
+
+// Ventanita rápida con solo las observaciones de una reserva, sin tener
+// que abrir el modal completo de edición para leerlas.
+function verObservacionesDeReserva(id){
+  const r = reservas.find(x => x.id === id);
+  if(!r) return;
+  document.getElementById('verObsTitulo').textContent = `Observaciones — ${r.nombre}`;
+  document.getElementById('verObsTexto').textContent = r.obs || '(sin observaciones)';
+  document.getElementById('overlayVerObs').classList.add('open');
+}
+
 function estadoLabel(e){
   return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar'}[e]||e;
 }
@@ -3067,6 +3130,104 @@ function mesaEsVip(id){
 function findMesa(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return {salon:s, mesa:m};
   return null;
+}
+
+/* ============ INFORME IMPRIMIBLE DEL DÍA ============ */
+// Genera una página aparte, lista para imprimir o "Guardar como PDF" desde
+// el propio navegador (más confiable en iPhone que generar el PDF desde
+// JS). Respeta el turno que esté activo en pantalla: si está en "Todos",
+// salen los 3 turnos en orden (Desayuno, Almuerzo, Cena); si hay un turno
+// puntual elegido, sale solo ese. Al final de cada turno va el plano con
+// las mesas ocupadas de ESE turno, para poder repartirlo al personal de
+// servicio en papel.
+function descargarInformeDia(){
+  const iso = fechaISO(fechaActual);
+  const fechaLarga = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
+  const turnosAIncluir = turnoActivo === 'todos' ? ['desayuno','almuerzo','cena'] : [turnoActivo];
+  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  const mesas = PLANO_MAESTRO ? (PLANO_MAESTRO.mesas || {}) : {};
+  const pref = PLANO_MAESTRO ? (PLANO_MAESTRO.pref || {}) : {};
+
+  const seccionesHtml = turnosAIncluir.map(turno => {
+    const rs = reservas
+      .filter(r => r.fecha===iso && r.turno===turno && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='cancelada')
+      .sort((a,b) => a.hora.localeCompare(b.hora));
+    const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
+
+    const filasHtml = rs.length ? rs.map(r => `
+      <tr>
+        <td>${escapeHtml(r.hora)}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
+        <td>${escapeHtml(r.nombre)}</td>
+        <td style="text-align:center;">${r.pax}${Number(r.pax)>=30?' ⭐':''}</td>
+        <td>${escapeHtml(r.celular||'—')}</td>
+        <td>${r.mesa?escapeHtml(r.mesa.split('+').join(' + ')):'—'}</td>
+        <td>${escapeHtml(r.canal||'—')}</td>
+        <td>${escapeHtml(r.ultimoEditorIniciales||r.creadoPorIniciales||'—')}</td>
+        <td>${estadoLabel(r.estado)}</td>
+        <td>${escapeHtml(r.obs||'')}</td>
+      </tr>`).join('') : `<tr><td colspan="9" style="text-align:center; color:#888; padding:14px;">Sin reservas en este turno.</td></tr>`;
+
+    const porMesaRef = {};
+    rs.forEach(r => { if(r.mesa) r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; }); });
+    const planoHtml = PLANO_MAESTRO ? `
+      <div class="plano-canvas-app" style="max-width:640px; margin:14px auto 0;">
+        ${buildBackgroundPlano()}
+        ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
+        ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
+      </div>` : '';
+
+    return `
+      <div class="informe-turno">
+        <h2>${turnoLabels[turno]} — ${rs.length} reserva${rs.length===1?'':'s'}, ${totalPax} pax</h2>
+        <table>
+          <thead><tr>
+            <th>Hora</th><th>Cliente</th><th>Pax</th><th>Celular</th><th>Mesa</th><th>Canal</th><th>Gestionó</th><th>Estado</th><th>Obs.</th>
+          </tr></thead>
+          <tbody>${filasHtml}</tbody>
+        </table>
+        ${planoHtml}
+      </div>`;
+  }).join('<div class="informe-salto"></div>');
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <title>Informe ${fechaLarga}</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif; color:#1a1a1a; margin:24px; background:#fff;}
+    h1{font-size:19px; margin-bottom:2px;}
+    .subtitulo{color:#555; font-size:13px; margin-bottom:18px;}
+    .informe-turno{margin-bottom:26px;}
+    .informe-turno h2{font-size:15px; background:#f1e6cf; padding:8px 10px; border-radius:6px; margin-bottom:8px;}
+    table{width:100%; border-collapse:collapse; font-size:11.5px;}
+    th,td{border:1px solid #ccc; padding:5px 6px; text-align:left; vertical-align:top;}
+    th{background:#faf6ec;}
+    .informe-salto{page-break-after:always;}
+    .btn-imprimir{
+      background:#e8a33d; border:none; color:#1a1408; font-weight:700; padding:10px 18px;
+      border-radius:8px; font-size:14px; cursor:pointer; margin-bottom:18px;
+    }
+    @media print{ .btn-imprimir{display:none;} }
+    /* ---- estilos del plano, copiados tal cual del panel Plano de la app ---- */
+    .plano-canvas-app{position:relative; width:100%; aspect-ratio:1079/760; border-radius:10px; border:1px solid #ccc; background:#fbf8f1; overflow:hidden;}
+    .plano-zoneblock{position:absolute; display:flex; align-items:center; justify-content:center; text-align:center; font-size:8px; font-weight:700; color:rgba(0,0,0,0.55); line-height:1.1; padding:2px;}
+    .plano-gridzone{position:absolute; display:grid; gap:0;}
+    .plano-cell{border:1px solid rgba(18,71,74,0.18); position:relative;}
+    .plano-mesa-core{position:absolute; left:10%; top:10%; right:10%; bottom:10%; background:#0a2f31; border:1px solid #444; border-radius:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:6px; font-weight:800; color:#fff; overflow:hidden;}
+    .plano-mesa-core.p-libre{background:#e6e6e6; border-color:#aaa; color:#333;}
+    .plano-mesa-core.p-ocupada{background:#2fa66b; color:#08210f; border-color:#2fa66b;}
+    .plano-mesa-core.p-pendiente{background:#e8a33d; color:#2b1c05; border-color:#e8a33d;}
+    .plano-guest{font-size:5px; font-weight:600; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  </style></head>
+  <body>
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+    <h1>La Matriarca Barranquilla — Informe de reservas</h1>
+    <div class="subtitulo">${fechaLarga} · ${turnoActivo==='todos' ? 'Todos los turnos' : turnoLabels[turnoActivo]}</div>
+    ${seccionesHtml}
+  </body></html>`;
+
+  const ventana = window.open('', '_blank');
+  if(!ventana){ alert('El navegador bloqueó la ventana del informe — permite pop-ups para este sitio e intenta de nuevo.'); return; }
+  ventana.document.write(html);
+  ventana.document.close();
 }
 
 /* ============ RENDER: PLANO ============ */
@@ -3874,6 +4035,8 @@ function renderSolicitudesScreen(){
         ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`:''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
+        ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
+        ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
       </div>
       ${(r.codigoReserva || formatearHoraSolicitud(r.horaSolicitud) || r.ultimoEditorIniciales) ? `
       <div class="sc-firma">
