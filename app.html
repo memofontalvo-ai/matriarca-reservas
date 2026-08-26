@@ -1398,7 +1398,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.92</div>
+<div class="version-tag">v3.93</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3041,14 +3041,17 @@ function renderResumenTurnoHTML(rsTodas){
   const generalReservas = rsTodas.filter(r=>!mesaEsVip(r.mesa));
   const generalPax = generalReservas.reduce((a,r)=>a+Number(r.pax||0),0);
 
-  // Los 3 salones VIP se muestran siempre en este orden, cada uno por separado.
-  const salonesVip = SALONES.filter(s=>s.vip);
-  const vipPorSalon = salonesVip.map(salon => {
-    const idsDeEsteSalon = new Set(salon.mesas.map(m=>m.id));
-    const reservasDeEsteSalon = rsTodas.filter(r => idsDeEsteSalon.has(r.mesa))
-      .sort((a,b)=>(a.mesa||'').localeCompare(b.mesa||''));
+  // Los 3 salones VIP reales del plano (Puerta de Oro, Curramba, La
+  // Arenosa) — antes este resumen usaba una lista vieja ("VIP Azul/Grande/
+  // Pequeña") que ya no existe en el plano actual, así que las reservas de
+  // estos salones no se contaban en ningún lado. Se muestran siempre en
+  // este orden.
+  const vipPorSalon = Object.entries(SALON_ESPECIAL_LABELS).map(([salonId, nombre]) => {
+    const reservasDeEsteSalon = rsTodas
+      .filter(r => r.mesa && r.mesa.split('+').map(p=>p.trim()).includes(salonId))
+      .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
     const pax = reservasDeEsteSalon.reduce((a,r)=>a+Number(r.pax||0),0);
-    return { salon, reservas: reservasDeEsteSalon, pax };
+    return { salon:{nombre}, reservas: reservasDeEsteSalon, pax };
   });
 
   const vipReservasCount = vipPorSalon.reduce((a,s)=>a+s.reservas.length,0);
@@ -3059,14 +3062,14 @@ function renderResumenTurnoHTML(rsTodas){
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
     const filas = reservas.length
       ? reservas.map(r => `<div class="resumen-fila">
-          <span class="resumen-fila-label">${escapeHtml(mesaLabelCorto(r.mesa))} <span class="resumen-fila-nombre">· ${escapeHtml(r.nombre)}</span></span>
+          <span class="resumen-fila-label">${escapeHtml(r.nombre)}</span>
           <span class="resumen-fila-val">${r.pax} pax</span>
         </div>`).join('')
       : `<div class="resumen-fila resumen-vacio"><span>Sin reservas</span></div>`;
     return `<div class="resumen-subsalon">
       <div class="resumen-subsalon-head">
         <span>${salon.nombre}</span>
-        <span>${reservas.length} mesas · ${pax} pax</span>
+        <span>${reservas.length} reserva${reservas.length===1?'':'s'} · ${pax} pax</span>
       </div>
       ${filas}
     </div>`;
@@ -3166,6 +3169,7 @@ function mesaLabelCorto(id){
   return `${mesaLabel(partes[0])} +${partes.length-1} más`;
 }
 function mesaEsVip(id){
+  if(esSalonVipEspecial(id)) return true;
   for(const s of SALONES) if(s.vip) for(const m of s.mesas) if(m.id===id) return true;
   return false;
 }
