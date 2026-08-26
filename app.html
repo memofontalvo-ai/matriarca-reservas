@@ -536,6 +536,15 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   position:absolute; display:flex; align-items:center; justify-content:center; text-align:center;
   font-size:8px; font-weight:700; color:rgba(0,0,0,0.55); line-height:1.1; padding:2px;
 }
+/* Vista de solo lectura (plano en vivo, "Ver mesas", informe imprimible):
+   cuando el salón entero está reservado, se marca igual que una mesa
+   ocupada, con el nombre del cliente encima — antes se veía siempre
+   "libre" aunque estuviera reservado, porque solo la cuadrícula de mesas
+   sueltas mostraba quién la tenía. */
+.plano-zoneblock-reservado{
+  flex-direction:column; box-shadow:inset 0 0 0 3px var(--confirmed); outline:2px solid var(--confirmed); z-index:4;
+}
+.plano-zoneblock-guest{font-size:7px; font-weight:800; margin-top:2px; background:rgba(0,0,0,0.55); color:#fff; padding:1px 5px; border-radius:4px;}
 /* Salones seleccionables dentro del selector de mesas (Puerta de Oro,
    Curramba, Arenosa, Lobby 1/2) — mismos tres estados que una mesa suelta:
    libre (se puede tocar), elegida (dorada, ya asignada a esta reserva),
@@ -1389,7 +1398,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.91</div>
+<div class="version-tag">v3.92</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2959,7 +2968,8 @@ function renderLista(){
   }
   const cardsHtml = rs.map(r=>{
     const mesaTxt = r.mesa ? mesaLabelCorto(r.mesa) : '—';
-    const isVip = mesaEsVip(r.mesa);
+    const salonVipNombre = esSalonVipEspecial(r.mesa);
+    const isVip = mesaEsVip(r.mesa) || !!salonVipNombre;
     const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
     return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
@@ -2976,8 +2986,7 @@ function renderLista(){
       <div class="res-meta">
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
-        <span>Mesa ${mesaTxt}</span>
-        ${isVip?`<span class="vip-tag">VIP</span>`:''}
+        ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
         ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
         ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
@@ -3120,7 +3129,7 @@ function verMesasDeReserva(id){
   const mesas = PLANO_MAESTRO.mesas || {};
   const pref = PLANO_MAESTRO.pref || {};
   document.getElementById('verMesasCanvas').innerHTML = `<div class="plano-canvas-app">
-    ${buildBackgroundPlano()}
+    ${buildBackgroundPlano(false, null, porMesaRef)}
     ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
     ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
   </div>`;
@@ -3159,6 +3168,23 @@ function mesaLabelCorto(id){
 function mesaEsVip(id){
   for(const s of SALONES) if(s.vip) for(const m of s.mesas) if(m.id===id) return true;
   return false;
+}
+// Los 3 salones VIP completos (Puerta de Oro, Curramba, La Arenosa) no son
+// mesas dentro de la cuadrícula — son un salón entero que se reserva de
+// una vez. Antes se mostraban en las tarjetas como "Mesa SALON-ORO", que no
+// dice nada; esto detecta cuando la reserva es justo uno de esos salones y
+// devuelve su nombre real, para mostrar "VIP: Salón Puerta de Oro" en su
+// lugar.
+const SALON_ESPECIAL_LABELS = {
+  'SALON-ORO': 'Salón Puerta de Oro',
+  'SALON-CURRAMBA': 'Salón Curramba',
+  'SALON-ARENOSA': 'Salón La Arenosa',
+};
+function esSalonVipEspecial(mesaId){
+  if(!mesaId) return null;
+  const partes = mesaId.split('+').map(p=>p.trim());
+  for(const p of partes) if(SALON_ESPECIAL_LABELS[p]) return SALON_ESPECIAL_LABELS[p];
+  return null;
 }
 function findMesa(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return {salon:s, mesa:m};
@@ -3211,7 +3237,7 @@ function descargarInformeDia(){
     rs.forEach(r => { if(r.mesa) r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; }); });
     const planoHtml = PLANO_MAESTRO ? `
       <div class="plano-canvas-app" style="max-width:640px; margin:14px auto 0;">
-        ${buildBackgroundPlano()}
+        ${buildBackgroundPlano(false, null, porMesaRef)}
         ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
         ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
       </div>` : '';
@@ -3272,7 +3298,7 @@ function parseKeyPlano(key){
 // lógica de selección/ocupación que ya existe para mesas los reconoce sin
 // cambios adicionales. Barra y Tarima quedan solo decorativas (no son
 // espacio para sentar clientes).
-function buildBackgroundPlano(interactive, estadoZonas){
+function buildBackgroundPlano(interactive, estadoZonas, porMesaRef){
   const z = [
     { l:6.02, t:9.02, w:8.80, h:28.57, bg:'#ecc9a8', label:'BARRA' },
     { l:76.0, t:8.27, w:19.93, h:31.58, bg:'#6b6b6b', label:'TARIMA', color:'#fff' },
@@ -3294,6 +3320,17 @@ function buildBackgroundPlano(interactive, estadoZonas){
       const cls = elegida ? 'plano-zoneblock-elegida' : (ocupada ? 'plano-zoneblock-ocupada' : 'plano-zoneblock-libre');
       const clickJs = ocupada ? '' : `onclick='toggleMesaSeleccion(${JSON.stringify(b.id)})'`;
       return `<div class="plano-zoneblock ${cls}" ${clickJs} title="${escapeHtml(b.label)}${ocupada ? ' — ocupado' : ''}" style="left:${b.l}%; top:${b.t}%; width:${b.w}%; height:${b.h}%; background:${b.bg}; color:${b.color||'rgba(0,0,0,0.55)'};">${b.label||''}${elegida ? ' ✓' : ''}</div>`;
+    }
+    // Vista de solo lectura: si este salón aparece en porMesaRef (viene del
+    // mismo mapa "código de mesa/salón → reserva" que ya arma cada pantalla
+    // para la cuadrícula de mesas), se marca como reservado con el nombre
+    // del cliente — antes esto solo pasaba con mesas sueltas, nunca con un
+    // salón VIP completo.
+    if(b.id && porMesaRef){
+      const reserva = porMesaRef[b.id.toLowerCase()];
+      if(reserva){
+        return `<div class="plano-zoneblock plano-zoneblock-reservado" style="left:${b.l}%; top:${b.t}%; width:${b.w}%; height:${b.h}%; background:${b.bg}; color:${b.color||'rgba(0,0,0,0.55)'};" title="${escapeHtml(b.label)} — reservado por ${escapeHtml(reserva.nombre||'')}">${b.label||''}<div class="plano-zoneblock-guest">${escapeHtml(reserva.nombre||'')}</div></div>`;
+      }
     }
     return `<div class="plano-zoneblock" style="left:${b.l}%; top:${b.t}%; width:${b.w}%; height:${b.h}%; background:${b.bg}; color:${b.color||'rgba(0,0,0,0.55)'};">${b.label||''}</div>`;
   }).join('');
@@ -3377,7 +3414,7 @@ function renderPlano(){
   const mesas = PLANO_MAESTRO.mesas || {};
   const pref = PLANO_MAESTRO.pref || {};
   const canvasHtml = `<div class="plano-canvas-app">
-    ${buildBackgroundPlano()}
+    ${buildBackgroundPlano(false, null, porMesaRef)}
     ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
     ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
   </div>`;
@@ -4050,7 +4087,7 @@ function renderSolicitudesScreen(){
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
         ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
-        ${r.mesa?`<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`:''}
+        ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
         ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
