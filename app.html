@@ -1403,7 +1403,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.97</div>
+<div class="version-tag">v3.98</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3236,7 +3236,7 @@ function descargarInformeDia(){
         <td style="text-align:center;">${r.pax}${Number(r.pax)>=30?' ⭐':''}</td>
         <td>${escapeHtml(r.celular||'—')}</td>
         <td>${r.mesa?escapeHtml(r.mesa.split('+').join(' + ')):'—'}</td>
-        <td>${escapeHtml(r.canal||'—')}</td>
+        <td>${r.abono>0?'$'+Number(r.abono).toLocaleString('es-CO'):'—'}</td>
         <td>${escapeHtml(r.ultimoEditorIniciales||r.creadoPorIniciales||'—')}</td>
         <td>${estadoLabel(r.estado)}</td>
         <td>${escapeHtml(r.obs||'')}</td>
@@ -3256,7 +3256,7 @@ function descargarInformeDia(){
         <h2>${turnoLabels[turno]} — ${rs.length} reserva${rs.length===1?'':'s'}, ${totalPax} pax</h2>
         <table>
           <thead><tr>
-            <th>Hora</th><th>Cliente</th><th>Pax</th><th>Celular</th><th>Mesa</th><th>Canal</th><th>Gestionó</th><th>Estado</th><th>Obs.</th>
+            <th>Hora</th><th>Cliente</th><th>Pax</th><th>Celular</th><th>Mesa</th><th>Abono</th><th>Gestionó</th><th>Estado</th><th>Obs.</th>
           </tr></thead>
           <tbody>${filasHtml}</tbody>
         </table>
