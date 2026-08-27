@@ -1381,6 +1381,34 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </div>
       </div>
 
+      <!-- ===== GRUPO: BACKUP ===== -->
+      <div class="config-grupo">
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoBackup')">
+          <span>💾 Backup</span>
+          <span class="config-grupo-chevron" id="chevron_grupoBackup">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoBackup" style="display:none;">
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">⬇️ Descargar backup ahora</div>
+          <div class="config-mensaje-sub">Genera un archivo con todas las reservas y la configuración (mensajes, carrusel, plano de mesas, horarios) tal como están en este momento, con la fecha y hora en el nombre del archivo. Guárdalo donde prefieras — es tu respaldo por si se llega a perder información. <b>Esto NO modifica ni borra nada de tu base de datos</b> — solo lee la información para armar el archivo, igual que cuando abres una reserva para verla.</div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" id="btnDescargarBackup" onclick="descargarBackup()">⬇️ Descargar backup ahora</button>
+          </div>
+          <div id="backupEstadoDescarga" style="margin-top:8px; font-size:12px; color:var(--text-dim);"></div>
+        </div>
+
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">⬆️ Subir backup</div>
+          <div class="config-mensaje-sub">Esta es la única acción de esta sección que sí modifica la base de datos: restaura el sistema a partir de un archivo de backup descargado antes. <b>Esto reemplaza TODAS las reservas y la configuración actuales</b> por lo que traiga el archivo — antes de aplicarlo, te muestro la fecha y hora con la que se generó, y te pide escribir una palabra de confirmación, para que nunca pase por accidente.</div>
+          <input type="file" id="fBackupArchivo" accept="application/json,.json" style="width:100%; padding:9px 11px; border-radius:8px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text); font-size:13px;">
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-restaurar" style="color:#e05a5a; border-color:#e05a5a;" onclick="restaurarBackup()">⬆️ Subir y restaurar backup</button>
+          </div>
+          <div id="backupEstadoRestaurar" style="margin-top:8px; font-size:12px; color:var(--text-dim);"></div>
+        </div>
+        </div>
+      </div>
+
       <!-- ===== GRUPO: ZONA DE PELIGRO ===== -->
       <div class="config-grupo">
         <button class="config-grupo-header config-grupo-header-peligro" onclick="toggleConfigGrupo('grupoPeligro')">
@@ -1403,7 +1431,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v3.98</div>
+<div class="version-tag">v4.00</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3890,7 +3918,7 @@ function toggleConfigGrupo(id){
   const contenido = document.getElementById(id);
   const chevron = document.getElementById('chevron_' + id);
   const yaAbierto = contenido.style.display !== 'none';
-  ['grupoMensajes', 'grupoCarrusel', 'grupoUsuarios', 'grupoPeligro'].forEach(otroId => {
+  ['grupoMensajes', 'grupoCarrusel', 'grupoUsuarios', 'grupoBackup', 'grupoPeligro'].forEach(otroId => {
     const otroContenido = document.getElementById(otroId);
     const otroChevron = document.getElementById('chevron_' + otroId);
     if(otroContenido) otroContenido.style.display = 'none';
@@ -4871,6 +4899,157 @@ function eliminarReservaDirecta(id, nombre){
     console.error('Error eliminando reserva:', err);
     alert('No se pudo eliminar la reserva. Revisa tu conexión e intenta de nuevo.');
   });
+}
+
+/* ============ BACKUP: DESCARGAR Y RESTAURAR ============ */
+// Junta todo lo necesario para reconstruir el sistema desde cero: todas
+// las reservas + la configuración (mensajes, carrusel, plano de mesas,
+// horarios, el contador de códigos R-000xxx). NO incluye la lista de
+// usuarios/contraseñas a propósito — esas cuentas están ligadas a Firebase
+// Authentication, y restaurar ese documento sin restaurar también la
+// cuenta de acceso real dejaría el sistema en un estado inconsistente
+// (o peor, con un usuario "activo" en la base de datos que en realidad no
+// existe o no puede iniciar sesión). Las cuentas de usuario se manejan
+// aparte, en Config → Usuarios y accesos.
+function descargarBackup(){
+  const btn = document.getElementById('btnDescargarBackup');
+  const estadoEl = document.getElementById('backupEstadoDescarga');
+  if(btn){ btn.disabled = true; btn.textContent = 'Generando…'; }
+  if(estadoEl) estadoEl.textContent = '';
+
+  Promise.all([
+    reservasRef.get(),
+    db.collection('configuracion').doc('mensajes').get(),
+    db.collection('configuracion').doc('carrusel').get(),
+    db.collection('configuracion').doc('contadorReservas').get(),
+    db.collection('configuracion').doc('planoMesas').get(),
+    db.collection('configuracion').doc('horarios').get(),
+  ]).then(([reservasSnap, mensajesDoc, carruselDoc, contadorDoc, planoDoc, horariosDoc]) => {
+    const ahora = new Date();
+    const fechaLegible = `${DIAS[ahora.getDay()]} ${ahora.getDate()} de ${MESES[ahora.getMonth()]} de ${ahora.getFullYear()}, ${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+    const backup = {
+      tipo: 'backup-la-matriarca-reservas',
+      version: 1,
+      generadoEn: ahora.toISOString(),
+      generadoEnLegible: fechaLegible,
+      reservas: reservasSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      configuracion: {
+        mensajes: mensajesDoc.exists ? mensajesDoc.data() : null,
+        carrusel: carruselDoc.exists ? carruselDoc.data() : null,
+        contadorReservas: contadorDoc.exists ? contadorDoc.data() : null,
+        planoMesas: planoDoc.exists ? planoDoc.data() : null,
+        horarios: horariosDoc.exists ? horariosDoc.data() : null,
+      }
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const nombreArchivo = `backup-la-matriarca-${fechaISO(ahora)}-${String(ahora.getHours()).padStart(2,'0')}${String(ahora.getMinutes()).padStart(2,'0')}.json`;
+    const a = document.createElement('a');
+    a.href = url; a.download = nombreArchivo;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if(estadoEl) estadoEl.textContent = `✓ Backup generado: ${fechaLegible} — ${backup.reservas.length} reservas incluidas.`;
+  }).catch(err => {
+    console.error('Error generando backup:', err);
+    alert('No se pudo generar el backup. Revisa tu conexión e intenta de nuevo.');
+  }).finally(() => {
+    if(btn){ btn.disabled = false; btn.textContent = '⬇️ Descargar backup ahora'; }
+  });
+}
+
+function restaurarBackup(){
+  const input = document.getElementById('fBackupArchivo');
+  const estadoEl = document.getElementById('backupEstadoRestaurar');
+  const archivo = input.files[0];
+  if(!archivo){ alert('Primero elige el archivo de backup (.json) que descargaste antes.'); return; }
+
+  const lector = new FileReader();
+  lector.onload = (evento) => {
+    let backup;
+    try{
+      backup = JSON.parse(evento.target.result);
+    } catch(e){
+      alert('Este archivo no es un backup válido — no se pudo leer como JSON.');
+      return;
+    }
+    if(!backup || backup.tipo !== 'backup-la-matriarca-reservas' || !Array.isArray(backup.reservas)){
+      alert('Este archivo no parece un backup de La Matriarca — revisa que sea el archivo correcto.');
+      return;
+    }
+    // Se muestra la fecha con la que se generó ANTES de tocar nada, tal
+    // como se pidió, para confirmar que es el backup correcto antes de
+    // reemplazar los datos actuales. Además, igual que "Borrar TODAS las
+    // reservas", exige escribir una palabra exacta — un solo toque por
+    // error nunca puede disparar esto, porque es la única acción de todo
+    // el backup que sí modifica la base de datos (descargar el backup
+    // nunca la toca, solo la lee).
+    const escrito = prompt(
+      `Este backup fue generado el ${backup.generadoEnLegible || '(fecha desconocida)'} y trae ${backup.reservas.length} reserva(s).\n\n` +
+      `Al restaurarlo se van a BORRAR todas las reservas actuales (los días que ya tienes guardados) y reemplazar por las del backup, además de la configuración de mensajes, carrusel, plano de mesas y horarios.\n\n` +
+      `Esta acción no se puede deshacer. Para confirmar, escribe la palabra RESTAURAR (en mayúsculas) y toca Aceptar:`
+    );
+    if(escrito !== 'RESTAURAR'){
+      if(escrito !== null) alert('No coincide con "RESTAURAR" — no se modificó nada.');
+      return;
+    }
+
+    if(estadoEl) estadoEl.textContent = 'Restaurando… no cierres esta pantalla.';
+
+    reservasRef.get().then(snapActual => {
+      // 1) Borrar todas las reservas actuales (mismo patrón por lotes de
+      //    450 que usa "Borrar TODAS las reservas", por el límite de 500
+      //    operaciones por lote de Firestore).
+      const docsActuales = snapActual.docs;
+      const gruposBorrar = [];
+      for(let i=0; i<docsActuales.length; i+=450) gruposBorrar.push(docsActuales.slice(i, i+450));
+      let promesa = Promise.resolve();
+      gruposBorrar.forEach(grupo => {
+        promesa = promesa.then(() => {
+          const batch = db.batch();
+          grupo.forEach(d => batch.delete(d.ref));
+          return batch.commit();
+        });
+      });
+      return promesa;
+    }).then(() => {
+      // 2) Volver a escribir las reservas del backup, respetando sus IDs
+      //    originales (así los links de aprobación que ya se hayan
+      //    mandado por WhatsApp, si aplica, siguen apuntando al mismo id).
+      const gruposEscribir = [];
+      for(let i=0; i<backup.reservas.length; i+=450) gruposEscribir.push(backup.reservas.slice(i, i+450));
+      let promesa = Promise.resolve();
+      gruposEscribir.forEach(grupo => {
+        promesa = promesa.then(() => {
+          const batch = db.batch();
+          grupo.forEach(r => {
+            const { id, ...datos } = r;
+            batch.set(reservasRef.doc(id), datos);
+          });
+          return batch.commit();
+        });
+      });
+      return promesa;
+    }).then(() => {
+      // 3) Restaurar la configuración, si el backup la trae.
+      const cfg = backup.configuracion || {};
+      const escrituras = [];
+      if(cfg.mensajes) escrituras.push(db.collection('configuracion').doc('mensajes').set(cfg.mensajes));
+      if(cfg.carrusel) escrituras.push(db.collection('configuracion').doc('carrusel').set(cfg.carrusel));
+      if(cfg.contadorReservas) escrituras.push(db.collection('configuracion').doc('contadorReservas').set(cfg.contadorReservas));
+      if(cfg.planoMesas) escrituras.push(db.collection('configuracion').doc('planoMesas').set(cfg.planoMesas));
+      if(cfg.horarios) escrituras.push(db.collection('configuracion').doc('horarios').set(cfg.horarios));
+      return Promise.all(escrituras);
+    }).then(() => {
+      if(estadoEl) estadoEl.textContent = `✓ Restaurado — backup del ${backup.generadoEnLegible || ''} aplicado con éxito (${backup.reservas.length} reservas).`;
+      alert(`Listo — se restauró el backup del ${backup.generadoEnLegible || ''}.`);
+      input.value = '';
+    }).catch(err => {
+      console.error('Error restaurando backup:', err);
+      if(estadoEl) estadoEl.textContent = '';
+      alert('No se pudo completar la restauración. Revisa tu conexión e intenta de nuevo — si alcanzó a borrar las reservas actuales antes de fallar, vuelve a intentar subir el mismo backup.');
+    });
+  };
+  lector.readAsText(archivo);
 }
 
 function resetearTodasLasReservas(){
