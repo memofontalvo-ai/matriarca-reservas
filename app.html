@@ -599,7 +599,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .cal-weekdays span{font-size:10px; text-align:center; color:var(--text-dim); font-weight:700; text-transform:uppercase;}
 .cal-days{display:grid; grid-template-columns:repeat(7,1fr); gap:3px;}
 .cal-day{
-  aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  aspect-ratio:1; display:flex; align-items:center; justify-content:center; position:relative;
   border-radius:8px; font-size:12.5px; font-family:'JetBrains Mono',monospace;
   color:var(--text); background:transparent; border:1px solid transparent;
 }
@@ -627,6 +627,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   padding:1.5px 5px; white-space:nowrap;
 }
 .cal-day-count.especial{background:linear-gradient(135deg, var(--gold-bright), #ffd76a); box-shadow:0 0 0 1px rgba(255,215,106,0.5);}
+.cal-day-count.bloqueado{background:#e05a5a; color:#fff; font-size:9px;}
+.cal-day-lock{font-size:9px; margin-left:2px;}
+.cal-day-bloqueado{opacity:0.75;}
+.cal-day-bloqueado::after{content:''; position:absolute; inset:0; border:1px solid rgba(224,90,90,0.5); border-radius:inherit; pointer-events:none;}
+.aviso-bloqueo-dia{
+  background:rgba(224,90,90,0.12); border:1px solid #e05a5a; color:#f0a3a7;
+  font-size:12px; line-height:1.5; padding:10px 12px; border-radius:10px; margin-bottom:10px;
+}
 .cal-day-count.pendiente{background:#e8a33d; color:#1a1408;}
 .cal-day.selected .cal-day-count{background:#1a1408; color:var(--gold-bright);}
 .cal-inline-leyenda{
@@ -1246,6 +1254,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
       <div class="turnos" id="turnosBar"></div>
       <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()">⭐ <span>Especiales (30+)</span></button>
+      <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
       <button class="clear-btn" onclick="confirmarVaciarTurno()" title="Eliminar todas las reservas de este turno">🗑 <span>Vaciar turno</span></button>
     </header>
 
@@ -1431,7 +1440,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.00</div>
+<div class="version-tag">v4.01</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1687,6 +1696,35 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div id="verObsTexto" style="margin-top:10px; white-space:pre-wrap; font-size:14px; color:var(--text); line-height:1.5;"></div>
     <div class="modal-actions" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="document.getElementById('overlayVerObs').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayBloqueoDia">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="bloqueoDiaTitulo">Bloquear día</h3>
+    <div class="modal-sub">Marca los turnos que quieres cerrar para reservas nuevas — el cliente que entre a solicitar una reserva para ese turno va a ver un aviso de que no está disponible. No afecta las reservas que ya tengas guardadas ese día.</div>
+    <div class="rol-opciones" style="margin-top:10px;">
+      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="fBloqueoDesayuno" style="width:18px; height:18px;">
+        <div><strong>☕ Desayuno</strong></div>
+      </label>
+      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="fBloqueoAlmuerzo" style="width:18px; height:18px;">
+        <div><strong>☀️ Almuerzo</strong></div>
+      </label>
+      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
+        <input type="checkbox" id="fBloqueoCena" style="width:18px; height:18px;">
+        <div><strong>🌙 Cena</strong></div>
+      </label>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Motivo (opcional, solo para uso interno)</label>
+      <input type="text" id="fBloqueoMotivo" placeholder="Ej. Concierto — cupo lleno">
+    </div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="document.getElementById('overlayBloqueoDia').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarBloqueoDia" onclick="guardarBloqueoDia()">Guardar</button>
     </div>
   </div>
 </div>
@@ -2694,6 +2732,66 @@ function armarMensaje(plantilla, valores){
   return msg;
 }
 
+/* ============ FECHAS/TURNOS BLOQUEADOS ============ */
+// Para eventos que llenan el cupo, o días que el restaurante decide cerrar
+// para reservas nuevas (un concierto, un cierre por mantenimiento, etc.).
+// Estructura: { "2026-09-17": { desayuno:true, almuerzo:false, cena:true,
+// motivo:"Concierto — cupo lleno" } }. Este mismo documento lo lee también
+// solicitud.html (el formulario público del cliente) para no dejarlo
+// avanzar con una fecha/turno bloqueado — por eso necesita permiso de
+// lectura pública en las reglas de Firestore, igual que el carrusel.
+let FECHAS_BLOQUEADAS = {};
+const fechasBloqueadasRef = db.collection('configuracion').doc('fechasBloqueadas');
+fechasBloqueadasRef.onSnapshot(snap => {
+  FECHAS_BLOQUEADAS = snap.exists ? (snap.data() || {}) : {};
+  if(typeof renderCalendarioInline === 'function') renderCalendarioInline();
+  if(typeof renderLista === 'function' && vistaApp === 'porDia') renderLista();
+}, err => console.error('Error de conexión en fechas bloqueadas:', err));
+
+function turnoBloqueado(fechaIso, turno){
+  const dia = FECHAS_BLOQUEADAS[fechaIso];
+  if(!dia) return false;
+  if(turno === 'todos') return !!(dia.desayuno || dia.almuerzo || dia.cena);
+  return !!dia[turno];
+}
+function diaTieneAlgunBloqueo(fechaIso){
+  const dia = FECHAS_BLOQUEADAS[fechaIso];
+  return !!(dia && (dia.desayuno || dia.almuerzo || dia.cena));
+}
+function diaCompletoBloqueado(fechaIso){
+  const dia = FECHAS_BLOQUEADAS[fechaIso];
+  return !!(dia && dia.desayuno && dia.almuerzo && dia.cena);
+}
+
+function abrirModalBloqueoDia(){
+  const iso = fechaISO(fechaActual);
+  const dia = FECHAS_BLOQUEADAS[iso] || {};
+  document.getElementById('bloqueoDiaTitulo').textContent = `Bloquear — ${formatearFechaLarga(iso)}`;
+  document.getElementById('fBloqueoDesayuno').checked = !!dia.desayuno;
+  document.getElementById('fBloqueoAlmuerzo').checked = !!dia.almuerzo;
+  document.getElementById('fBloqueoCena').checked = !!dia.cena;
+  document.getElementById('fBloqueoMotivo').value = dia.motivo || '';
+  document.getElementById('overlayBloqueoDia').classList.add('open');
+}
+function guardarBloqueoDia(){
+  const iso = fechaISO(fechaActual);
+  const desayuno = document.getElementById('fBloqueoDesayuno').checked;
+  const almuerzo = document.getElementById('fBloqueoAlmuerzo').checked;
+  const cena = document.getElementById('fBloqueoCena').checked;
+  const motivo = document.getElementById('fBloqueoMotivo').value.trim();
+  const btn = document.getElementById('btnGuardarBloqueoDia');
+  if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
+  const dataDia = (desayuno || almuerzo || cena) ? { desayuno, almuerzo, cena, motivo } : firebase.firestore.FieldValue.delete();
+  fechasBloqueadasRef.set({ [iso]: dataDia }, { merge: true }).then(() => {
+    document.getElementById('overlayBloqueoDia').classList.remove('open');
+  }).catch(err => {
+    console.error('Error guardando bloqueo de día:', err);
+    alert('No se pudo guardar. Revisa tu conexión e intenta de nuevo.');
+  }).finally(() => {
+    if(btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
+  });
+}
+
 function formatearFechaLarga(iso){
   if(!iso) return '';
   const [y,m,d] = iso.split('-').map(Number);
@@ -2913,11 +3011,16 @@ function renderCalendarioInline(){
     if(iso===selISO) cls += ' selected';
     const tieneReserva = diasConReserva.has(iso);
     const tieneEspecial = diasConEspecial.has(iso);
+    const bloqueado = diaTieneAlgunBloqueo(iso);
     const total = conteoPorDia[iso] || 0;
-    const marca = tieneReserva
-      ? `<span class="cal-day-count${tieneEspecial ? ' especial' : ''}">${tieneEspecial ? '⭐ ' : ''}${total}</span>`
-      : '';
-    html += `<div class="${cls}" onclick="seleccionarDiaInline(${d})">${d}<div class="cal-day-marcas">${marca}</div></div>`;
+    let marca = '';
+    if(tieneReserva){
+      marca = `<span class="cal-day-count${tieneEspecial ? ' especial' : ''}">${tieneEspecial ? '⭐ ' : ''}${total}</span>`;
+      if(bloqueado) marca += `<span class="cal-day-lock" title="Este día tiene turnos bloqueados">🔒</span>`;
+    } else if(bloqueado){
+      marca = `<span class="cal-day-count bloqueado">🔒</span>`;
+    }
+    html += `<div class="${cls}${bloqueado?' cal-day-bloqueado':''}" onclick="seleccionarDiaInline(${d})">${d}<div class="cal-day-marcas">${marca}</div></div>`;
   }
   const totalCeldas = offset + diasEnMes;
   const restante = (7 - (totalCeldas % 7)) % 7;
@@ -2982,6 +3085,18 @@ function renderLista(){
   const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
   const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
   const el = document.getElementById('panelLista');
+  // Aviso de bloqueo: recuerda al staff que este día/turno ya no acepta
+  // solicitudes nuevas del cliente (solicitud.html lo respeta). No impide
+  // que el staff mismo cree una reserva manual aquí si hace falta hacer
+  // una excepción — solo informa.
+  const isoAviso = fechaISO(fechaActual);
+  let avisoBloqueoHtml = '';
+  if(turnoBloqueado(isoAviso, turnoActivo)){
+    const dia = FECHAS_BLOQUEADAS[isoAviso] || {};
+    const turnosCerrados = ['desayuno','almuerzo','cena'].filter(t => dia[t]);
+    const nombresCerrados = turnosCerrados.map(t=>t.charAt(0).toUpperCase()+t.slice(1)).join(', ');
+    avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">🔒 Este día tiene bloqueado: <b>${nombresCerrados}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}. Los clientes no pueden solicitar reserva para ese turno desde el formulario.</div>`;
+  }
   if(rs.length===0){
     // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
     // lo decimos explícitamente para no confundir con "no hay nada este día".
@@ -2993,9 +3108,9 @@ function renderLista(){
       .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
     if(otrosTurnos.length){
       const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
-      el.innerHTML = renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
+      el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
     } else {
-      el.innerHTML = renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
+      el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>`;
     }
     return;
   }
@@ -3036,7 +3151,7 @@ function renderLista(){
     </div>`;
   }).join('');
 
-  el.innerHTML = renderResumenTurnoHTML(rsTodas) + cardsHtml;
+  el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + cardsHtml;
 }
 
 function renderResumenTurnoHTML(rsTodas){
