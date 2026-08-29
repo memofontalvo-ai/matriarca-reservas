@@ -1449,7 +1449,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.04</div>
+<div class="version-tag">v4.05</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2805,11 +2805,24 @@ function diaCompletoBloqueado(fechaIso){
 function abrirModalBloqueoDia(){
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
-  document.getElementById('bloqueoDiaTitulo').textContent = `Bloquear — ${formatearFechaLarga(iso)}`;
+  // El modal se ajusta a dónde estás parado: si tienes un turno puntual
+  // activo (Desayuno/Almuerzo/Cena), solo se muestra ESE turno para
+  // bloquear — así nunca se te queda otro turno marcado sin querer, de
+  // una vez anterior en la que estabas viendo "Todos". Si estás en
+  // "Todos", ahí sí se muestran los tres, para bloquear el día completo.
+  const soloEsteTurno = turnoActivo !== 'todos' ? turnoActivo : null;
+  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  document.getElementById('bloqueoDiaTitulo').textContent = soloEsteTurno
+    ? `Bloquear ${turnoLabels[soloEsteTurno]} — ${formatearFechaLarga(iso)}`
+    : `Bloquear — ${formatearFechaLarga(iso)}`;
   ['desayuno','almuerzo','cena'].forEach(t => {
+    const nombre = t.charAt(0).toUpperCase()+t.slice(1);
+    const fila = document.getElementById('fBloqueo'+nombre).closest('.bloqueo-turno-fila');
+    const esEsteTurno = !soloEsteTurno || t === soloEsteTurno;
+    if(fila) fila.style.display = esEsteTurno ? 'flex' : 'none';
     const info = dia[t];
-    document.getElementById('fBloqueo'+t.charAt(0).toUpperCase()+t.slice(1)).checked = !!info;
-    document.getElementById('fBloqueo'+t.charAt(0).toUpperCase()+t.slice(1)+'Tipo').value = (info && info.tipo) || 'disponibilidad';
+    document.getElementById('fBloqueo'+nombre).checked = !!info;
+    document.getElementById('fBloqueo'+nombre+'Tipo').value = (info && info.tipo) || 'disponibilidad';
   });
   document.getElementById('fBloqueoMotivo').value = dia.motivo || '';
   document.getElementById('overlayBloqueoDia').classList.add('open');
