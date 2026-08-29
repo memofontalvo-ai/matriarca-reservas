@@ -233,6 +233,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .res-card:hover{border-color:var(--gold);}
 .cancelada-card{opacity:.55;}
 .solicitud-card{border-color:#c79bff; border-width:1.5px;}
+.lista-espera-card{border-color:#e8a33d; border-width:1.5px;}
 .solicitud-hint{
   margin-top:8px; padding-top:8px; border-top:1px dashed rgba(199,155,255,0.3);
   font-size:11px; color:#c79bff; font-weight:600; line-height:1.4;
@@ -323,6 +324,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .badge.solicitud{background:rgba(180,120,255,0.16); color:#c79bff;}
 .badge.pendiente_aprobacion{background:rgba(232,163,61,0.16); color:#e8a33d;}
 .badge.mensaje_enviado{background:rgba(154,163,178,0.16); color:#9aa3b2;}
+.badge.lista_espera{background:rgba(232,163,61,0.16); color:#e8a33d;}
 .badge.turno-badge{background:var(--panel-raised); color:var(--text-dim); border:1px solid var(--border);}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
@@ -418,6 +420,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .solicitud-card-global.card-aprobada{border-color:var(--confirmed); opacity:.85;}
 .solicitud-card-global.card-aprobada .sc-fecha{color:var(--confirmed);}
 .solicitud-card-global.card-mensaje-enviado{border-color:#9aa3b2; opacity:.85;}
+.solicitud-card-global.card-lista-espera{border-color:#e8a33d;}
+.solicitud-card-global.card-lista-espera .sc-fecha{color:#e8a33d;}
 .mensaje-enviado-hint{
   margin-top:8px; padding-top:8px; border-top:1px dashed rgba(154,163,178,0.3);
   font-size:11px; color:#9aa3b2; font-weight:600; line-height:1.4;
@@ -1440,7 +1444,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.01</div>
+<div class="version-tag">v4.03</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2931,7 +2935,7 @@ function reservasDelTurno(){
   // La vista "por día" solo muestra reservas ya resueltas: no incluye las que
   // siguen en el flujo de solicitud/aprobación del cliente (esas viven en
   // la pantalla "Solicitudes" hasta que el cliente las apruebe).
-  let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
   if(turnoActivo !== 'todos') rs = rs.filter(r=>r.turno===turnoActivo);
   if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=30);
   return rs;
@@ -2986,7 +2990,7 @@ function renderCalendarioInline(){
   // calendario respeta ese filtro y solo suma ese turno — así el número de
   // cada día refleja exactamente lo que se está viendo, no siempre el total.
   const reservasDelMes = reservas.filter(r => {
-    if(r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='cancelada') return false;
+    if(r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='cancelada' || r.estado==='lista_espera') return false;
     if(turnoActivo !== 'todos' && r.turno !== turnoActivo) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && m===(calInlineMes+1);
@@ -3105,7 +3109,7 @@ function renderLista(){
     const iso = fechaISO(fechaActual);
     const otrosTurnos = turnoActivo === 'todos' ? [] : ['desayuno','almuerzo','cena']
       .filter(t => t !== turnoActivo)
-      .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion'));
+      .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'));
     if(otrosTurnos.length){
       const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
       el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>`;
@@ -3119,7 +3123,7 @@ function renderLista(){
     const salonVipNombre = esSalonVipEspecial(r.mesa);
     const isVip = mesaEsVip(r.mesa) || !!salonVipNombre;
     const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       <div class="res-top">
         <div>
           <div class="res-hora">${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
@@ -3148,6 +3152,7 @@ function renderLista(){
       </div>` : ''}
       ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
       ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
+      ${r.estado==='lista_espera'?`<div class="solicitud-hint">🕒 En lista de espera — avísale si se libera cupo${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
     </div>`;
   }).join('');
 
@@ -3160,7 +3165,7 @@ function renderResumenTurnoHTML(rsTodas){
   // Almuerzo/Cena). Así, aunque estés viendo solo "Cena", igual ves de un
   // vistazo cuántas reservas hay en cada turno y el total del día completo.
   const iso = fechaISO(fechaActual);
-  const reservasDia = reservas.filter(r=>r.fecha===iso && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion');
+  const reservasDia = reservas.filter(r=>r.fecha===iso && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
   const porTurnoDia = ['desayuno','almuerzo','cena'].map(t=>{
     const rs = reservasDia.filter(r=>r.turno===t);
     return { turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo',cena:'Cena'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) };
@@ -3299,7 +3304,7 @@ function verObservacionesDeReserva(id){
 }
 
 function estadoLabel(e){
-  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar'}[e]||e;
+  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar', lista_espera:'Lista de espera'}[e]||e;
 }
 function mesaLabel(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return m.id;
@@ -3368,7 +3373,7 @@ function descargarInformeDia(){
 
   const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
-      .filter(r => r.fecha===iso && r.turno===turno && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='cancelada')
+      .filter(r => r.fecha===iso && r.turno===turno && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='cancelada' && r.estado!=='lista_espera')
       .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
 
@@ -4091,7 +4096,7 @@ function requiereGestion(r){
   // dejó en estado "Pendiente" (todavía no la confirma). "Confirmada" y
   // "Cancelada" sí cuentan como ya resueltas, sin importar el canal.
   return r.estado==='solicitud' || r.estado==='pendiente_aprobacion' ||
-    r.estado==='mensaje_enviado' || r.estado==='pendiente';
+    r.estado==='mensaje_enviado' || r.estado==='pendiente' || r.estado==='lista_espera';
 }
 
 function fechaSolicitudEfectiva(r){
@@ -4157,7 +4162,7 @@ function renderSolicitudesScreen(){
   });
   // "Respondidas" = el cliente ya contestó y llenó el formulario (dejó de
   // estar solo en "mensaje enviado"), sin importar en qué quedó después.
-  const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud' && r.estado!=='mensaje_enviado').length;
+  const respondidas = delDiaTotal.filter(r=>r.estado!=='solicitud' && r.estado!=='mensaje_enviado' && r.estado!=='lista_espera').length;
   // "Aprobadas" = terminó confirmada, sin importar si fue el cliente
   // aprobando por el link o tú confirmándola directo por teléfono — las
   // dos formas terminan en el mismo lugar: una reserva lista y confirmada.
@@ -4195,13 +4200,15 @@ function renderSolicitudesScreen(){
     // "Pendiente" — todavía no la confirma. Necesita el mismo tipo de
     // atención que una solicitud sin gestionar, aunque llegó por otra vía.
     const esPendienteInterno = r.estado === 'pendiente';
+    const esListaEspera = r.estado === 'lista_espera';
     const yaAprobada = r.aprobadaPorCliente === true;
-    const claseColor = esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : ((esSinGestionar || esPendienteInterno) ? 'card-solicitud' : 'card-aprobada'));
+    const claseColor = esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : (esListaEspera ? 'card-lista-espera' : ((esSinGestionar || esPendienteInterno) ? 'card-solicitud' : 'card-aprobada')));
     let hint = '';
     if(esMensajeEnviado) hint = `<div class="mensaje-enviado-hint">📨 Le mandamos el link — esperando que el cliente llene el formulario</div>`;
     else if(esSinGestionar) hint = `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
     else if(esPorAprobar) hint = `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`;
     else if(esPendienteInterno) hint = `<div class="solicitud-hint">⏳ Pendiente por confirmar</div>`;
+    else if(esListaEspera) hint = `<div class="solicitud-hint">🕒 En lista de espera — avísale si se libera cupo</div>`;
     else if(yaAprobada) hint = `<div class="historial-aprobada-hint">✓ Aprobada por el cliente — ya está en Reservas por día</div>`;
     // Si todavía no hay respuesta del cliente, no hay fecha/turno/hora que
     // mostrar — solo el contacto al que se le escribió.
@@ -4241,6 +4248,7 @@ function renderSolicitudesScreen(){
         ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
+        ${r.listaEspera?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🕒 Lista de espera</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
         ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
         ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
@@ -4271,6 +4279,7 @@ function renderSolicitudesScreen(){
   const sinGestionar = delDia.filter(r=>r.estado==='solicitud');
   const porAprobar = delDia.filter(r=>r.estado==='pendiente_aprobacion');
   const mensajesEnviados = delDia.filter(r=>r.estado==='mensaje_enviado');
+  const listaEsperaDelDia = delDia.filter(r=>r.estado==='lista_espera');
 
   const vipSols = delDia.filter(r=>r.vipSolicitada && r.estado!=='mensaje_enviado');
   const generalSols = delDia.filter(r=>!r.vipSolicitada && r.estado!=='mensaje_enviado');
@@ -4295,6 +4304,9 @@ function renderSolicitudesScreen(){
       </div>
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>📤 Por aprobar del cliente</span><span>${porAprobar.length} · ${porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
+      </div>
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head"><span>🕒 En lista de espera</span><span>${listaEsperaDelDia.length} · ${listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
       </div>
       <div class="resumen-seccion">
         <div class="resumen-seccion-head"><span>Piden mesa general</span><span>${generalSols.length} · ${generalPax} pax</span></div>
