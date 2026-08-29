@@ -735,6 +735,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .rol-opcion input{margin-top:3px;}
 .rol-opcion strong{display:block; font-size:13px; color:var(--text);}
 .rol-opcion span{display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px; line-height:1.4;}
+.bloqueo-turno-fila{display:flex; align-items:center; gap:8px;}
+.bloqueo-tipo-select{
+  flex:0 0 130px; font-size:11.5px; padding:8px 6px; border-radius:8px;
+  border:1px solid var(--border); background:var(--panel-alt); color:var(--text);
+}
 .rol-badge{
   display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:0.3px;
   padding:2px 7px; border-radius:20px; text-transform:uppercase; margin-left:6px;
@@ -1444,7 +1449,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.03</div>
+<div class="version-tag">v4.04</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1707,20 +1712,38 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <div class="overlay" id="overlayBloqueoDia">
   <div class="modal" style="max-width:420px;">
     <h3 id="bloqueoDiaTitulo">Bloquear día</h3>
-    <div class="modal-sub">Marca los turnos que quieres cerrar para reservas nuevas — el cliente que entre a solicitar una reserva para ese turno va a ver un aviso de que no está disponible. No afecta las reservas que ya tengas guardadas ese día.</div>
+    <div class="modal-sub">Marca los turnos que quieres cerrar para reservas nuevas, y elige el motivo de cada uno: <b>Evento especial</b> cierra del todo (el cliente no puede ni intentarlo); <b>Sin disponibilidad</b> le muestra al cliente la opción de quedar en lista de espera. No afecta las reservas que ya tengas guardadas ese día.</div>
     <div class="rol-opciones" style="margin-top:10px;">
-      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="fBloqueoDesayuno" style="width:18px; height:18px;">
-        <div><strong>☕ Desayuno</strong></div>
-      </label>
-      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="fBloqueoAlmuerzo" style="width:18px; height:18px;">
-        <div><strong>☀️ Almuerzo</strong></div>
-      </label>
-      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
-        <input type="checkbox" id="fBloqueoCena" style="width:18px; height:18px;">
-        <div><strong>🌙 Cena</strong></div>
-      </label>
+      <div class="bloqueo-turno-fila">
+        <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
+          <input type="checkbox" id="fBloqueoDesayuno" style="width:18px; height:18px;">
+          <div><strong>☕ Desayuno</strong></div>
+        </label>
+        <select id="fBloqueoDesayunoTipo" class="bloqueo-tipo-select">
+          <option value="disponibilidad">Sin disponibilidad</option>
+          <option value="evento">Evento especial</option>
+        </select>
+      </div>
+      <div class="bloqueo-turno-fila">
+        <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
+          <input type="checkbox" id="fBloqueoAlmuerzo" style="width:18px; height:18px;">
+          <div><strong>☀️ Almuerzo</strong></div>
+        </label>
+        <select id="fBloqueoAlmuerzoTipo" class="bloqueo-tipo-select">
+          <option value="disponibilidad">Sin disponibilidad</option>
+          <option value="evento">Evento especial</option>
+        </select>
+      </div>
+      <div class="bloqueo-turno-fila">
+        <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
+          <input type="checkbox" id="fBloqueoCena" style="width:18px; height:18px;">
+          <div><strong>🌙 Cena</strong></div>
+        </label>
+        <select id="fBloqueoCenaTipo" class="bloqueo-tipo-select">
+          <option value="disponibilidad">Sin disponibilidad</option>
+          <option value="evento">Evento especial</option>
+        </select>
+      </div>
     </div>
     <div class="field" style="margin-top:12px;">
       <label>Motivo (opcional, solo para uso interno)</label>
@@ -2752,11 +2775,23 @@ fechasBloqueadasRef.onSnapshot(snap => {
   if(typeof renderLista === 'function' && vistaApp === 'porDia') renderLista();
 }, err => console.error('Error de conexión en fechas bloqueadas:', err));
 
-function turnoBloqueado(fechaIso, turno){
+// Cada turno bloqueado guarda su propio "tipo":
+//  - 'evento'        → bloqueo total. El cliente ni siquiera puede
+//                       intentarlo, no hay lista de espera.
+//  - 'disponibilidad' → cupo lleno por ahora. El cliente sí puede seguir
+//                       y quedar en lista de espera si quiere.
+// Estructura: FECHAS_BLOQUEADAS["2026-09-17"] = { desayuno:{tipo:'evento'},
+// almuerzo:false, cena:{tipo:'disponibilidad'}, motivo:'...' }
+function infoBloqueoTurno(fechaIso, turno){
   const dia = FECHAS_BLOQUEADAS[fechaIso];
-  if(!dia) return false;
-  if(turno === 'todos') return !!(dia.desayuno || dia.almuerzo || dia.cena);
-  return !!dia[turno];
+  if(!dia) return null;
+  if(turno === 'todos'){
+    return dia.desayuno || dia.almuerzo || dia.cena || null;
+  }
+  return dia[turno] || null;
+}
+function turnoBloqueado(fechaIso, turno){
+  return !!infoBloqueoTurno(fechaIso, turno);
 }
 function diaTieneAlgunBloqueo(fechaIso){
   const dia = FECHAS_BLOQUEADAS[fechaIso];
@@ -2771,21 +2806,33 @@ function abrirModalBloqueoDia(){
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
   document.getElementById('bloqueoDiaTitulo').textContent = `Bloquear — ${formatearFechaLarga(iso)}`;
-  document.getElementById('fBloqueoDesayuno').checked = !!dia.desayuno;
-  document.getElementById('fBloqueoAlmuerzo').checked = !!dia.almuerzo;
-  document.getElementById('fBloqueoCena').checked = !!dia.cena;
+  ['desayuno','almuerzo','cena'].forEach(t => {
+    const info = dia[t];
+    document.getElementById('fBloqueo'+t.charAt(0).toUpperCase()+t.slice(1)).checked = !!info;
+    document.getElementById('fBloqueo'+t.charAt(0).toUpperCase()+t.slice(1)+'Tipo').value = (info && info.tipo) || 'disponibilidad';
+  });
   document.getElementById('fBloqueoMotivo').value = dia.motivo || '';
   document.getElementById('overlayBloqueoDia').classList.add('open');
 }
 function guardarBloqueoDia(){
   const iso = fechaISO(fechaActual);
-  const desayuno = document.getElementById('fBloqueoDesayuno').checked;
-  const almuerzo = document.getElementById('fBloqueoAlmuerzo').checked;
-  const cena = document.getElementById('fBloqueoCena').checked;
   const motivo = document.getElementById('fBloqueoMotivo').value.trim();
   const btn = document.getElementById('btnGuardarBloqueoDia');
   if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
-  const dataDia = (desayuno || almuerzo || cena) ? { desayuno, almuerzo, cena, motivo } : firebase.firestore.FieldValue.delete();
+  const turnos = {};
+  let algunoBloqueado = false;
+  ['desayuno','almuerzo','cena'].forEach(t => {
+    const nombre = t.charAt(0).toUpperCase()+t.slice(1);
+    const marcado = document.getElementById('fBloqueo'+nombre).checked;
+    if(marcado){
+      const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
+      turnos[t] = { tipo };
+      algunoBloqueado = true;
+    } else {
+      turnos[t] = false;
+    }
+  });
+  const dataDia = algunoBloqueado ? { ...turnos, motivo } : firebase.firestore.FieldValue.delete();
   fechasBloqueadasRef.set({ [iso]: dataDia }, { merge: true }).then(() => {
     document.getElementById('overlayBloqueoDia').classList.remove('open');
   }).catch(err => {
@@ -3098,8 +3145,12 @@ function renderLista(){
   if(turnoBloqueado(isoAviso, turnoActivo)){
     const dia = FECHAS_BLOQUEADAS[isoAviso] || {};
     const turnosCerrados = ['desayuno','almuerzo','cena'].filter(t => dia[t]);
-    const nombresCerrados = turnosCerrados.map(t=>t.charAt(0).toUpperCase()+t.slice(1)).join(', ');
-    avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">🔒 Este día tiene bloqueado: <b>${nombresCerrados}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}. Los clientes no pueden solicitar reserva para ese turno desde el formulario.</div>`;
+    const descripcion = turnosCerrados.map(t => {
+      const nombre = t.charAt(0).toUpperCase()+t.slice(1);
+      const esEvento = dia[t].tipo === 'evento';
+      return `${nombre} (${esEvento?'evento — bloqueo total':'sin disponibilidad — permite lista de espera'})`;
+    }).join(', ');
+    avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">🔒 Este día tiene bloqueado: <b>${descripcion}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}.</div>`;
   }
   if(rs.length===0){
     // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
