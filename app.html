@@ -1449,7 +1449,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.05</div>
+<div class="version-tag">v4.06</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3075,7 +3075,11 @@ function renderCalendarioInline(){
     if(iso===selISO) cls += ' selected';
     const tieneReserva = diasConReserva.has(iso);
     const tieneEspecial = diasConEspecial.has(iso);
-    const bloqueado = diaTieneAlgunBloqueo(iso);
+    // El candado respeta el turno que se está viendo: si estás en
+    // "Almuerzo" y solo la Cena está bloqueada, no debe salir candado acá
+    // — solo cuando el turno bloqueado sea justo el que tienes activo (o
+    // cualquiera, si estás viendo "Todos").
+    const bloqueado = turnoBloqueado(iso, turnoActivo);
     const total = conteoPorDia[iso] || 0;
     let marca = '';
     if(tieneReserva){
