@@ -445,7 +445,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .resumen-dia-titulo{
   font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
-  color:var(--gold-bright); margin-bottom:10px; text-align:center;
+  color:var(--gold-bright); margin-bottom:2px; text-align:center;
+}
+.resumen-dia-fecha{
+  font-size:11px; color:var(--text-dim); text-align:center; margin-bottom:10px;
 }
 .resumen-dia-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
 .resumen-dia-card{
@@ -466,7 +469,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .resumen-turno-title{
   font-family:'Fraunces',serif; font-size:14px; font-weight:600; color:var(--gold-bright);
-  margin-bottom:10px;
+  margin-bottom:2px;
+}
+.resumen-turno-fecha{
+  font-size:11.5px; color:var(--text-dim); margin-bottom:12px;
 }
 .resumen-grid-mini{display:flex; gap:10px; margin-bottom:14px;}
 .resumen-mini{
@@ -1449,7 +1455,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.06</div>
+<div class="version-tag">v4.07</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3243,6 +3249,7 @@ function renderResumenTurnoHTML(rsTodas){
   const resumenDiaHtml = `
     <div class="resumen-dia-turnos">
       <div class="resumen-dia-titulo">Resumen del día — todos los turnos</div>
+      <div class="resumen-dia-fecha">${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}</div>
       <div class="resumen-dia-grid">
         ${porTurnoDia.map(t=>`
           <div class="resumen-dia-card ${turnoActivo===t.turno?'activo':''}">
@@ -3280,6 +3287,16 @@ function renderResumenTurnoHTML(rsTodas){
   const totalReservas = generalReservas.length + vipReservasCount;
   const totalPax = generalPax + vipPax;
 
+  // Total de abonos de este turno — para hacerle seguimiento a cuánto se
+  // ha recaudado y cuántas reservas de las de hoy ya dejaron abono.
+  const reservasConAbono = rsTodas.filter(r => Number(r.abono) > 0);
+  const totalAbonos = reservasConAbono.reduce((a,r) => a + Number(r.abono||0), 0);
+
+  // Fecha legible para que el resumen se entienda solo, si alguien le toma
+  // una captura de pantalla sin más contexto (a qué día y turno corresponde).
+  const fechaLegibleResumen = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
+  const turnoLabelResumen = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'}[turnoActivo] || 'Todos los turnos';
+
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
     const filas = reservas.length
       ? reservas.map(r => `<div class="resumen-fila">
@@ -3299,7 +3316,8 @@ function renderResumenTurnoHTML(rsTodas){
   return `
     ${resumenDiaHtml}
     <div class="resumen-turno">
-      <div class="resumen-turno-title">Resumen de ${turnoActivo==='todos'?'todos los turnos':turnoActivo}</div>
+      <div class="resumen-turno-title">Resumen de ${turnoLabelResumen}</div>
+      <div class="resumen-turno-fecha">${fechaLegibleResumen}</div>
 
       <div class="resumen-seccion">
         <div class="resumen-seccion-head">
@@ -3314,6 +3332,13 @@ function renderResumenTurnoHTML(rsTodas){
           <span>${vipReservasCount} mesas · ${vipPax} pax</span>
         </div>
         ${vipSalonesHtml}
+      </div>
+
+      <div class="resumen-seccion">
+        <div class="resumen-seccion-head">
+          <span>💰 Abonos registrados</span>
+          <span>${reservasConAbono.length} reserva${reservasConAbono.length===1?'':'s'} · $${totalAbonos.toLocaleString('es-CO')}</span>
+        </div>
       </div>
 
       <div class="resumen-total">
