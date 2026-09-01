@@ -742,8 +742,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .rol-opcion strong{display:block; font-size:13px; color:var(--text);}
 .rol-opcion span{display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px; line-height:1.4;}
 .bloqueo-turno-fila{display:flex; align-items:center; gap:8px;}
+.bloqueo-turno-bloque{margin-bottom:6px;}
+.bloqueo-show-imagen{margin-top:8px; padding:10px; background:var(--panel-alt); border-radius:10px; border:1px dashed var(--border);}
+.bloqueo-show-imagen label{display:block; font-size:11px; color:var(--text-dim); margin-bottom:6px;}
+.bloqueo-show-imagen input[type="file"]{width:100%; font-size:11.5px; color:var(--text);}
 .bloqueo-tipo-select{
-  flex:0 0 130px; font-size:11.5px; padding:8px 6px; border-radius:8px;
+  flex:0 0 150px; font-size:10.5px; padding:8px 6px; border-radius:8px;
   border:1px solid var(--border); background:var(--panel-alt); color:var(--text);
 }
 .rol-badge{
@@ -1455,7 +1459,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.07</div>
+<div class="version-tag">v4.08</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1716,45 +1720,70 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 </div>
 
 <div class="overlay" id="overlayBloqueoDia">
-  <div class="modal" style="max-width:420px;">
+  <div class="modal" style="max-width:440px; max-height:90vh; overflow-y:auto;">
     <h3 id="bloqueoDiaTitulo">Bloquear día</h3>
-    <div class="modal-sub">Marca los turnos que quieres cerrar para reservas nuevas, y elige el motivo de cada uno: <b>Evento especial</b> cierra del todo (el cliente no puede ni intentarlo); <b>Sin disponibilidad</b> le muestra al cliente la opción de quedar en lista de espera. No afecta las reservas que ya tengas guardadas ese día.</div>
+    <div class="modal-sub">Marca los turnos que quieres cerrar (o anunciar) y elige el motivo de cada uno: <b>Evento privado</b> cierra del todo, el cliente no puede ni intentarlo (el restaurante está reservado completo); <b>Sin disponibilidad</b> le muestra la opción de quedar en lista de espera; <b>Show especial / concierto</b> NO bloquea nada — le muestra la publicidad del evento al cliente y le pregunta si quiere continuar con su reserva normal. No afecta las reservas que ya tengas guardadas ese día.</div>
     <div class="rol-opciones" style="margin-top:10px;">
-      <div class="bloqueo-turno-fila">
-        <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
-          <input type="checkbox" id="fBloqueoDesayuno" style="width:18px; height:18px;">
-          <div><strong>☕ Desayuno</strong></div>
-        </label>
-        <select id="fBloqueoDesayunoTipo" class="bloqueo-tipo-select">
-          <option value="disponibilidad">Sin disponibilidad</option>
-          <option value="evento">Evento especial</option>
-        </select>
+      <div class="bloqueo-turno-bloque" id="bloqueoBloqueDesayuno">
+        <div class="bloqueo-turno-fila">
+          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
+            <input type="checkbox" id="fBloqueoDesayuno" style="width:18px; height:18px;" onchange="actualizarVisibilidadImagenShow('Desayuno')">
+            <div><strong>☕ Desayuno</strong></div>
+          </label>
+          <select id="fBloqueoDesayunoTipo" class="bloqueo-tipo-select" onchange="actualizarVisibilidadImagenShow('Desayuno')">
+            <option value="disponibilidad">Sin disponibilidad</option>
+            <option value="evento_privado">Evento privado</option>
+            <option value="show_especial">Show especial / concierto</option>
+          </select>
+        </div>
+        <div class="bloqueo-show-imagen" id="fBloqueoDesayunoShowWrap" style="display:none;">
+          <label>Publicidad del show (mismo tamaño del carrusel)</label>
+          <input type="file" accept="image/*" onchange="previsualizarImagenShow(this,'Desayuno')">
+          <img id="fBloqueoDesayunoShowPreview" style="display:none; width:100%; border-radius:8px; margin-top:6px;">
+        </div>
       </div>
-      <div class="bloqueo-turno-fila">
-        <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
-          <input type="checkbox" id="fBloqueoAlmuerzo" style="width:18px; height:18px;">
-          <div><strong>☀️ Almuerzo</strong></div>
-        </label>
-        <select id="fBloqueoAlmuerzoTipo" class="bloqueo-tipo-select">
-          <option value="disponibilidad">Sin disponibilidad</option>
-          <option value="evento">Evento especial</option>
-        </select>
+      <div class="bloqueo-turno-bloque" id="bloqueoBloqueAlmuerzo">
+        <div class="bloqueo-turno-fila">
+          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
+            <input type="checkbox" id="fBloqueoAlmuerzo" style="width:18px; height:18px;" onchange="actualizarVisibilidadImagenShow('Almuerzo')">
+            <div><strong>☀️ Almuerzo</strong></div>
+          </label>
+          <select id="fBloqueoAlmuerzoTipo" class="bloqueo-tipo-select" onchange="actualizarVisibilidadImagenShow('Almuerzo')">
+            <option value="disponibilidad">Sin disponibilidad</option>
+            <option value="evento_privado">Evento privado</option>
+            <option value="show_especial">Show especial / concierto</option>
+          </select>
+        </div>
+        <div class="bloqueo-show-imagen" id="fBloqueoAlmuerzoShowWrap" style="display:none;">
+          <label>Publicidad del show (mismo tamaño del carrusel)</label>
+          <input type="file" accept="image/*" onchange="previsualizarImagenShow(this,'Almuerzo')">
+          <img id="fBloqueoAlmuerzoShowPreview" style="display:none; width:100%; border-radius:8px; margin-top:6px;">
+        </div>
       </div>
-      <div class="bloqueo-turno-fila">
-        <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
-          <input type="checkbox" id="fBloqueoCena" style="width:18px; height:18px;">
-          <div><strong>🌙 Cena</strong></div>
-        </label>
-        <select id="fBloqueoCenaTipo" class="bloqueo-tipo-select">
-          <option value="disponibilidad">Sin disponibilidad</option>
-          <option value="evento">Evento especial</option>
-        </select>
+      <div class="bloqueo-turno-bloque" id="bloqueoBloqueCena">
+        <div class="bloqueo-turno-fila">
+          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:10px; cursor:pointer; flex:1;">
+            <input type="checkbox" id="fBloqueoCena" style="width:18px; height:18px;" onchange="actualizarVisibilidadImagenShow('Cena')">
+            <div><strong>🌙 Cena</strong></div>
+          </label>
+          <select id="fBloqueoCenaTipo" class="bloqueo-tipo-select" onchange="actualizarVisibilidadImagenShow('Cena')">
+            <option value="disponibilidad">Sin disponibilidad</option>
+            <option value="evento_privado">Evento privado</option>
+            <option value="show_especial">Show especial / concierto</option>
+          </select>
+        </div>
+        <div class="bloqueo-show-imagen" id="fBloqueoCenaShowWrap" style="display:none;">
+          <label>Publicidad del show (mismo tamaño del carrusel)</label>
+          <input type="file" accept="image/*" onchange="previsualizarImagenShow(this,'Cena')">
+          <img id="fBloqueoCenaShowPreview" style="display:none; width:100%; border-radius:8px; margin-top:6px;">
+        </div>
       </div>
     </div>
     <div class="field" style="margin-top:12px;">
-      <label>Motivo (opcional, solo para uso interno)</label>
-      <input type="text" id="fBloqueoMotivo" placeholder="Ej. Concierto — cupo lleno">
+      <label>Motivo / nombre del evento (para uso interno y para el cliente si es show especial)</label>
+      <input type="text" id="fBloqueoMotivo" placeholder="Ej. Concierto de salsa — cupo lleno">
     </div>
+    <div class="login-error" id="bloqueoDiaError"></div>
     <div class="modal-actions" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="document.getElementById('overlayBloqueoDia').classList.remove('open')">Cancelar</button>
       <button class="btn btn-primary" id="btnGuardarBloqueoDia" onclick="guardarBloqueoDia()">Guardar</button>
@@ -2782,12 +2811,18 @@ fechasBloqueadasRef.onSnapshot(snap => {
 }, err => console.error('Error de conexión en fechas bloqueadas:', err));
 
 // Cada turno bloqueado guarda su propio "tipo":
-//  - 'evento'        → bloqueo total. El cliente ni siquiera puede
-//                       intentarlo, no hay lista de espera.
+//  - 'evento_privado' → bloqueo total. El restaurante está reservado
+//                       completo (evento privado); el cliente ni siquiera
+//                       puede intentarlo, no hay lista de espera.
+//                       ("evento" a secas, de versiones viejas, se sigue
+//                       tratando igual — ver esBloqueoDuro más abajo.)
 //  - 'disponibilidad' → cupo lleno por ahora. El cliente sí puede seguir
 //                       y quedar en lista de espera si quiere.
-// Estructura: FECHAS_BLOQUEADAS["2026-09-17"] = { desayuno:{tipo:'evento'},
-// almuerzo:false, cena:{tipo:'disponibilidad'}, motivo:'...' }
+//  - 'show_especial'  → NO bloquea nada. El cliente ve la publicidad del
+//                       show/concierto (imagen tamaño carrusel) antes de
+//                       continuar con su reserva normal para ese turno.
+// Estructura: FECHAS_BLOQUEADAS["2026-09-17"] = { desayuno:{tipo:'evento_privado'},
+// almuerzo:false, cena:{tipo:'show_especial', imagen:'data:...'}, motivo:'...' }
 function infoBloqueoTurno(fechaIso, turno){
   const dia = FECHAS_BLOQUEADAS[fechaIso];
   if(!dia) return null;
@@ -2796,21 +2831,74 @@ function infoBloqueoTurno(fechaIso, turno){
   }
   return dia[turno] || null;
 }
+// "Bloqueado" para efectos de disponibilidad = de verdad restringe al
+// cliente (evento privado o cupo lleno). Un show especial NO cuenta como
+// bloqueado — el cliente puede reservar igual, solo se le avisa primero.
+function esBloqueoDuro(info){
+  return !!info && info.tipo !== 'show_especial';
+}
 function turnoBloqueado(fechaIso, turno){
-  return !!infoBloqueoTurno(fechaIso, turno);
+  return esBloqueoDuro(infoBloqueoTurno(fechaIso, turno));
 }
 function diaTieneAlgunBloqueo(fechaIso){
   const dia = FECHAS_BLOQUEADAS[fechaIso];
-  return !!(dia && (dia.desayuno || dia.almuerzo || dia.cena));
+  if(!dia) return false;
+  return ['desayuno','almuerzo','cena'].some(t => esBloqueoDuro(dia[t]));
 }
 function diaCompletoBloqueado(fechaIso){
   const dia = FECHAS_BLOQUEADAS[fechaIso];
-  return !!(dia && dia.desayuno && dia.almuerzo && dia.cena);
+  if(!dia) return false;
+  return ['desayuno','almuerzo','cena'].every(t => esBloqueoDuro(dia[t]));
+}
+// Para el candadito del calendario: distingue si lo que hay ese día es un
+// bloqueo real o solo un show especial anunciado (que no bloquea nada).
+function diaTieneShowEspecial(fechaIso){
+  const dia = FECHAS_BLOQUEADAS[fechaIso];
+  if(!dia) return false;
+  return ['desayuno','almuerzo','cena'].some(t => dia[t] && dia[t].tipo === 'show_especial');
+}
+
+// Imagen del show, comprimida igual que las fotos del carrusel (máx 1000px
+// de ancho, JPEG calidad media) — para que quepa en el documento de
+// Firestore sin pasarse del límite de 1MB, y cargue rápido en el celular
+// del cliente.
+let imagenesShowTemp = {};
+function actualizarVisibilidadImagenShow(nombre){
+  const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
+  const marcado = document.getElementById('fBloqueo'+nombre).checked;
+  const wrap = document.getElementById('fBloqueo'+nombre+'ShowWrap');
+  if(wrap) wrap.style.display = (marcado && tipo === 'show_especial') ? 'block' : 'none';
+}
+function previsualizarImagenShow(input, nombre){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1000;
+      const escala = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      imagenesShowTemp[nombre] = canvas.toDataURL('image/jpeg', 0.72);
+      const preview = document.getElementById('fBloqueo'+nombre+'ShowPreview');
+      preview.src = imagenesShowTemp[nombre];
+      preview.style.display = 'block';
+    };
+    img.onerror = () => { document.getElementById('bloqueoDiaError').textContent = 'No se pudo leer esa imagen. Prueba con otra foto.'; };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function abrirModalBloqueoDia(){
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
+  imagenesShowTemp = {};
+  document.getElementById('bloqueoDiaError').textContent = '';
   // El modal se ajusta a dónde estás parado: si tienes un turno puntual
   // activo (Desayuno/Almuerzo/Cena), solo se muestra ESE turno para
   // bloquear — así nunca se te queda otro turno marcado sin querer, de
@@ -2823,12 +2911,23 @@ function abrirModalBloqueoDia(){
     : `Bloquear — ${formatearFechaLarga(iso)}`;
   ['desayuno','almuerzo','cena'].forEach(t => {
     const nombre = t.charAt(0).toUpperCase()+t.slice(1);
-    const fila = document.getElementById('fBloqueo'+nombre).closest('.bloqueo-turno-fila');
+    const bloque = document.getElementById('bloqueoBloque'+nombre);
     const esEsteTurno = !soloEsteTurno || t === soloEsteTurno;
-    if(fila) fila.style.display = esEsteTurno ? 'flex' : 'none';
+    if(bloque) bloque.style.display = esEsteTurno ? 'block' : 'none';
     const info = dia[t];
     document.getElementById('fBloqueo'+nombre).checked = !!info;
-    document.getElementById('fBloqueo'+nombre+'Tipo').value = (info && info.tipo) || 'disponibilidad';
+    // Compatibilidad con datos viejos: 'evento' (sin distinción) se lee
+    // igual que 'evento_privado' — ambos son bloqueo total.
+    const tipoGuardado = (info && info.tipo === 'evento') ? 'evento_privado' : ((info && info.tipo) || 'disponibilidad');
+    document.getElementById('fBloqueo'+nombre+'Tipo').value = tipoGuardado;
+    const preview = document.getElementById('fBloqueo'+nombre+'ShowPreview');
+    if(info && info.tipo === 'show_especial' && info.imagen){
+      preview.src = info.imagen; preview.style.display = 'block';
+      imagenesShowTemp[nombre] = info.imagen;
+    } else {
+      preview.style.display = 'none';
+    }
+    actualizarVisibilidadImagenShow(nombre);
   });
   document.getElementById('fBloqueoMotivo').value = dia.motivo || '';
   document.getElementById('overlayBloqueoDia').classList.add('open');
@@ -2836,6 +2935,22 @@ function abrirModalBloqueoDia(){
 function guardarBloqueoDia(){
   const iso = fechaISO(fechaActual);
   const motivo = document.getElementById('fBloqueoMotivo').value.trim();
+  const errEl = document.getElementById('bloqueoDiaError');
+  errEl.textContent = '';
+
+  // Si algún turno queda marcado como "Show especial / concierto", exige
+  // que tenga su imagen de publicidad — sin eso no tiene sentido esta
+  // opción, ya que es justo lo que se le muestra al cliente.
+  const turnosNombres = ['Desayuno','Almuerzo','Cena'];
+  for(const nombre of turnosNombres){
+    const marcado = document.getElementById('fBloqueo'+nombre).checked;
+    const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
+    if(marcado && tipo === 'show_especial' && !imagenesShowTemp[nombre]){
+      errEl.textContent = `Falta la imagen de publicidad para ${nombre} — es obligatoria cuando eliges "Show especial / concierto".`;
+      return;
+    }
+  }
+
   const btn = document.getElementById('btnGuardarBloqueoDia');
   if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
   const turnos = {};
@@ -2845,7 +2960,7 @@ function guardarBloqueoDia(){
     const marcado = document.getElementById('fBloqueo'+nombre).checked;
     if(marcado){
       const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
-      turnos[t] = { tipo };
+      turnos[t] = tipo === 'show_especial' ? { tipo, imagen: imagenesShowTemp[nombre] } : { tipo };
       algunoBloqueado = true;
     } else {
       turnos[t] = false;
@@ -2856,7 +2971,7 @@ function guardarBloqueoDia(){
     document.getElementById('overlayBloqueoDia').classList.remove('open');
   }).catch(err => {
     console.error('Error guardando bloqueo de día:', err);
-    alert('No se pudo guardar. Revisa tu conexión e intenta de nuevo.');
+    errEl.textContent = 'No se pudo guardar. Si el error persiste, prueba con una foto de show más liviana.';
   }).finally(() => {
     if(btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
   });
@@ -3084,15 +3199,22 @@ function renderCalendarioInline(){
     // El candado respeta el turno que se está viendo: si estás en
     // "Almuerzo" y solo la Cena está bloqueada, no debe salir candado acá
     // — solo cuando el turno bloqueado sea justo el que tienes activo (o
-    // cualquiera, si estás viendo "Todos").
-    const bloqueado = turnoBloqueado(iso, turnoActivo);
+    // cualquiera, si estás viendo "Todos"). El micrófono 🎤 es distinto:
+    // avisa que hay un show especial anunciado ese turno, pero SIN
+    // bloquear nada — el cliente puede reservar igual.
+    const infoTurnoDia = infoBloqueoTurno(iso, turnoActivo);
+    const bloqueado = esBloqueoDuro(infoTurnoDia);
+    const soloShow = !!infoTurnoDia && infoTurnoDia.tipo === 'show_especial';
     const total = conteoPorDia[iso] || 0;
     let marca = '';
     if(tieneReserva){
       marca = `<span class="cal-day-count${tieneEspecial ? ' especial' : ''}">${tieneEspecial ? '⭐ ' : ''}${total}</span>`;
       if(bloqueado) marca += `<span class="cal-day-lock" title="Este día tiene turnos bloqueados">🔒</span>`;
+      else if(soloShow) marca += `<span class="cal-day-lock" title="Show especial anunciado, sin bloquear reservas">🎤</span>`;
     } else if(bloqueado){
       marca = `<span class="cal-day-count bloqueado">🔒</span>`;
+    } else if(soloShow){
+      marca = `<span class="cal-day-count" style="background:#3a5a9c;">🎤</span>`;
     }
     html += `<div class="${cls}${bloqueado?' cal-day-bloqueado':''}" onclick="seleccionarDiaInline(${d})">${d}<div class="cal-day-marcas">${marca}</div></div>`;
   }
@@ -3165,15 +3287,19 @@ function renderLista(){
   // una excepción — solo informa.
   const isoAviso = fechaISO(fechaActual);
   let avisoBloqueoHtml = '';
-  if(turnoBloqueado(isoAviso, turnoActivo)){
+  if(diaTieneAlgunBloqueo(isoAviso) || diaTieneShowEspecial(isoAviso)){
     const dia = FECHAS_BLOQUEADAS[isoAviso] || {};
-    const turnosCerrados = ['desayuno','almuerzo','cena'].filter(t => dia[t]);
-    const descripcion = turnosCerrados.map(t => {
+    const turnosConAlgo = ['desayuno','almuerzo','cena'].filter(t => dia[t]);
+    const descripcion = turnosConAlgo.map(t => {
       const nombre = t.charAt(0).toUpperCase()+t.slice(1);
-      const esEvento = dia[t].tipo === 'evento';
-      return `${nombre} (${esEvento?'evento — bloqueo total':'sin disponibilidad — permite lista de espera'})`;
+      const tipo = dia[t].tipo === 'evento' ? 'evento_privado' : dia[t].tipo;
+      const etiqueta = tipo === 'evento_privado' ? 'evento privado — bloqueo total'
+        : tipo === 'show_especial' ? 'show especial — no bloquea, solo se anuncia'
+        : 'sin disponibilidad — permite lista de espera';
+      return `${nombre} (${etiqueta})`;
     }).join(', ');
-    avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">🔒 Este día tiene bloqueado: <b>${descripcion}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}.</div>`;
+    const icono = diaTieneAlgunBloqueo(isoAviso) ? '🔒' : '🎤';
+    avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">${icono} Este día tiene: <b>${descripcion}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}.</div>`;
   }
   if(rs.length===0){
     // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
