@@ -1459,7 +1459,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.08</div>
+<div class="version-tag">v4.09</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5229,22 +5229,37 @@ function eliminarReserva(){
   const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
   if(rol !== 'admin'){ alert('Solo un administrador puede eliminar una reserva. Si ya no aplica, márcala como Cancelada — así queda el registro de que existió.'); return; }
   if(!confirm('¿Eliminar esta reserva? Esta acción no se puede deshacer. Si el cliente escribió y quieres dejar constancia de que no se le atendió, usa "Cancelada" en vez de eliminar.')) return;
-  reservasRef.doc(editandoId).delete().then(() => {
-    cerrarModal();
-  }).catch(err => {
-    console.error('Error eliminando reserva:', err);
-    alert('No se pudo eliminar la reserva. Revisa tu conexión e intenta de nuevo.');
-  });
+  // Envuelto en try/catch además del .catch() de la promesa: si algo falla
+  // ANTES de que Firestore siquiera intente el borrado (por ejemplo un id
+  // de reserva con un formato raro), antes se quedaba en silencio total,
+  // sin ningún aviso — con esto, sea cual sea el problema, siempre se ve
+  // algo en pantalla en vez de que el botón no haga nada.
+  try {
+    reservasRef.doc(editandoId).delete().then(() => {
+      cerrarModal();
+    }).catch(err => {
+      console.error('Error eliminando reserva:', err);
+      alert('No se pudo eliminar la reserva (' + (err && err.message ? err.message : 'error desconocido') + '). Revisa tu conexión e intenta de nuevo.');
+    });
+  } catch(err) {
+    console.error('Error eliminando reserva (antes de llegar a Firestore):', err, 'id:', editandoId);
+    alert('No se pudo eliminar esta reserva — el id parece tener un formato inválido (' + (err && err.message ? err.message : String(err)) + '). Avísame con este mensaje para revisarlo.');
+  }
 }
 
 function eliminarReservaDirecta(id, nombre){
   const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
   if(rol !== 'admin'){ alert('Solo un administrador puede eliminar una reserva. Si ya no aplica, márcala como Cancelada — así queda el registro de que existió.'); return; }
   if(!confirm(`¿Eliminar la reserva de "${nombre}"? Esta acción no se puede deshacer.`)) return;
-  reservasRef.doc(id).delete().catch(err => {
-    console.error('Error eliminando reserva:', err);
-    alert('No se pudo eliminar la reserva. Revisa tu conexión e intenta de nuevo.');
-  });
+  try {
+    reservasRef.doc(id).delete().catch(err => {
+      console.error('Error eliminando reserva:', err);
+      alert('No se pudo eliminar la reserva (' + (err && err.message ? err.message : 'error desconocido') + '). Revisa tu conexión e intenta de nuevo.');
+    });
+  } catch(err) {
+    console.error('Error eliminando reserva (antes de llegar a Firestore):', err, 'id:', id);
+    alert('No se pudo eliminar esta reserva — el id parece tener un formato inválido (' + (err && err.message ? err.message : String(err)) + '). Avísame con este mensaje para revisarlo.');
+  }
 }
 
 /* ============ BACKUP: DESCARGAR Y RESTAURAR ============ */
