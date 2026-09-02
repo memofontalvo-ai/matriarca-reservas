@@ -301,6 +301,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   font-size:12.5px; padding:9px 12px; border-radius:9px; width:100%; text-align:left; cursor:pointer;
 }
 .btn-toggle-hora-salida.abierto{color:var(--gold-bright); border-color:var(--gold);}
+.btn-confirmar-hora{
+  width:100%; padding:12px; border-radius:10px; margin-top:12px; cursor:pointer;
+  background:var(--panel-alt); border:1.5px solid var(--gold); color:var(--gold-bright);
+  font-size:13.5px; font-weight:700;
+}
+.btn-confirmar-hora.confirmada{background:linear-gradient(180deg,var(--gold-bright),var(--gold)); color:#1a1408; border-color:var(--gold-bright);}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; max-width:100%;}
 .res-meta span{overflow-wrap:anywhere; max-width:100%;}
@@ -1459,7 +1465,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.09</div>
+<div class="version-tag">v4.10</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1553,7 +1559,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <div class="phone-wheel-col"><label>AM/PM</label><div class="phone-wheel" id="phoneAmPmWheel"></div></div>
         </div>
         <input type="time" id="fHora" class="phone-hidden-control">
+        <button type="button" class="btn-confirmar-hora" id="btnConfirmarHoraTelefono" onclick="confirmarHoraSeleccionadaTelefono()" style="display:none;">✓ Confirmar hora seleccionada</button>
+        <div id="avisoHoraSinConfirmarTelefono" style="display:none; margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">⏱️ Confirma la hora y el turno para poder continuar.</div>
       </div>
+
+      <div id="restoFormularioTelefono">
 
       <div class="field">
         <button type="button" class="btn-toggle-hora-salida" id="btnToggleHoraSalida" onclick="toggleHoraSalidaBlock()">+ Asignar hora de salida (opcional)</button>
@@ -1645,11 +1655,15 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div class="field phone-obs-field"><label>Observaciones (opcional)</label><textarea id="fObs" placeholder="Notas operativas..."></textarea></div>
 
       <div class="modal-actions modal-actions-wrap phone-actions">
-        <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
         <button class="btn btn-danger" id="btnEliminar" style="display:none;" onclick="eliminarReserva()">Eliminar</button>
         <button class="btn btn-primary" id="btnGuardarReserva" onclick="guardarReserva()">Guardar reserva</button>
       </div>
       <button class="btn btn-aprobacion phone-approval-btn" onclick="enviarParaAprobacion()">✉ Enviar para aprobación del cliente</button>
+      </div>
+
+      <div class="modal-actions modal-actions-wrap phone-actions" style="margin-top:8px;">
+        <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1787,6 +1801,18 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div class="modal-actions" style="margin-top:16px;">
       <button class="btn btn-ghost" onclick="document.getElementById('overlayBloqueoDia').classList.remove('open')">Cancelar</button>
       <button class="btn btn-primary" id="btnGuardarBloqueoDia" onclick="guardarBloqueoDia()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlayAvisoBloqueoTelefono">
+  <div class="modal" style="max-width:420px;">
+    <h3 id="avisoBloqueoTelTitulo">Aviso</h3>
+    <img id="avisoBloqueoTelImg" style="display:none; width:100%; border-radius:10px; margin:10px 0;" alt="Publicidad del show especial">
+    <div class="modal-sub" id="avisoBloqueoTelTexto" style="margin-top:8px;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-ghost" onclick="cancelarAvisoBloqueoTelefono()">Elegir otra hora</button>
+      <button class="btn btn-primary" onclick="confirmarAvisoBloqueoTelefono()">Continuar de todas formas</button>
     </div>
   </div>
 </div>
@@ -2840,6 +2866,78 @@ function esBloqueoDuro(info){
 function turnoBloqueado(fechaIso, turno){
   return esBloqueoDuro(infoBloqueoTurno(fechaIso, turno));
 }
+
+/* ============ CONFIRMACIÓN DE HORA — Nueva reserva por teléfono ============ */
+// Mismo patrón que usa solicitud.html del lado del cliente: al crear una
+// reserva nueva por teléfono, hay que confirmar la hora a propósito antes
+// de ver el resto del formulario — y si el turno elegido tiene algún
+// bloqueo (evento privado, sin disponibilidad, o show especial), sale un
+// aviso ANTES de dejar continuar. A diferencia del cliente, el staff SÍ
+// puede seguir adelante si quiere (tiene la autoridad para hacer
+// excepciones), pero tiene que verlo y confirmarlo a propósito, en vez de
+// crearla a ciegas. Esto solo aplica al CREAR una reserva nueva — al
+// EDITAR una que ya existe (editandoId con valor), el formulario se
+// muestra completo de una vez, como siempre.
+function bloquearFormularioTelefonoPorHoraSinConfirmar(){
+  if(editandoId) return;
+  const resto = document.getElementById('restoFormularioTelefono');
+  const btn = document.getElementById('btnConfirmarHoraTelefono');
+  const aviso = document.getElementById('avisoHoraSinConfirmarTelefono');
+  if(!resto || !btn) return;
+  resto.style.display = 'none';
+  btn.style.display = 'block';
+  btn.classList.remove('confirmada');
+  btn.textContent = '✓ Confirmar hora seleccionada';
+  if(aviso) aviso.style.display = 'block';
+}
+function desbloquearFormularioTelefonoComoConfirmado(){
+  const resto = document.getElementById('restoFormularioTelefono');
+  const btn = document.getElementById('btnConfirmarHoraTelefono');
+  const aviso = document.getElementById('avisoHoraSinConfirmarTelefono');
+  if(!resto) return;
+  resto.style.display = 'block';
+  if(btn){ btn.classList.add('confirmada'); btn.textContent = '✓ Hora confirmada'; }
+  if(aviso) aviso.style.display = 'none';
+}
+function confirmarHoraSeleccionadaTelefono(){
+  const fecha = document.getElementById('fFechaReservaEdit').value;
+  const turno = document.getElementById('fTurnoReservaEdit').value;
+  const info = infoBloqueoTurno(fecha, turno);
+  if(!info){
+    desbloquearFormularioTelefonoComoConfirmado();
+    return;
+  }
+  abrirModalAvisoBloqueoTelefono(fecha, turno, info);
+}
+function abrirModalAvisoBloqueoTelefono(fecha, turno, info){
+  const dia = FECHAS_BLOQUEADAS[fecha] || {};
+  const tipo = info.tipo === 'evento' ? 'evento_privado' : info.tipo;
+  const titulo = document.getElementById('avisoBloqueoTelTitulo');
+  const texto = document.getElementById('avisoBloqueoTelTexto');
+  const img = document.getElementById('avisoBloqueoTelImg');
+  if(tipo === 'evento_privado'){
+    titulo.textContent = '🔒 Evento privado en este turno';
+    texto.textContent = `Este turno está bloqueado por un evento privado — el restaurante queda reservado completo.${dia.motivo?' '+dia.motivo:''} ¿Confirmas que quieres crear esta reserva de todas formas?`;
+    img.style.display = 'none';
+  } else if(tipo === 'disponibilidad'){
+    titulo.textContent = '🕒 Sin disponibilidad en este turno';
+    texto.textContent = `Este turno está marcado como sin disponibilidad (cupo lleno).${dia.motivo?' '+dia.motivo:''} ¿Confirmas que quieres crear esta reserva de todas formas?`;
+    img.style.display = 'none';
+  } else {
+    titulo.textContent = '🎤 Show especial en este turno';
+    texto.textContent = `${dia.motivo || 'Hay un show especial anunciado ese día.'} Esto no bloquea nada — puedes continuar normal si quieres.`;
+    if(info.imagen){ img.src = info.imagen; img.style.display = 'block'; } else { img.style.display = 'none'; }
+  }
+  document.getElementById('overlayAvisoBloqueoTelefono').classList.add('open');
+}
+function cancelarAvisoBloqueoTelefono(){
+  document.getElementById('overlayAvisoBloqueoTelefono').classList.remove('open');
+}
+function confirmarAvisoBloqueoTelefono(){
+  document.getElementById('overlayAvisoBloqueoTelefono').classList.remove('open');
+  desbloquearFormularioTelefonoComoConfirmado();
+}
+
 function diaTieneAlgunBloqueo(fechaIso){
   const dia = FECHAS_BLOQUEADAS[fechaIso];
   if(!dia) return false;
@@ -5530,6 +5628,7 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   document.querySelectorAll('#phoneTurnButtons button').forEach(b=>b.addEventListener('click',()=>{
     if(isReadOnly()) return;
     const sel=document.getElementById('fTurnoReservaEdit'); sel.value=b.dataset.turno; sel.dispatchEvent(new Event('change',{bubbles:true})); renderTurnButtons();
+    bloquearFormularioTelefonoPorHoraSinConfirmar();
   }));
 
   function syncHiddenTime(){
@@ -5537,6 +5636,7 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     const h12=Number(wheelState.hour)||12, min=Number(wheelState.minute)||0;
     let h24=h12%12; if(wheelState.ampm==='PM') h24+=12;
     document.getElementById('fHora').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
+    bloquearFormularioTelefonoPorHoraSinConfirmar();
   }
   function readTimeFromHidden(){
     const v=document.getElementById('fHora').value;
@@ -5618,6 +5718,21 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     // cerrado hasta que alguien lo toque a propósito.
     const yaTeniaSalida = !!document.getElementById('fHoraSalida').value;
     window.toggleHoraSalidaBlock(yaTeniaSalida);
+    // Nueva reserva por teléfono: arranca bloqueada hasta confirmar la
+    // hora, igual que en solicitud.html. Al editar una reserva que ya
+    // existe (editandoId con valor), se muestra todo de una vez, como
+    // siempre — ese paso de confirmación es solo para cuando se está
+    // creando de cero.
+    if(editandoId){
+      const resto = document.getElementById('restoFormularioTelefono');
+      const btnConfHora = document.getElementById('btnConfirmarHoraTelefono');
+      const avisoConfHora = document.getElementById('avisoHoraSinConfirmarTelefono');
+      if(resto) resto.style.display = 'block';
+      if(btnConfHora) btnConfHora.style.display = 'none';
+      if(avisoConfHora) avisoConfHora.style.display = 'none';
+    } else {
+      bloquearFormularioTelefonoPorHoraSinConfirmar();
+    }
   }
 
   // Valor sugerido por defecto al habilitar la hora de salida: 2 horas
@@ -5668,7 +5783,7 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     requestAnimationFrame(()=>{ if(document.getElementById('formCompletoBlock').style.display!=='none') initPhoneUI(); });
   };
 
-  document.getElementById('fFechaReservaEdit').addEventListener('change',()=>{renderPhoneDates();});
+  document.getElementById('fFechaReservaEdit').addEventListener('change',()=>{renderPhoneDates(); bloquearFormularioTelefonoPorHoraSinConfirmar();});
   document.getElementById('fTurnoReservaEdit').addEventListener('change',renderTurnButtons);
 
   // Calendario completo del primer cuadrito.
