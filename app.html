@@ -1101,6 +1101,23 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   const db = firebase.firestore();
   const auth = firebase.auth();
 
+  // Guarda una copia local de la base de datos en el propio celular/
+  // computador (IndexedDB), para que cada vez que se abra la app NO tenga
+  // que volver a descargar TODA la historia de reservas desde cero por
+  // internet — solo lo que cambió desde la última vez. Antes esto no
+  // estaba activado: cada apertura descargaba absolutamente todo otra vez,
+  // y entre más meses de uso se acumulan, más lenta se pone esa carga
+  // inicial (esa era la causa real de la demora y la pantalla negra al
+  // entrar). `synchronizeTabs` permite tener la app abierta en varias
+  // pestañas/dispositivos a la vez sin que se bloqueen entre sí.
+  db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+    if(err.code === 'failed-precondition'){
+      console.warn('Persistencia offline no se pudo activar (varias pestañas abiertas al mismo tiempo sin sincronización) — la app sigue funcionando normal, solo sin este acelere.');
+    } else if(err.code === 'unimplemented'){
+      console.warn('Este navegador no soporta guardar datos offline — la app sigue funcionando normal, solo sin este acelere.');
+    }
+  });
+
   // App secundaria SOLO para crear usuarios nuevos sin desconectar la
   // sesión actual del administrador. Firebase Auth, al crear una cuenta
   // desde el navegador, automáticamente "inicia sesión" con esa cuenta
@@ -1466,7 +1483,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.12</div>
+<div class="version-tag">v4.13</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
