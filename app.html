@@ -906,23 +906,24 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    botón de borrar encima — así Guillermo ve de una vez qué hay puesto,
    sin tener que abrir nada para saberlo. */
 .carrusel-config-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:6px 0 12px;}
-.carrusel-config-item{position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; border:1px solid var(--border);}
-.carrusel-config-item img{width:100%; height:100%; object-fit:cover; display:block;}
+.carrusel-config-item{position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--border); display:flex; flex-direction:column;}
+.carrusel-config-item img{width:100%; aspect-ratio:1; object-fit:cover; display:block;}
+.carrusel-config-numero{
+  position:absolute; top:6px; left:6px; min-width:22px; height:22px; padding:0 6px; border-radius:999px;
+  background:var(--gold-bright); color:#1a1408; font-size:12px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; z-index:2;
+}
 .carrusel-config-borrar{
   position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%;
   background:rgba(20,10,10,0.75); color:#f5b5b5; font-size:12px; display:flex; align-items:center; justify-content:center;
-  border:1px solid rgba(255,255,255,0.15);
+  border:1px solid rgba(255,255,255,0.15); z-index:2;
 }
-.carrusel-config-mover{
-  position:absolute; bottom:4px; display:flex; gap:3px;
+.carrusel-config-mover-bar{display:flex; gap:4px; padding:5px;}
+.carrusel-config-mover-bar button{
+  flex:1; padding:7px 4px; border-radius:7px; background:var(--panel-alt); color:var(--text);
+  font-size:11px; font-weight:700; border:1px solid var(--border);
 }
-.carrusel-config-mover button{
-  width:20px; height:20px; border-radius:5px; background:rgba(20,20,24,0.75); color:var(--text);
-  font-size:10px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.12);
-}
-.carrusel-config-mover button:disabled{opacity:0.3;}
-.carrusel-config-mover .mover-izq{left:4px;}
-.carrusel-config-mover .mover-der{right:4px;}
+.carrusel-config-mover-bar button:disabled{opacity:0.3;}
 
 .config-peligro-bloque{
   background:rgba(200,60,60,0.08); border:1px solid #b23a3a; border-radius:12px;
@@ -1465,7 +1466,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.11</div>
+<div class="version-tag">v4.12</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2391,11 +2392,12 @@ function cargarCarruselConfig(){
     }
     el.innerHTML = carruselCache.map((s, i) => `
       <div class="carrusel-config-item">
+        <div class="carrusel-config-numero">${i+1}</div>
         <img src="${s.img}">
         <button class="carrusel-config-borrar" onclick='eliminarSlide(${JSON.stringify(s.id)})' title="Borrar">✕</button>
-        <div class="carrusel-config-mover">
-          <button class="mover-izq" onclick="moverSlide(${i},-1)" ${i===0?'disabled':''} title="Mover antes">‹</button>
-          <button class="mover-der" onclick="moverSlide(${i},1)" ${i===carruselCache.length-1?'disabled':''} title="Mover después">›</button>
+        <div class="carrusel-config-mover-bar">
+          <button onclick="moverSlide(${i},-1)" ${i===0?'disabled':''} title="Mover antes">◀ Antes</button>
+          <button onclick="moverSlide(${i},1)" ${i===carruselCache.length-1?'disabled':''} title="Mover después">Después ▶</button>
         </div>
       </div>`).join('');
   });
