@@ -1465,7 +1465,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.10</div>
+<div class="version-tag">v4.11</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5636,7 +5636,28 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     const h12=Number(wheelState.hour)||12, min=Number(wheelState.minute)||0;
     let h24=h12%12; if(wheelState.ampm==='PM') h24+=12;
     document.getElementById('fHora').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
+    autoSeleccionarTurnoPorHoraTelefono(h24, min);
     bloquearFormularioTelefonoPorHoraSinConfirmar();
+  }
+  // Solo al CREAR una reserva nueva (no al editar una que ya existe): el
+  // turno de arriba (Desayuno/Almuerzo/Cena) se ajusta solo según la hora
+  // que se va moviendo en la rueda, igual que en solicitud.html —
+  // 8:00–10:59 Desayuno, 11:00–17:59 Almuerzo, 18:00+ Cena. Así el aviso
+  // de bloqueo siempre revisa el turno correcto, no uno que se quedó
+  // seleccionado de antes sin que coincida con la hora actual.
+  function autoSeleccionarTurnoPorHoraTelefono(h24, min){
+    if(editandoId) return;
+    const minutosDelDia = h24*60 + min;
+    let turnoAuto;
+    if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
+    else if(minutosDelDia >= 660 && minutosDelDia < 1080) turnoAuto = 'almuerzo';
+    else turnoAuto = 'cena';
+    const sel = document.getElementById('fTurnoReservaEdit');
+    if(sel.value !== turnoAuto){
+      sel.value = turnoAuto;
+      sel.dispatchEvent(new Event('change', {bubbles:true}));
+      renderTurnButtons();
+    }
   }
   function readTimeFromHidden(){
     const v=document.getElementById('fHora').value;
@@ -5731,8 +5752,19 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       if(btnConfHora) btnConfHora.style.display = 'none';
       if(avisoConfHora) avisoConfHora.style.display = 'none';
     } else {
+      // Sincroniza el turno de arriba con la hora que haya quedado
+      // seleccionada en la rueda, por si el modal arrancó con un turno
+      // que ya no coincide con la hora (por ejemplo, quedó en "Cena" de
+      // una reserva anterior mientras la hora está en la mañana).
+      const { h24, min } = horaActualDesdeWheelState();
+      autoSeleccionarTurnoPorHoraTelefono(h24, min);
       bloquearFormularioTelefonoPorHoraSinConfirmar();
     }
+  }
+  function horaActualDesdeWheelState(){
+    const h12=Number(wheelState.hour)||12, min=Number(wheelState.minute)||0;
+    let h24=h12%12; if(wheelState.ampm==='PM') h24+=12;
+    return { h24, min };
   }
 
   // Valor sugerido por defecto al habilitar la hora de salida: 2 horas
