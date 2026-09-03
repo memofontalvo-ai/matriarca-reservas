@@ -1512,6 +1512,26 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </div>
       </div>
 
+      <!-- ===== GRUPO: BASE DE DATOS DE CLIENTES ===== -->
+      <div class="config-grupo">
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoClientes')">
+          <span>👥 Base de datos de clientes</span>
+          <span class="config-grupo-chevron" id="chevron_grupoClientes">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoClientes" style="display:none;">
+        <div class="config-mensaje-bloque">
+          <div style="text-align:center; padding:12px; background:#171c25; border-radius:10px; border:1px solid var(--gold-bright);">
+            <div style="font-size:11.5px; letter-spacing:0.5px; color:var(--text-dim); text-transform:uppercase;">Total clientes registrados</div>
+            <div id="totalClientesRegistrados" style="font-size:32px; font-weight:800; color:var(--gold-bright);">0</div>
+          </div>
+          <div class="config-mensaje-sub" style="margin-top:10px;">Cada persona que hace una solicitud de reserva (por la web o por teléfono) queda registrada aquí una sola vez, identificada por su celular — sin importar cuántas veces vuelva a reservar. Así sabes cuántos clientes únicos tienes, no cuántas solicitudes han llegado.</div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="abrirBaseDatosClientes()">👥 Ver / buscar clientes</button>
+          </div>
+        </div>
+        </div>
+      </div>
+
       <!-- ===== GRUPO: ZONA DE PELIGRO ===== -->
       <div class="config-grupo">
         <button class="config-grupo-header config-grupo-header-peligro" onclick="toggleConfigGrupo('grupoPeligro')">
@@ -1534,7 +1554,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.20</div>
+<div class="version-tag">v4.21</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1686,6 +1706,17 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           </div>
         </div>
         <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
+      </div>
+
+      <div class="field-row phone-two-cols">
+        <div class="field">
+          <label>Correo electrónico (opcional)</label>
+          <input type="email" id="fCorreo" placeholder="cliente@ejemplo.com">
+        </div>
+        <div class="field">
+          <label>Fecha de cumpleaños (opcional)</label>
+          <input type="date" id="fCumpleanos">
+        </div>
       </div>
 
       <div class="field-row phone-two-cols">
@@ -1900,6 +1931,41 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   </div>
 </div>
 
+<div class="overlay" id="overlayClientes">
+  <div class="modal informe-modal">
+    <div class="informe-toolbar">
+      <button class="btn btn-ghost" onclick="cerrarBaseDatosClientes()">✕ Cerrar</button>
+    </div>
+    <div class="informe-header">
+      <h1>La Matriarca Barranquilla — Base de datos de clientes</h1>
+      <div class="informe-subtitulo" id="clientesSubtitulo">0 clientes registrados</div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label>Buscar por nombre, teléfono o correo</label>
+      <input type="text" id="clientesBusqueda" placeholder="Escribe para buscar..." oninput="renderTablaClientes()">
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Filtro adicional</label>
+      <select id="clientesFiltroTipo" onchange="actualizarFiltroClientesUI()">
+        <option value="todos">Todos los clientes</option>
+        <option value="cumple_mes">Cumpleaños en un mes determinado</option>
+        <option value="periodo">Solicitud registrada en un mes/año</option>
+        <option value="min_solicitudes">Mínimo de solicitudes realizadas</option>
+      </select>
+    </div>
+    <div class="field" id="clientesFiltroValorWrap" style="display:none; margin-bottom:10px;"></div>
+
+    <div style="margin:6px 0 12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn-config-guardar" style="flex:1; min-width:150px;" onclick="exportarClientesCSV()">⬇️ Exportar CSV / Excel</button>
+      <button class="btn-config-guardar" style="flex:1; min-width:150px;" onclick="exportarClientesVCF()">📇 Exportar contactos (VCF)</button>
+    </div>
+    <div style="font-size:11.5px; color:#777; margin-bottom:12px;">La exportación toma exactamente los clientes que ves en la tabla de abajo (aplica la búsqueda y el filtro que tengas puestos). Para exportar todos, deja la búsqueda vacía y el filtro en "Todos".</div>
+
+    <div id="clientesTablaWrap"></div>
+  </div>
+</div>
+
 <div class="overlay" id="calOverlay">
   <div class="modal cal-modal">
     <div class="cal-head">
@@ -2068,6 +2134,53 @@ function armarCelularCompleto(codigo, numeroLocal){
   const local = (numeroLocal||'').replace(/\D/g,'');
   if(!local) return '';
   return `+${codigo||'57'} ${local}`;
+}
+
+// ===== Base de datos de clientes: registro automático =====
+// Identifica al cliente por su celular normalizado (solo dígitos, sin "+"
+// ni espacios) para que "3001234567", "+57 3001234567" y "573001234567"
+// cuenten como LA MISMA persona y no se dupliquen — sea que la reserva
+// haya entrado por la web (solicitud.html) o se haya tomado acá por
+// teléfono/presencial.
+function normalizarTelefono(celularCompleto){
+  return (celularCompleto||'').replace(/\D/g,'');
+}
+function upsertCliente(datos){
+  const tel = normalizarTelefono(datos.celular);
+  if(!tel) return Promise.resolve();
+  const hoy = new Date();
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+  const ref = db.collection('clientes').doc(tel);
+  return db.runTransaction(t => t.get(ref).then(doc => {
+    if(doc.exists){
+      const data = doc.data() || {};
+      const update = {
+        nombre: datos.nombre || data.nombre || '',
+        telefono: datos.celular || data.telefono || '',
+        fechaUltimaSolicitud: hoyISO,
+        cantidadSolicitudes: (Number(data.cantidadSolicitudes)||0) + 1,
+        estadoUltimaSolicitud: datos.estado || data.estadoUltimaSolicitud || ''
+      };
+      // El correo y el cumpleaños solo se actualizan si esta vez sí los
+      // dieron — si el cliente ya los tenía guardados de una gestión
+      // anterior y esta vez quedaron en blanco, no se borran.
+      if(datos.correo) update.correo = datos.correo;
+      if(datos.cumpleanos) update.cumpleanos = datos.cumpleanos;
+      t.update(ref, update);
+    } else {
+      t.set(ref, {
+        nombre: datos.nombre || '',
+        telefono: datos.celular || '',
+        correo: datos.correo || '',
+        cumpleanos: datos.cumpleanos || '',
+        fechaCreacion: hoyISO,
+        fechaPrimeraSolicitud: hoyISO,
+        fechaUltimaSolicitud: hoyISO,
+        cantidadSolicitudes: 1,
+        estadoUltimaSolicitud: datos.estado || ''
+      });
+    }
+  }));
 }
 // Para precargar el formulario al editar una reserva ya guardada: separa
 // el código de país del número local. Los celulares guardados ANTES de
@@ -3239,6 +3352,20 @@ reservasRef.onSnapshot(snap => {
     '<div class="empty-state">No se pudo conectar con la base de datos.<br>Revisa tu conexión e intenta de nuevo.</div>';
 });
 
+// Base de datos de clientes: se va armando sola cada vez que llega una
+// solicitud (desde solicitud.html o desde acá por teléfono), identificando
+// a cada persona por su celular normalizado para no duplicarla. El doc.id
+// de cada registro ES el celular normalizado (solo dígitos).
+let clientesDB = [];
+const clientesRef = db.collection('clientes');
+clientesRef.onSnapshot(snap => {
+  clientesDB = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const badge = document.getElementById('totalClientesRegistrados');
+  if(badge) badge.textContent = clientesDB.length.toLocaleString('es-CO');
+}, err => {
+  console.error('Error de conexión en clientes:', err);
+});
+
 /* ============ STATE ============ */
 // Siempre arranca en la fecha real de hoy — antes quedó fija en una fecha
 // de prueba (14 de agosto) y nunca se actualizó, así que la app siempre
@@ -4015,6 +4142,160 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
     </div>
     <div style="margin-top:8px; font-size:11.5px; color:#777;">${tipoInforme==='aprobadas' ? 'La tabla principal solo cuenta reservas confirmadas, pendientes o walk-in vigentes. El bloque rojo de canceladas muestra las que sí llegaron a estar aprobadas y luego se cayeron.' : 'Incluye toda solicitud recibida ese mes, llegue por la web o la haya tomado el staff por teléfono. El bloque rojo de canceladas separa las que no prosperaron.'}</div>`;
   document.getElementById('overlayInforme').classList.add('open');
+}
+
+/* ============ BASE DE DATOS DE CLIENTES ============ */
+function abrirBaseDatosClientes(){
+  document.getElementById('clientesBusqueda').value = '';
+  document.getElementById('clientesFiltroTipo').value = 'todos';
+  actualizarFiltroClientesUI();
+  renderTablaClientes();
+  document.getElementById('overlayClientes').classList.add('open');
+}
+function cerrarBaseDatosClientes(){
+  document.getElementById('overlayClientes').classList.remove('open');
+}
+// Cambia qué input extra se muestra según el filtro elegido (mes de
+// cumpleaños, mes/año de solicitud, o mínimo de solicitudes).
+function actualizarFiltroClientesUI(){
+  const tipo = document.getElementById('clientesFiltroTipo').value;
+  const wrap = document.getElementById('clientesFiltroValorWrap');
+  if(tipo === 'cumple_mes'){
+    wrap.style.display = 'block';
+    wrap.innerHTML = `<label>Mes de cumpleaños</label>
+      <select id="clientesFiltroMes" onchange="renderTablaClientes()">
+        ${MESES.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('')}
+      </select>`;
+  } else if(tipo === 'periodo'){
+    wrap.style.display = 'block';
+    wrap.innerHTML = `<label>Mes de la solicitud (primera o última)</label>
+      <input type="month" id="clientesFiltroPeriodo" onchange="renderTablaClientes()">`;
+  } else if(tipo === 'min_solicitudes'){
+    wrap.style.display = 'block';
+    wrap.innerHTML = `<label>Mínimo de solicitudes realizadas</label>
+      <input type="number" id="clientesFiltroMin" min="1" value="2" oninput="renderTablaClientes()">`;
+  } else {
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+  }
+  renderTablaClientes();
+}
+// Aplica la búsqueda + el filtro adicional sobre clientesDB y devuelve la
+// lista resultante — la usan tanto la tabla en pantalla como las dos
+// exportaciones, así lo que se ve es exactamente lo que se descarga.
+function clientesFiltrados(){
+  const q = (document.getElementById('clientesBusqueda').value || '').trim().toLowerCase();
+  const tipo = document.getElementById('clientesFiltroTipo').value;
+  let lista = clientesDB.slice();
+  if(q){
+    lista = lista.filter(c =>
+      (c.nombre||'').toLowerCase().includes(q) ||
+      (c.telefono||'').toLowerCase().includes(q) ||
+      (c.correo||'').toLowerCase().includes(q)
+    );
+  }
+  if(tipo === 'cumple_mes'){
+    const mesEl = document.getElementById('clientesFiltroMes');
+    const mes = mesEl ? Number(mesEl.value) : null;
+    if(mes){
+      lista = lista.filter(c => c.cumpleanos && Number(c.cumpleanos.split('-')[1]) === mes);
+    }
+  } else if(tipo === 'periodo'){
+    const periodoEl = document.getElementById('clientesFiltroPeriodo');
+    const periodo = periodoEl ? periodoEl.value : '';
+    if(periodo){
+      lista = lista.filter(c => (c.fechaPrimeraSolicitud||'').startsWith(periodo) || (c.fechaUltimaSolicitud||'').startsWith(periodo));
+    }
+  } else if(tipo === 'min_solicitudes'){
+    const minEl = document.getElementById('clientesFiltroMin');
+    const min = minEl ? Number(minEl.value) : 1;
+    lista = lista.filter(c => Number(c.cantidadSolicitudes||0) >= min);
+  }
+  lista.sort((a,b) => (b.fechaUltimaSolicitud||'').localeCompare(a.fechaUltimaSolicitud||''));
+  return lista;
+}
+function renderTablaClientes(){
+  const lista = clientesFiltrados();
+  document.getElementById('clientesSubtitulo').textContent = `${clientesDB.length.toLocaleString('es-CO')} clientes registrados en total · mostrando ${lista.length.toLocaleString('es-CO')}`;
+  if(lista.length === 0){
+    document.getElementById('clientesTablaWrap').innerHTML = `<div style="color:#555; font-size:13px;">No hay clientes que coincidan con la búsqueda/filtro.</div>`;
+    return;
+  }
+  const filas = lista.map(c => `
+    <tr>
+      <td>${escapeHtml(c.nombre||'—')}</td>
+      <td>${escapeHtml(c.telefono||'—')}</td>
+      <td>${escapeHtml(c.correo||'—')}</td>
+      <td>${c.cumpleanos ? formatearFechaLarga(c.cumpleanos) : '—'}</td>
+      <td>${c.fechaPrimeraSolicitud ? formatearFechaLarga(c.fechaPrimeraSolicitud) : '—'}</td>
+      <td>${c.fechaUltimaSolicitud ? formatearFechaLarga(c.fechaUltimaSolicitud) : '—'}</td>
+      <td style="text-align:center;"><b>${c.cantidadSolicitudes||0}</b></td>
+    </tr>`).join('');
+  document.getElementById('clientesTablaWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Nombre</th><th>Teléfono</th><th>Correo</th><th>Cumpleaños</th><th>1ª solicitud</th><th>Última solicitud</th><th>Total sol.</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+}
+function descargarArchivo(nombreArchivo, contenido, tipoMime){
+  const blob = new Blob([contenido], { type: tipoMime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nombreArchivo;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+// Escapa un valor para que sea seguro dentro de una celda CSV (comillas
+// dobles si tiene coma, comillas o salto de línea).
+function csvCelda(v){
+  const s = (v===undefined||v===null) ? '' : String(v);
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function exportarClientesCSV(){
+  const lista = clientesFiltrados();
+  const encabezados = ['Nombre','Apellido','Teléfono','Correo electrónico','Fecha de cumpleaños','Fecha primera solicitud','Fecha última solicitud','Cantidad de solicitudes'];
+  const filas = lista.map(c => {
+    // El nombre se guarda completo en un solo campo en toda la app; para
+    // separar Nombre/Apellido en el Excel se usa la primera palabra como
+    // nombre y el resto como apellido — es una separación aproximada,
+    // porque el sistema nunca pide esos dos datos por separado.
+    const partes = (c.nombre||'').trim().split(/\s+/);
+    const nombrePila = partes[0] || '';
+    const apellido = partes.slice(1).join(' ');
+    return [nombrePila, apellido, c.telefono||'', c.correo||'', c.cumpleanos||'', c.fechaPrimeraSolicitud||'', c.fechaUltimaSolicitud||'', c.cantidadSolicitudes||0]
+      .map(csvCelda).join(',');
+  });
+  const csv = '\uFEFF' + encabezados.join(',') + '\n' + filas.join('\n'); // \uFEFF = BOM para que Excel muestre bien las tildes
+  descargarArchivo(`clientes-la-matriarca-${fechaISO(new Date())}.csv`, csv, 'text/csv;charset=utf-8;');
+}
+function exportarClientesVCF(){
+  const lista = clientesFiltrados();
+  const tarjetas = lista.map(c => {
+    const partes = (c.nombre||'').trim().split(/\s+/);
+    const nombrePila = partes[0] || '';
+    const apellido = partes.slice(1).join(' ');
+    // El teléfono queda guardado como "+57 3001234567" — para el vCard se
+    // deja sin espacios, que es el formato que mejor reconocen los
+    // celulares al importar.
+    const telVcard = (c.telefono||'').replace(/\s+/g,'');
+    let bday = '';
+    if(c.cumpleanos){
+      const [y,m,d] = c.cumpleanos.split('-');
+      if(y && m && d) bday = `BDAY:${y}${m}${d}\n`;
+    }
+    return [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `N:${apellido};${nombrePila};;;`,
+      `FN:${c.nombre||''}`,
+      telVcard ? `TEL;TYPE=CELL:${telVcard}` : '',
+      c.correo ? `EMAIL:${c.correo}` : '',
+      bday ? bday.trim() : '',
+      'END:VCARD'
+    ].filter(Boolean).join('\n');
+  });
+  descargarArchivo(`clientes-la-matriarca-${fechaISO(new Date())}.vcf`, tarjetas.join('\n'), 'text/vcard;charset=utf-8;');
 }
 
 /* ============ RENDER: PLANO ============ */
@@ -4975,6 +5256,8 @@ function abrirModal(id, mesaId){
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
     { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
+    document.getElementById('fCorreo').value = r.correo || '';
+    document.getElementById('fCumpleanos').value = r.cumpleanos || '';
     document.getElementById('fMesa').value = r.mesa;
     actualizarBotonMesa();
     document.getElementById('fCanal').value = r.canal;
@@ -5038,6 +5321,8 @@ function abrirModal(id, mesaId){
     document.getElementById('fNombre').value = '';
     document.getElementById('fCelularCod').value = '57';
     document.getElementById('fCelular').value = '';
+    document.getElementById('fCorreo').value = '';
+    document.getElementById('fCumpleanos').value = '';
     document.getElementById('fMesa').value = mesaId || '';
     actualizarBotonMesa();
     document.getElementById('fCanal').value = 'Teléfono';
@@ -5447,6 +5732,8 @@ function guardarReserva(){
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular: armarCelularCompleto(document.getElementById('fCelularCod').value, document.getElementById('fCelular').value),
+    correo: document.getElementById('fCorreo').value.trim(),
+    cumpleanos: document.getElementById('fCumpleanos').value,
     mesa: document.getElementById('fMesa').value,
     canal: document.getElementById('fCanal').value,
     abono: Number(document.getElementById('fAbono').value)||0,
@@ -5507,6 +5794,12 @@ function guardarReserva(){
 
   promesa.then(() => {
     guardandoReserva = false;
+    // Registra o actualiza al cliente en la base de datos de clientes —
+    // pasa con CUALQUIER reserva gestionada desde acá (teléfono,
+    // presencial, etc.), sin importar el estado. No debe romper el
+    // guardado de la reserva si falla, así que el error solo queda en
+    // consola.
+    upsertCliente(data).catch(err => console.error('No se pudo registrar el cliente:', err));
     cerrarModal(); // Firestore actualiza la app sola vía onSnapshot
   }).catch(err => {
     guardandoReserva = false;
