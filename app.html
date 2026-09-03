@@ -1488,6 +1488,27 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button class="btn-config-guardar" onclick="generarInformeEspecialesMes()">📊 Generar informe</button>
           </div>
         </div>
+
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">📋 Informe general de reservas (todas)</div>
+          <div class="config-mensaje-sub">El mismo informe, pero sin filtro de tamaño de grupo — incluye absolutamente todas las reservas del mes (las especiales quedan marcadas con ⭐ para distinguirlas), con el mismo desglose semanal, ranking de gestores y seguimiento de canceladas.</div>
+          <div class="field" style="margin-top:10px;">
+            <label>Tipo de informe</label>
+            <select id="fInformeGeneralTipo">
+              <option value="aprobadas">Reservas aprobadas por día (ya confirmadas)</option>
+              <option value="solicitudes">Solicitudes (todas las que llegan — web o por teléfono)</option>
+            </select>
+          </div>
+          <div class="field-row phone-two-cols" style="margin-top:10px;">
+            <div class="field">
+              <label>Mes</label>
+              <input type="month" id="fInformeGeneralMes">
+            </div>
+          </div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="generarInformeGeneralMes()">📋 Generar informe</button>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -1513,7 +1534,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.19</div>
+<div class="version-tag">v4.20</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3814,8 +3835,26 @@ function generarInformeEspecialesMes(){
     const hoy = new Date();
     yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
   }
-  const [anio, mes] = yearMonth.split('-').map(Number);
   const tipoInforme = document.getElementById('fInformeEspecialesTipo').value; // 'aprobadas' | 'solicitudes'
+  renderInformeReservas(yearMonth, tipoInforme, 20);
+}
+function generarInformeGeneralMes(){
+  const inputMes = document.getElementById('fInformeGeneralMes').value;
+  let yearMonth = inputMes;
+  if(!yearMonth){
+    const hoy = new Date();
+    yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  }
+  const tipoInforme = document.getElementById('fInformeGeneralTipo').value; // 'aprobadas' | 'solicitudes'
+  renderInformeReservas(yearMonth, tipoInforme, 0);
+}
+// Motor común de los dos informes (especiales y general) — la única
+// diferencia real entre ambos es el umbral mínimo de pax: 20 para el de
+// especiales, 0 (sin filtro) para el general, que incluye TODAS las
+// reservas de cualquier tamaño, especiales incluidas.
+function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
+  const [anio, mes] = yearMonth.split('-').map(Number);
+  const esGeneral = umbralPax <= 0;
 
   // "Reservas aprobadas" = ya confirmadas de verdad (confirmada/pendiente/
   // walk-in) — lo que ya está agendado en el día a día, agrupado por la
@@ -3827,7 +3866,7 @@ function generarInformeEspecialesMes(){
   // tiene que aparecer HOY, no en la semana del evento — si no, parecía
   // que ya había solicitudes de días que ni siquiera habían llegado.
   const fechaClave = r => tipoInforme === 'solicitudes' ? (r.fechaSolicitud || r.fecha) : r.fecha;
-  const enElMes = r => { const f = fechaClave(r); return f && f.startsWith(yearMonth) && Number(r.pax) >= 20; };
+  const enElMes = r => { const f = fechaClave(r); return f && f.startsWith(yearMonth) && Number(r.pax) >= umbralPax; };
   const especiales = reservas
     .filter(r => enElMes(r) && (tipoInforme === 'aprobadas' ? ['confirmada','pendiente','walkin'].includes(r.estado) : r.estado !== 'cancelada'))
     .sort((a,b) => (fechaClave(a)+(a.hora||'')).localeCompare(fechaClave(b)+(b.hora||'')));
@@ -3841,7 +3880,10 @@ function generarInformeEspecialesMes(){
     .sort((a,b) => (fechaClave(a)+(a.hora||'')).localeCompare(fechaClave(b)+(b.hora||'')));
 
   const mesLabel = `${MESES[mes-1]} ${anio}`;
-  const tituloInforme = tipoInforme === 'aprobadas' ? 'Reservas especiales aprobadas' : 'Solicitudes especiales recibidas';
+  const baseTitulo = esGeneral ? 'todas las reservas' : 'reservas especiales';
+  const tituloInforme = esGeneral
+    ? (tipoInforme === 'aprobadas' ? 'Reservas aprobadas — informe general' : 'Solicitudes recibidas — informe general')
+    : (tipoInforme === 'aprobadas' ? 'Reservas especiales aprobadas' : 'Solicitudes especiales recibidas');
   // Nombre del gestor a mostrar (y a agrupar) — mismo criterio que usa el
   // resto de la app: prioriza el nombre completo sobre las iniciales.
   // "Gestionó" = quién respondió/tramitó la solicitud (el último que la
@@ -3909,7 +3951,7 @@ function generarInformeEspecialesMes(){
         ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
         <td>${escapeHtml(r.hora||'—')}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
-        <td style="text-align:center;">${r.pax}</td>
+        <td style="text-align:center;">${r.pax}${!esGeneral || Number(r.pax)>=20 ? ' ⭐' : ''}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td style="text-align:right;">$${Number(r.abono||0).toLocaleString('es-CO')}</td>
       </tr>`).join('');
@@ -3918,7 +3960,7 @@ function generarInformeEspecialesMes(){
         <td>${formatearFechaLarga(fechaClave(r))}</td>
         ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
-        <td style="text-align:center;">${r.pax}</td>
+        <td style="text-align:center;">${r.pax}${Number(r.pax)>=20 ? ' ⭐' : ''}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td>${escapeHtml(r.motivoCancelacion || '— sin motivo registrado —')}</td>
       </tr>`).join('');
@@ -3952,19 +3994,20 @@ function generarInformeEspecialesMes(){
   const totalCanceladasMes = canceladas.length;
   const totalPaxCanceladasMes = canceladas.reduce((a,r)=>a+Number(r.pax||0),0);
   const palabraReserva = tipoInforme === 'aprobadas' ? 'reserva' : 'solicitud';
+  const filtroLabel = esGeneral ? 'cualquier tamaño de grupo' : '20 o más personas';
 
   if(especiales.length === 0 && canceladas.length === 0){
-    semanasHtml = `<div style="color:#555; font-size:13px;">No hubo ${palabraReserva}s especiales (20 o más personas) en ${mesLabel}.</div>`;
+    semanasHtml = `<div style="color:#555; font-size:13px;">No hubo ${palabraReserva}s (${filtroLabel}) en ${mesLabel}.</div>`;
   }
 
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
       <h1>La Matriarca Barranquilla — ${tituloInforme}</h1>
-      <div class="informe-subtitulo">${mesLabel} · 20 o más personas · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}</div>
+      <div class="informe-subtitulo">${mesLabel} · ${filtroLabel} · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}${esGeneral ? ' · Las marcadas con ⭐ son las reservas especiales (20+)' : ''}</div>
     </div>
     ${semanasHtml}
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
-      <b>Total del mes (${mesLabel}):</b> ${totalReservasMes} ${palabraReserva}${totalReservasMes===1?'':'s'} especial${totalReservasMes===1?'':'es'} · ${totalPaxMes} personas en total · Abonos totales: $${totalAbonoMes.toLocaleString('es-CO')}
+      <b>Total del mes (${mesLabel}):</b> ${totalReservasMes} ${palabraReserva}${totalReservasMes===1?'':'s'}${esGeneral?'':' especial'+(totalReservasMes===1?'':'es')} · ${totalPaxMes} personas en total · Abonos totales: $${totalAbonoMes.toLocaleString('es-CO')}
     </div>
     ${totalReservasMes>0 ? `<div style="margin-top:8px; font-size:13px; font-weight:700;">Por gestor en todo el mes (ranking):</div>${rankingPorGestor(especiales)}` : ''}
     <div style="margin-top:16px; padding:10px 12px; background:#fdf2f2; border-radius:6px; border:1px solid #e8b8b8;">
