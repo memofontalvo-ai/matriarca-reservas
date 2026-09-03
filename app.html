@@ -1513,7 +1513,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.18</div>
+<div class="version-tag">v4.19</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3818,14 +3818,19 @@ function generarInformeEspecialesMes(){
   const tipoInforme = document.getElementById('fInformeEspecialesTipo').value; // 'aprobadas' | 'solicitudes'
 
   // "Reservas aprobadas" = ya confirmadas de verdad (confirmada/pendiente/
-  // walk-in) — lo que ya está agendado en el día a día. "Solicitudes" =
-  // TODO lo que llegó ese mes, sin importar el canal (web o por teléfono)
-  // ni en qué quedó — para saber cuánto entra en total, se haya
-  // confirmado, cancelado o quedado en trámite.
-  const enElMes = r => r.fecha && r.fecha.startsWith(yearMonth) && Number(r.pax) >= 20;
+  // walk-in) — lo que ya está agendado en el día a día, agrupado por la
+  // FECHA DE LA RESERVA (para cuándo es el evento). "Solicitudes" = TODO
+  // lo que llegó ese mes, sin importar el canal (web o por teléfono) ni en
+  // qué quedó — pero agrupado por el DÍA EN QUE LLEGÓ LA SOLICITUD
+  // (fechaSolicitud), no por la fecha de la reserva que están pidiendo:
+  // una solicitud que llega hoy para un evento de dentro de tres semanas
+  // tiene que aparecer HOY, no en la semana del evento — si no, parecía
+  // que ya había solicitudes de días que ni siquiera habían llegado.
+  const fechaClave = r => tipoInforme === 'solicitudes' ? (r.fechaSolicitud || r.fecha) : r.fecha;
+  const enElMes = r => { const f = fechaClave(r); return f && f.startsWith(yearMonth) && Number(r.pax) >= 20; };
   const especiales = reservas
     .filter(r => enElMes(r) && (tipoInforme === 'aprobadas' ? ['confirmada','pendiente','walkin'].includes(r.estado) : r.estado !== 'cancelada'))
-    .sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+    .sort((a,b) => (fechaClave(a)+(a.hora||'')).localeCompare(fechaClave(b)+(b.hora||'')));
 
   // Seguimiento aparte de canceladas: en "aprobadas", solo las que SÍ
   // habían llegado a estar aprobadas antes de caerse (para no mezclar con
@@ -3833,7 +3838,7 @@ function generarInformeEspecialesMes(){
   // canceladas de ese mes, vinieran de donde vinieran.
   const canceladas = reservas
     .filter(r => enElMes(r) && r.estado === 'cancelada' && (tipoInforme === 'aprobadas' ? !!r.fueAprobadaAntesDeCancelar : true))
-    .sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+    .sort((a,b) => (fechaClave(a)+(a.hora||'')).localeCompare(fechaClave(b)+(b.hora||'')));
 
   const mesLabel = `${MESES[mes-1]} ${anio}`;
   const tituloInforme = tipoInforme === 'aprobadas' ? 'Reservas especiales aprobadas' : 'Solicitudes especiales recibidas';
@@ -3856,7 +3861,7 @@ function generarInformeEspecialesMes(){
   function agruparPorSemana(lista){
     const mapa = new Map();
     lista.forEach(r => {
-      const key = fechaISO(lunesDeLaSemana(r.fecha));
+      const key = fechaISO(lunesDeLaSemana(fechaClave(r)));
       if(!mapa.has(key)) mapa.set(key, []);
       mapa.get(key).push(r);
     });
@@ -3900,7 +3905,8 @@ function generarInformeEspecialesMes(){
     const paxSemana = grupo.reduce((a,r)=>a+Number(r.pax||0),0);
     const filas = grupo.map(r => `
       <tr>
-        <td>${formatearFechaLarga(r.fecha)}</td>
+        <td>${formatearFechaLarga(fechaClave(r))}</td>
+        ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
         <td>${escapeHtml(r.hora||'—')}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
         <td style="text-align:center;">${r.pax}</td>
@@ -3909,22 +3915,25 @@ function generarInformeEspecialesMes(){
       </tr>`).join('');
     const filasCancel = grupoCancel.map(r => `
       <tr>
-        <td>${formatearFechaLarga(r.fecha)}</td>
+        <td>${formatearFechaLarga(fechaClave(r))}</td>
+        ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
         <td style="text-align:center;">${r.pax}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td>${escapeHtml(r.motivoCancelacion || '— sin motivo registrado —')}</td>
       </tr>`).join('');
+    const encFecha = tipoInforme==='solicitudes' ? 'Fecha solicitud' : 'Fecha';
+    const encFechaExtra = tipoInforme==='solicitudes' ? '<th>Fecha reserva</th>' : '';
     const tablaPrincipal = grupo.length === 0
       ? `<div style="font-size:12.5px; color:#777; margin-bottom:8px;">Sin ${tipoInforme==='aprobadas'?'reservas aprobadas':'solicitudes'} esta semana.</div>`
       : `<table>
-          <thead><tr><th>Fecha</th><th>Cliente</th><th>Hora entrada → salida</th><th>Pax</th><th>Gestionó</th><th>Abono</th></tr></thead>
+          <thead><tr><th>${encFecha}</th>${encFechaExtra}<th>Cliente</th><th>Hora entrada → salida</th><th>Pax</th><th>Gestionó</th><th>Abono</th></tr></thead>
           <tbody>${filas}</tbody>
         </table>`;
     const bloqueCancel = grupoCancel.length === 0 ? '' : `
         <div style="margin-top:14px; padding:8px 10px; background:#fdf2f2; border-radius:6px; border:1px solid #e8b8b8;">
           <div style="font-size:13px; font-weight:700; color:#a33; margin-bottom:6px;">🚫 Canceladas esta semana (${grupoCancel.length})</div>
-          <table><thead><tr><th>Fecha</th><th>Cliente</th><th>Pax</th><th>Gestionó</th><th>Motivo</th></tr></thead>
+          <table><thead><tr><th>${encFecha}</th>${encFechaExtra}<th>Cliente</th><th>Pax</th><th>Gestionó</th><th>Motivo</th></tr></thead>
           <tbody>${filasCancel}</tbody></table>
         </div>`;
     semanasHtml += `
@@ -3951,7 +3960,7 @@ function generarInformeEspecialesMes(){
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
       <h1>La Matriarca Barranquilla — ${tituloInforme}</h1>
-      <div class="informe-subtitulo">${mesLabel} · 20 o más personas · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Incluye todos los canales (web y teléfono)' : ' · Solo confirmadas / pendientes / walk-in'}</div>
+      <div class="informe-subtitulo">${mesLabel} · 20 o más personas · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}</div>
     </div>
     ${semanasHtml}
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
