@@ -1471,6 +1471,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">⭐ Informe de reservas especiales (20+ personas)</div>
           <div class="config-mensaje-sub">Desglosa mes a mes, semana a semana (lunes a domingo), todas las reservas de 20 o más personas: cliente, cantidad de personas, quién la gestionó y el abono de cada una — con subtotal de abono por semana y totales al final del mes.</div>
+          <div class="field" style="margin-top:10px;">
+            <label>Tipo de informe</label>
+            <select id="fInformeEspecialesTipo">
+              <option value="aprobadas">Reservas aprobadas por día (ya confirmadas)</option>
+              <option value="solicitudes">Solicitudes (todas las que llegan — web o por teléfono)</option>
+            </select>
+          </div>
           <div class="field-row phone-two-cols" style="margin-top:10px;">
             <div class="field">
               <label>Mes</label>
@@ -1506,7 +1513,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.16</div>
+<div class="version-tag">v4.17</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3804,16 +3811,32 @@ function generarInformeEspecialesMes(){
     yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
   }
   const [anio, mes] = yearMonth.split('-').map(Number);
+  const tipoInforme = document.getElementById('fInformeEspecialesTipo').value; // 'aprobadas' | 'solicitudes'
 
-  // No se cuentan las canceladas — no llegaron a ser una reserva real.
+  // "Reservas aprobadas" = ya confirmadas de verdad (confirmada/pendiente/
+  // walk-in) — lo que ya está agendado en el día a día. "Solicitudes" =
+  // TODO lo que llegó ese mes, sin importar el canal (web o por teléfono)
+  // ni en qué quedó — para saber cuánto entra en total, se haya
+  // confirmado, cancelado o quedado en trámite.
   const especiales = reservas
-    .filter(r => r.fecha && r.fecha.startsWith(yearMonth) && Number(r.pax) >= 20 && r.estado !== 'cancelada')
+    .filter(r => {
+      if(!r.fecha || !r.fecha.startsWith(yearMonth) || Number(r.pax) < 20) return false;
+      if(tipoInforme === 'aprobadas'){
+        return ['confirmada','pendiente','walkin'].includes(r.estado);
+      }
+      return true; // solicitudes: todas, cualquier estado y canal
+    })
     .sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
 
   const mesLabel = `${MESES[mes-1]} ${anio}`;
+  const tituloInforme = tipoInforme === 'aprobadas' ? 'Reservas especiales aprobadas' : 'Solicitudes especiales recibidas';
   // Nombre del gestor a mostrar (y a agrupar) — mismo criterio que usa el
   // resto de la app: prioriza el nombre completo sobre las iniciales.
-  const nombreGestor = r => r.creadoPorNombre || r.creadoPorIniciales || 'Sin asignar';
+  // "Gestionó" = quién respondió/tramitó la solicitud (el último que la
+  // tocó) — si nadie la ha editado todavía, se usa quién la creó. Esto es
+  // clave para solicitudes que llegan directo del cliente por la web: ahí
+  // no hay "creador" del lado del staff, solo queda quién la gestionó.
+  const nombreGestor = r => r.ultimoEditorNombre || r.ultimoEditorIniciales || r.creadoPorNombre || r.creadoPorIniciales || 'Sin asignar';
 
   function lunesDeLaSemana(fechaIso){
     const [y,m,d] = fechaIso.split('-').map(Number);
@@ -3878,22 +3901,23 @@ function generarInformeEspecialesMes(){
   const totalReservasMes = especiales.length;
   const totalPaxMes = especiales.reduce((a,r)=>a+Number(r.pax||0),0);
   const totalAbonoMes = especiales.reduce((a,r)=>a+Number(r.abono||0),0);
+  const palabraReserva = tipoInforme === 'aprobadas' ? 'reserva' : 'solicitud';
 
   if(especiales.length === 0){
-    semanasHtml = `<div style="color:#555; font-size:13px;">No hubo reservas especiales (20 o más personas) en ${mesLabel}.</div>`;
+    semanasHtml = `<div style="color:#555; font-size:13px;">No hubo ${palabraReserva}s especiales (20 o más personas) en ${mesLabel}.</div>`;
   }
 
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
-      <h1>La Matriarca Barranquilla — Reservas especiales</h1>
-      <div class="informe-subtitulo">${mesLabel} · Reservas de 20 o más personas · Semanas de lunes a domingo</div>
+      <h1>La Matriarca Barranquilla — ${tituloInforme}</h1>
+      <div class="informe-subtitulo">${mesLabel} · 20 o más personas · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Incluye todos los canales (web y teléfono) y cualquier estado' : ' · Solo confirmadas / pendientes / walk-in'}</div>
     </div>
     ${semanasHtml}
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
-      <b>Total del mes (${mesLabel}):</b> ${totalReservasMes} reserva${totalReservasMes===1?'':'s'} especial${totalReservasMes===1?'':'es'} · ${totalPaxMes} personas en total · Abonos totales: $${totalAbonoMes.toLocaleString('es-CO')}
+      <b>Total del mes (${mesLabel}):</b> ${totalReservasMes} ${palabraReserva}${totalReservasMes===1?'':'s'} especial${totalReservasMes===1?'':'es'} · ${totalPaxMes} personas en total · Abonos totales: $${totalAbonoMes.toLocaleString('es-CO')}
     </div>
     ${totalReservasMes>0 ? `<div style="margin-top:4px; font-size:13px;"><b>Por gestor en todo el mes:</b> ${tablaPorGestor(especiales)}</div>` : ''}
-    <div style="margin-top:8px; font-size:11.5px; color:#777;">No se incluyen reservas canceladas.</div>`;
+    <div style="margin-top:8px; font-size:11.5px; color:#777;">${tipoInforme==='aprobadas' ? 'Solo se cuentan reservas confirmadas, pendientes o walk-in — no incluye canceladas ni solicitudes aún sin aprobar.' : 'Incluye toda solicitud recibida ese mes, llegue por la web o la haya tomado el staff por teléfono, sin importar en qué haya quedado (aprobada, cancelada, en trámite).'}</div>`;
   document.getElementById('overlayInforme').classList.add('open');
 }
 
