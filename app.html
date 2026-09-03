@@ -1513,7 +1513,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.17</div>
+<div class="version-tag">v4.18</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1633,6 +1633,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <button type="button" class="estado-opt sel-confirmada" data-val="confirmada">✓ <span>Confirmada</span></button>
           <button type="button" class="estado-opt sel-pendiente" data-val="pendiente">◷ <span>Pendiente</span></button>
           <button type="button" class="estado-opt sel-cancelada" data-val="cancelada">× <span>Cancelada</span></button>
+        </div>
+        <div class="field" id="motivoCancelacionWrap" style="display:none; margin-top:8px;">
+          <label>Motivo de la cancelación (para el seguimiento en los informes)</label>
+          <textarea id="fMotivoCancelacion" maxlength="300" placeholder="Ej. El cliente cambió de fecha, no confirmó el pago, etc."></textarea>
         </div>
       </div>
 
@@ -3818,14 +3822,17 @@ function generarInformeEspecialesMes(){
   // TODO lo que llegó ese mes, sin importar el canal (web o por teléfono)
   // ni en qué quedó — para saber cuánto entra en total, se haya
   // confirmado, cancelado o quedado en trámite.
+  const enElMes = r => r.fecha && r.fecha.startsWith(yearMonth) && Number(r.pax) >= 20;
   const especiales = reservas
-    .filter(r => {
-      if(!r.fecha || !r.fecha.startsWith(yearMonth) || Number(r.pax) < 20) return false;
-      if(tipoInforme === 'aprobadas'){
-        return ['confirmada','pendiente','walkin'].includes(r.estado);
-      }
-      return true; // solicitudes: todas, cualquier estado y canal
-    })
+    .filter(r => enElMes(r) && (tipoInforme === 'aprobadas' ? ['confirmada','pendiente','walkin'].includes(r.estado) : r.estado !== 'cancelada'))
+    .sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+
+  // Seguimiento aparte de canceladas: en "aprobadas", solo las que SÍ
+  // habían llegado a estar aprobadas antes de caerse (para no mezclar con
+  // solicitudes que nunca se aprobaron); en "solicitudes", todas las
+  // canceladas de ese mes, vinieran de donde vinieran.
+  const canceladas = reservas
+    .filter(r => enElMes(r) && r.estado === 'cancelada' && (tipoInforme === 'aprobadas' ? !!r.fueAprobadaAntesDeCancelar : true))
     .sort((a,b) => (a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
 
   const mesLabel = `${MESES[mes-1]} ${anio}`;
@@ -3846,31 +3853,45 @@ function generarInformeEspecialesMes(){
     fecha.setDate(fecha.getDate() + diff);
     return fecha;
   }
+  function agruparPorSemana(lista){
+    const mapa = new Map();
+    lista.forEach(r => {
+      const key = fechaISO(lunesDeLaSemana(r.fecha));
+      if(!mapa.has(key)) mapa.set(key, []);
+      mapa.get(key).push(r);
+    });
+    return mapa;
+  }
+  const semanasMap = agruparPorSemana(especiales);
+  const semanasCanceladasMap = agruparPorSemana(canceladas);
+  // Unión de semanas: una semana puede tener solo canceladas y ninguna
+  // activa (o al revés), y de todas formas tiene que aparecer.
+  const semanasKeys = Array.from(new Set([...semanasMap.keys(), ...semanasCanceladasMap.keys()])).sort();
 
-  const semanasMap = new Map();
-  especiales.forEach(r => {
-    const key = fechaISO(lunesDeLaSemana(r.fecha));
-    if(!semanasMap.has(key)) semanasMap.set(key, []);
-    semanasMap.get(key).push(r);
-  });
-  const semanasKeys = Array.from(semanasMap.keys()).sort();
-
-  // Tabla de "cuántas reservas gestionó cada quién" — se arma una vez por
-  // semana y otra vez para el mes completo, reutilizando esta misma
-  // función con el grupo de reservas que corresponda.
-  function tablaPorGestor(grupo){
+  // Ranking de "quién gestionó cuántas" — ya no en una sola línea, sino
+  // una lista ordenada de mayor a menor, con el puesto (1º, 2º, 3º…), para
+  // ver de un vistazo quién lleva más solicitudes o aprobaciones.
+  function rankingPorGestor(grupo){
+    if(grupo.length === 0) return '<div style="font-size:12px; color:#777;">— sin datos —</div>';
     const conteo = new Map();
     grupo.forEach(r => {
       const nombre = nombreGestor(r);
       conteo.set(nombre, (conteo.get(nombre)||0) + 1);
     });
-    const nombres = Array.from(conteo.keys()).sort();
-    return nombres.map(n => `${escapeHtml(n)}: ${conteo.get(n)} reserva${conteo.get(n)===1?'':'s'}`).join(' · ');
+    const ordenado = Array.from(conteo.entries()).sort((a,b) => b[1]-a[1]);
+    const medallas = ['🥇','🥈','🥉'];
+    const filas = ordenado.map(([nombre, cant], i) => `
+      <div style="display:flex; justify-content:space-between; padding:3px 0; font-size:12.5px; border-bottom:1px solid #eee;">
+        <span>${medallas[i]||`${i+1}º`} ${escapeHtml(nombre)}</span>
+        <span><b>${cant}</b> reserva${cant===1?'':'s'}</span>
+      </div>`).join('');
+    return `<div style="margin-top:2px;">${filas}</div>`;
   }
 
   let semanasHtml = '';
   semanasKeys.forEach((key, i) => {
-    const grupo = semanasMap.get(key);
+    const grupo = semanasMap.get(key) || [];
+    const grupoCancel = semanasCanceladasMap.get(key) || [];
     const [y,m,d] = key.split('-').map(Number);
     const lunes = new Date(y, m-1, d, 12);
     const domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
@@ -3886,38 +3907,61 @@ function generarInformeEspecialesMes(){
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td style="text-align:right;">$${Number(r.abono||0).toLocaleString('es-CO')}</td>
       </tr>`).join('');
+    const filasCancel = grupoCancel.map(r => `
+      <tr>
+        <td>${formatearFechaLarga(r.fecha)}</td>
+        <td>${escapeHtml(r.nombre||'—')}</td>
+        <td style="text-align:center;">${r.pax}</td>
+        <td>${escapeHtml(nombreGestor(r))}</td>
+        <td>${escapeHtml(r.motivoCancelacion || '— sin motivo registrado —')}</td>
+      </tr>`).join('');
+    const tablaPrincipal = grupo.length === 0
+      ? `<div style="font-size:12.5px; color:#777; margin-bottom:8px;">Sin ${tipoInforme==='aprobadas'?'reservas aprobadas':'solicitudes'} esta semana.</div>`
+      : `<table>
+          <thead><tr><th>Fecha</th><th>Cliente</th><th>Hora entrada → salida</th><th>Pax</th><th>Gestionó</th><th>Abono</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>`;
+    const bloqueCancel = grupoCancel.length === 0 ? '' : `
+        <div style="margin-top:14px; padding:8px 10px; background:#fdf2f2; border-radius:6px; border:1px solid #e8b8b8;">
+          <div style="font-size:13px; font-weight:700; color:#a33; margin-bottom:6px;">🚫 Canceladas esta semana (${grupoCancel.length})</div>
+          <table><thead><tr><th>Fecha</th><th>Cliente</th><th>Pax</th><th>Gestionó</th><th>Motivo</th></tr></thead>
+          <tbody>${filasCancel}</tbody></table>
+        </div>`;
     semanasHtml += `
       <div class="informe-turno">
         <h2>Semana ${i+1} — ${rangoLabel}</h2>
-        <table>
-          <thead><tr><th>Fecha</th><th>Cliente</th><th>Hora entrada → salida</th><th>Pax</th><th>Gestionó</th><th>Abono</th></tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
-        <div style="margin-top:6px; font-size:12px;"><b>Subtotal semana:</b> ${grupo.length} reserva${grupo.length===1?'':'s'} · ${paxSemana} personas · Abonos: $${abonoSemana.toLocaleString('es-CO')}</div>
-        <div style="margin-top:2px; font-size:12px;"><b>Por gestor esta semana:</b> ${tablaPorGestor(grupo)}</div>
+        ${tablaPrincipal}
+        ${grupo.length>0 ? `<div style="margin-top:6px; font-size:12px;"><b>Subtotal semana:</b> ${grupo.length} reserva${grupo.length===1?'':'s'} · ${paxSemana} personas · Abonos: $${abonoSemana.toLocaleString('es-CO')}</div>` : ''}
+        ${grupo.length>0 ? `<div style="margin-top:8px; font-size:12.5px; font-weight:700;">Por gestor esta semana (ranking):</div>${rankingPorGestor(grupo)}` : ''}
+        ${bloqueCancel}
       </div>`;
   });
 
   const totalReservasMes = especiales.length;
   const totalPaxMes = especiales.reduce((a,r)=>a+Number(r.pax||0),0);
   const totalAbonoMes = especiales.reduce((a,r)=>a+Number(r.abono||0),0);
+  const totalCanceladasMes = canceladas.length;
+  const totalPaxCanceladasMes = canceladas.reduce((a,r)=>a+Number(r.pax||0),0);
   const palabraReserva = tipoInforme === 'aprobadas' ? 'reserva' : 'solicitud';
 
-  if(especiales.length === 0){
+  if(especiales.length === 0 && canceladas.length === 0){
     semanasHtml = `<div style="color:#555; font-size:13px;">No hubo ${palabraReserva}s especiales (20 o más personas) en ${mesLabel}.</div>`;
   }
 
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
       <h1>La Matriarca Barranquilla — ${tituloInforme}</h1>
-      <div class="informe-subtitulo">${mesLabel} · 20 o más personas · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Incluye todos los canales (web y teléfono) y cualquier estado' : ' · Solo confirmadas / pendientes / walk-in'}</div>
+      <div class="informe-subtitulo">${mesLabel} · 20 o más personas · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Incluye todos los canales (web y teléfono)' : ' · Solo confirmadas / pendientes / walk-in'}</div>
     </div>
     ${semanasHtml}
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
       <b>Total del mes (${mesLabel}):</b> ${totalReservasMes} ${palabraReserva}${totalReservasMes===1?'':'s'} especial${totalReservasMes===1?'':'es'} · ${totalPaxMes} personas en total · Abonos totales: $${totalAbonoMes.toLocaleString('es-CO')}
     </div>
-    ${totalReservasMes>0 ? `<div style="margin-top:4px; font-size:13px;"><b>Por gestor en todo el mes:</b> ${tablaPorGestor(especiales)}</div>` : ''}
-    <div style="margin-top:8px; font-size:11.5px; color:#777;">${tipoInforme==='aprobadas' ? 'Solo se cuentan reservas confirmadas, pendientes o walk-in — no incluye canceladas ni solicitudes aún sin aprobar.' : 'Incluye toda solicitud recibida ese mes, llegue por la web o la haya tomado el staff por teléfono, sin importar en qué haya quedado (aprobada, cancelada, en trámite).'}</div>`;
+    ${totalReservasMes>0 ? `<div style="margin-top:8px; font-size:13px; font-weight:700;">Por gestor en todo el mes (ranking):</div>${rankingPorGestor(especiales)}` : ''}
+    <div style="margin-top:16px; padding:10px 12px; background:#fdf2f2; border-radius:6px; border:1px solid #e8b8b8;">
+      <div style="font-size:13.5px; font-weight:700; color:#a33;">🚫 Total canceladas en el mes: ${totalCanceladasMes} · ${totalPaxCanceladasMes} personas${tipoInforme==='aprobadas' ? ' (que ya estaban aprobadas antes de caerse)' : ''}</div>
+    </div>
+    <div style="margin-top:8px; font-size:11.5px; color:#777;">${tipoInforme==='aprobadas' ? 'La tabla principal solo cuenta reservas confirmadas, pendientes o walk-in vigentes. El bloque rojo de canceladas muestra las que sí llegaron a estar aprobadas y luego se cayeron.' : 'Incluye toda solicitud recibida ese mes, llegue por la web o la haya tomado el staff por teléfono. El bloque rojo de canceladas separa las que no prosperaron.'}</div>`;
   document.getElementById('overlayInforme').classList.add('open');
 }
 
@@ -4886,6 +4930,8 @@ function abrirModal(id, mesaId){
     document.getElementById('fMenu').value = r.menu;
     document.getElementById('fObs').value = r.obs;
     estadoSeleccionado = r.estado;
+    document.getElementById('fMotivoCancelacion').value = r.motivoCancelacion || '';
+    actualizarEstadoUI();
     // El botón Eliminar es exclusivo del administrador — Operativo y
     // Consulta solo pueden cancelar la reserva (queda guardada en estado
     // "Cancelada"), nunca borrarla, para no perder la trazabilidad de que
@@ -4950,6 +4996,8 @@ function abrirModal(id, mesaId){
     document.getElementById('fWhatsTelefono').value = '';
     document.getElementById('fWhatsContacto').value = '';
     estadoSeleccionado = 'confirmada';
+    document.getElementById('fMotivoCancelacion').value = '';
+    actualizarEstadoUI();
     btnEliminar.style.display = 'none';
     document.getElementById('modalComprobanteBlock').style.display = 'none';
     document.getElementById('modalComprobanteBlock').innerHTML = '';
@@ -5112,6 +5160,8 @@ function actualizarEstadoUI(){
   document.querySelectorAll('.estado-opt').forEach(b=>{
     b.classList.toggle('on', b.dataset.val===estadoSeleccionado);
   });
+  const wrap = document.getElementById('motivoCancelacionWrap');
+  if(wrap) wrap.style.display = (estadoSeleccionado === 'cancelada') ? 'block' : 'none';
 }
 document.getElementById('estadoSelect').addEventListener('click', e=>{
   const btn = e.target.closest('.estado-opt');
@@ -5352,6 +5402,26 @@ function guardarReserva(){
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
   };
+  // Para el seguimiento de canceladas en los informes: guarda el motivo, y
+  // si esta reserva YA estaba aprobada (confirmada/pendiente/walk-in)
+  // antes de que se cancelara justo ahora — eso es lo que distingue "una
+  // reserva que se cayó después de estar aprobada" de "una solicitud que
+  // nunca se llegó a aprobar". Si ya venía cancelada de antes (solo se
+  // está editando el motivo), se conserva lo que ya tenía guardado.
+  const reservaAnterior = editandoId ? reservas.find(x => x.id === editandoId) : null;
+  if(estadoSeleccionado === 'cancelada'){
+    data.motivoCancelacion = document.getElementById('fMotivoCancelacion').value.trim();
+    if(reservaAnterior && reservaAnterior.estado === 'cancelada'){
+      data.fueAprobadaAntesDeCancelar = !!reservaAnterior.fueAprobadaAntesDeCancelar;
+    } else if(reservaAnterior){
+      data.fueAprobadaAntesDeCancelar = ['confirmada','pendiente','walkin'].includes(reservaAnterior.estado);
+    } else {
+      data.fueAprobadaAntesDeCancelar = false;
+    }
+  } else {
+    data.motivoCancelacion = '';
+    data.fueAprobadaAntesDeCancelar = false;
+  }
   // Si el bloque de "Fecha de solicitud" está visible, guardamos lo que
   // el staff haya puesto ahí (permite corregir a mano registros viejos
   // que no traían este dato, o ajustar la fecha real si se equivocó).
