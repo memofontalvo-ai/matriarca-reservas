@@ -1529,6 +1529,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button class="btn-config-guardar" onclick="abrirBaseDatosClientes()">👥 Ver / buscar clientes</button>
           </div>
         </div>
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">🔄 Construir con las reservas que ya existen</div>
+          <div class="config-mensaje-sub">Recorre TODAS las reservas ya guardadas (de antes de que existiera esta sección) y arma la base de datos de clientes a partir de ellas — nombre, teléfono, cuántas veces han reservado, primera y última vez. El correo y el cumpleaños quedan vacíos para esos clientes viejos, porque nunca se pidieron antes; se van llenando solos a medida que vuelvan a reservar y sí los den. Es seguro tocarlo varias veces: no duplica a nadie ni borra correo/cumpleaños ya guardados.</div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" id="btnMigrarClientes" onclick="migrarClientesDesdeReservas()">🔄 Construir base de datos desde reservas existentes</button>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -1554,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.21</div>
+<div class="version-tag">v4.23</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1682,7 +1689,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
 
       <div class="phone-section-title phone-client-title">● <span>Datos del cliente</span></div>
-      <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
 
       <div class="field-row phone-two-cols field-row-celular">
         <div class="field field-celular-completo">
@@ -1702,11 +1708,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
               <option value="34">🇪🇸 +34</option>
               <option value="506">🇨🇷 +506</option>
             </select>
-            <input type="text" id="fCelular" placeholder="300 000 0000">
+            <input type="text" id="fCelular" placeholder="300 000 0000" onblur="buscarClienteExistente()">
           </div>
+          <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12px; color:#2e8b57;">✓ Cliente ya registrado — datos completados automáticamente.</div>
         </div>
         <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
       </div>
+
+      <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
 
       <div class="field-row phone-two-cols">
         <div class="field">
@@ -2145,6 +2154,29 @@ function armarCelularCompleto(codigo, numeroLocal){
 function normalizarTelefono(celularCompleto){
   return (celularCompleto||'').replace(/\D/g,'');
 }
+// En cuanto el staff termina de escribir/pegar el celular (al salir del
+// campo), se busca si ese cliente ya existe en la base de datos. Si sí,
+// se completan nombre/correo/cumpleaños automáticamente — pero SOLO los
+// campos que estén vacíos en ese momento, para no pisar algo que ya se
+// haya escrito a mano (por ejemplo, al editar una reserva ya cargada).
+function buscarClienteExistente(){
+  const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+  if(celularLocal.length < 7) return;
+  const celularCod = document.getElementById('fCelularCod').value;
+  const tel = normalizarTelefono(`+${celularCod} ${celularLocal}`);
+  const aviso = document.getElementById('clienteReconocidoAviso');
+  clientesRef.doc(tel).get().then(doc => {
+    if(!doc.exists){ if(aviso) aviso.style.display = 'none'; return; }
+    const data = doc.data() || {};
+    const fNombre = document.getElementById('fNombre');
+    const fCorreo = document.getElementById('fCorreo');
+    const fCumpleanos = document.getElementById('fCumpleanos');
+    if(!fNombre.value.trim() && data.nombre) fNombre.value = data.nombre;
+    if(!fCorreo.value.trim() && data.correo) fCorreo.value = data.correo;
+    if(!fCumpleanos.value && data.cumpleanos) fCumpleanos.value = data.cumpleanos;
+    if(aviso) aviso.style.display = 'block';
+  }).catch(err => console.error('No se pudo buscar el cliente:', err));
+}
 function upsertCliente(datos){
   const tel = normalizarTelefono(datos.celular);
   if(!tel) return Promise.resolve();
@@ -2182,6 +2214,73 @@ function upsertCliente(datos){
     }
   }));
 }
+
+// Migración manual, para poblar la base de datos de clientes con TODO lo
+// que ya existía en "reservas" antes de que esta sección existiera — sin
+// esto, esos clientes viejos nunca aparecerían porque el registro
+// automático solo corre en reservas NUEVAS a partir de ahora. Reconstruye
+// nombre/teléfono/fechas/cantidad desde cero (es el conteo real y
+// completo de las reservas guardadas), pero nunca toca correo ni
+// cumpleaños si el cliente ya los tenía guardados — esos dos solo se
+// pueden llenar por la vía normal (reservando y dándolos).
+async function migrarClientesDesdeReservas(){
+  if(!confirm('Esto va a recorrer TODAS las reservas guardadas y construir/actualizar la base de datos de clientes a partir de ellas (nombre, teléfono, cuántas veces han reservado). El correo y el cumpleaños quedan vacíos para los que no los tengan — nunca se inventan. Puede tardar unos segundos si hay muchas reservas. ¿Continuar?')) return;
+
+  const btn = document.getElementById('btnMigrarClientes');
+  const textoOriginal = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Procesando…'; }
+
+  try{
+    // Agrupa TODAS las reservas guardadas por teléfono normalizado —
+    // ignora las que no tengan celular o nombre (no hay con qué armar
+    // el cliente).
+    const grupos = new Map();
+    reservas.forEach(r => {
+      const tel = normalizarTelefono(r.celular);
+      if(!tel || !r.nombre) return;
+      const fecha = r.fechaSolicitud || r.fecha || '';
+      if(!grupos.has(tel)) grupos.set(tel, []);
+      grupos.get(tel).push({ nombre: r.nombre, celular: r.celular, fecha, estado: r.estado||'' });
+    });
+
+    let creados = 0, actualizados = 0;
+    for(const [tel, lista] of grupos.entries()){
+      lista.sort((a,b) => (a.fecha||'').localeCompare(b.fecha||''));
+      const primera = lista[0];
+      const ultima = lista[lista.length-1];
+      const ref = clientesRef.doc(tel);
+      const doc = await ref.get();
+      const previo = doc.exists ? (doc.data()||{}) : null;
+      const calc = {
+        nombre: ultima.nombre || (previo && previo.nombre) || '',
+        telefono: ultima.celular || (previo && previo.telefono) || '',
+        fechaPrimeraSolicitud: primera.fecha || (previo && previo.fechaPrimeraSolicitud) || '',
+        fechaUltimaSolicitud: ultima.fecha || (previo && previo.fechaUltimaSolicitud) || '',
+        cantidadSolicitudes: lista.length,
+        estadoUltimaSolicitud: ultima.estado || ''
+      };
+      if(previo){
+        await ref.update(calc);
+        actualizados++;
+      } else {
+        await ref.set({
+          ...calc,
+          correo: '',
+          cumpleanos: '',
+          fechaCreacion: primera.fecha || fechaISO(new Date())
+        });
+        creados++;
+      }
+    }
+    alert(`Listo. Se encontraron ${grupos.size} teléfonos distintos en las reservas guardadas: ${creados} clientes nuevos creados y ${actualizados} ya existentes actualizados con el conteo real de reservas.`);
+  } catch(err){
+    console.error('Error migrando clientes:', err);
+    alert('Ocurrió un error durante la migración. Revisa tu conexión e intenta de nuevo — no se perdió nada de lo ya procesado.');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = textoOriginal; }
+  }
+}
+
 // Para precargar el formulario al editar una reserva ya guardada: separa
 // el código de país del número local. Los celulares guardados ANTES de
 // este cambio no tienen "+" al inicio — a esos se les asume 57 (Colombia),
@@ -5258,6 +5357,7 @@ function abrirModal(id, mesaId){
     { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
     document.getElementById('fCorreo').value = r.correo || '';
     document.getElementById('fCumpleanos').value = r.cumpleanos || '';
+    document.getElementById('clienteReconocidoAviso').style.display = 'none';
     document.getElementById('fMesa').value = r.mesa;
     actualizarBotonMesa();
     document.getElementById('fCanal').value = r.canal;
@@ -5323,6 +5423,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fCelular').value = '';
     document.getElementById('fCorreo').value = '';
     document.getElementById('fCumpleanos').value = '';
+    document.getElementById('clienteReconocidoAviso').style.display = 'none';
     document.getElementById('fMesa').value = mesaId || '';
     actualizarBotonMesa();
     document.getElementById('fCanal').value = 'Teléfono';
