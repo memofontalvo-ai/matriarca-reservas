@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.24</div>
+<div class="version-tag">v4.25</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1690,29 +1690,26 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
       <div class="phone-section-title phone-client-title">● <span>Datos del cliente</span></div>
 
-      <div class="field-row phone-two-cols field-row-celular">
-        <div class="field field-celular-completo">
-          <label>Celular de contacto</label>
-          <div class="celular-con-codigo">
-            <select id="fCelularCod">
-              <option value="57" selected>🇨🇴 +57</option>
-              <option value="58">🇻🇪 +58</option>
-              <option value="1">🇺🇸 +1</option>
-              <option value="52">🇲🇽 +52</option>
-              <option value="507">🇵🇦 +507</option>
-              <option value="593">🇪🇨 +593</option>
-              <option value="51">🇵🇪 +51</option>
-              <option value="54">🇦🇷 +54</option>
-              <option value="56">🇨🇱 +56</option>
-              <option value="55">🇧🇷 +55</option>
-              <option value="34">🇪🇸 +34</option>
-              <option value="506">🇨🇷 +506</option>
-            </select>
-            <input type="text" id="fCelular" placeholder="300 000 0000" onblur="buscarClienteExistente()">
-          </div>
-          <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12px; color:#2e8b57;">✓ Cliente ya registrado — datos completados automáticamente.</div>
+      <div class="field">
+        <label>Celular de contacto</label>
+        <div class="celular-con-codigo">
+          <select id="fCelularCod">
+            <option value="57" selected>🇨🇴 +57</option>
+            <option value="58">🇻🇪 +58</option>
+            <option value="1">🇺🇸 +1</option>
+            <option value="52">🇲🇽 +52</option>
+            <option value="507">🇵🇦 +507</option>
+            <option value="593">🇪🇨 +593</option>
+            <option value="51">🇵🇪 +51</option>
+            <option value="54">🇦🇷 +54</option>
+            <option value="56">🇨🇱 +56</option>
+            <option value="55">🇧🇷 +55</option>
+            <option value="34">🇪🇸 +34</option>
+            <option value="506">🇨🇷 +506</option>
+          </select>
+          <input type="text" id="fCelular" placeholder="300 000 0000" onblur="buscarClienteExistente()">
         </div>
-        <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
+        <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12px; color:#2e8b57;">✓ Cliente ya registrado — datos completados automáticamente.</div>
       </div>
 
       <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
@@ -1728,12 +1725,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </div>
       </div>
 
+      <div class="phone-section-title phone-client-title">▤ <span>Datos de la reserva</span></div>
+
       <div class="field-row phone-two-cols">
-        <div class="field">
-          <label>Mesa / Zona</label>
-          <input type="hidden" id="fMesa">
-          <button type="button" class="btn-elegir-mesa phone-mesa-btn" id="btnElegirMesa" onclick="abrirSelectorMesa()">Sin asignar — toca para elegir en el plano</button>
-        </div>
+        <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
         <div class="field">
           <label>Canal</label>
           <select id="fCanal">
@@ -1743,6 +1738,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option>Web</option>
           </select>
         </div>
+      </div>
+
+      <div class="field">
+        <label>Mesa / Zona</label>
+        <input type="hidden" id="fMesa">
+        <button type="button" class="btn-elegir-mesa phone-mesa-btn" id="btnElegirMesa" onclick="abrirSelectorMesa()">Sin asignar — toca para elegir en el plano</button>
       </div>
 
       <div class="field-row phone-two-cols">
