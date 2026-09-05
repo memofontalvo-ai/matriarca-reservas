@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.25</div>
+<div class="version-tag">v4.27</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2154,6 +2154,28 @@ function armarCelularCompleto(codigo, numeroLocal){
 // teléfono/presencial.
 function normalizarTelefono(celularCompleto){
   return (celularCompleto||'').replace(/\D/g,'');
+}
+// ===== Detección de solicitudes/reservas duplicadas =====
+// Antes de guardar, revisa si YA existe otra reserva (venga de solicitud.html
+// por WhatsApp/web, o cargada acá por teléfono/presencial) para el MISMO
+// cliente (celular normalizado), en la MISMA fecha Y la MISMA hora, y que
+// no esté cancelada. Se valida también la hora (no solo la fecha) porque
+// un mismo cliente puede tener varias reservas distintas el mismo día
+// (una al mediodía y otra en la noche, por ejemplo) — eso no es un
+// duplicado. Esto evita que la misma reserva quede registrada dos veces
+// solo porque entró por dos canales distintos (ej: el cliente la pide por
+// WhatsApp y el mismo día, a la misma hora, alguien del restaurante
+// también la toma por teléfono).
+function buscarReservaDuplicada(fecha, hora, celularCompleto, excludeId){
+  const telNuevo = normalizarTelefono(celularCompleto);
+  if(!telNuevo || !fecha || !hora) return null;
+  return reservas.find(r =>
+    r.id !== excludeId &&
+    r.estado !== 'cancelada' &&
+    r.fecha === fecha &&
+    r.hora === hora &&
+    normalizarTelefono(r.celular) === telNuevo
+  ) || null;
 }
 // En cuanto el staff termina de escribir/pegar el celular (al salir del
 // campo), se busca si ese cliente ya existe en la base de datos. Si sí,
@@ -5881,6 +5903,17 @@ function guardarReserva(){
     data.horaSolicitud = horaSolicitudActual();
     data.pasoPorSolicitud = true;
   }
+  // Antes de guardar: si hay otra reserva activa (de cualquier canal) para
+  // este mismo cliente en esta misma fecha, se avisa para no duplicar la
+  // información — el staff decide si de verdad quiere crear otra reserva
+  // aparte (ej: dos mesas distintas el mismo día) o si era la misma.
+  const posibleDuplicada = buscarReservaDuplicada(data.fecha, data.hora, data.celular, editandoId);
+  if(posibleDuplicada){
+    const detalle = `${posibleDuplicada.nombre||'(sin nombre)'} · ${posibleDuplicada.hora||'sin hora'} · ${posibleDuplicada.pax||'?'} personas · ${estadoLabel(posibleDuplicada.estado)} · Canal: ${posibleDuplicada.canal||'—'}`;
+    if(!confirm(`⚠️ Ya existe una solicitud/reserva registrada para este cliente en esta misma fecha y hora:\n\n${detalle}\n\n¿Seguro que quieres guardar esta reserva de todas formas (como una reserva aparte)?`)){
+      return;
+    }
+  }
   sellarUsuarioEnReserva(data, !editandoId);
   const promesaCodigo = (!editandoId) ? generarCodigoReserva() : Promise.resolve(null);
   const promesa = promesaCodigo.then(codigo => {
@@ -5973,6 +6006,17 @@ function enviarParaAprobacion(){
     const hoy = new Date();
     data.fechaSolicitud = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
     data.horaSolicitud = horaSolicitudActual();
+  }
+  // Mismo chequeo de duplicados que en el guardado normal — aquí también
+  // se puede estar creando una reserva por teléfono para un cliente que
+  // ya tiene una solicitud/reserva activa ese mismo día por otro canal.
+  const posibleDuplicadaAprob = buscarReservaDuplicada(data.fecha, data.hora, data.celular, editandoId);
+  if(posibleDuplicadaAprob){
+    const detalleAprob = `${posibleDuplicadaAprob.nombre||'(sin nombre)'} · ${posibleDuplicadaAprob.hora||'sin hora'} · ${posibleDuplicadaAprob.pax||'?'} personas · ${estadoLabel(posibleDuplicadaAprob.estado)} · Canal: ${posibleDuplicadaAprob.canal||'—'}`;
+    if(!confirm(`⚠️ Ya existe una solicitud/reserva registrada para este cliente en esta misma fecha y hora:\n\n${detalleAprob}\n\n¿Seguro que quieres continuar de todas formas (como una reserva aparte)?`)){
+      if(ventana) ventana.close();
+      return;
+    }
   }
   sellarUsuarioEnReserva(data, !editandoId);
 

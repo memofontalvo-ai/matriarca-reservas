@@ -190,7 +190,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.8</div>
+<div class="version-tag">v3.9</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -673,11 +673,45 @@ const firebaseConfig = {
     }
     errorMsg.style.display = 'none';
 
-    const obsFinal = obsTexto;
-
     const btn = document.getElementById('btnEnviar');
     btn.disabled = true;
+    btn.textContent = 'Verificando...';
+
+    // Antes de guardar: revisa si este mismo celular YA tiene una reserva
+    // activa (no cancelada) registrada para esta misma fecha y esta misma
+    // hora — sea que haya entrado antes por este mismo formulario o por
+    // teléfono/presencial desde el panel del restaurante. Si es así, NO
+    // se deja enviar de nuevo (para no duplicar la reserva): se le pide
+    // al cliente que cambie la fecha o la hora si de verdad quiere hacer
+    // otra reserva aparte.
+    db.collection('reservas').where('celular', '==', celular).get().then(snap => {
+      const duplicada = snap.docs.find(doc => {
+        if(doc.id === idExistente) return false; // es este mismo registro, no cuenta
+        const d = doc.data() || {};
+        return d.fecha === fecha && d.hora === hora && d.estado !== 'cancelada';
+      });
+      if(duplicada){
+        btn.disabled = false;
+        btn.textContent = 'Enviar solicitud de reserva';
+        errorMsg.textContent = 'Ya tienes una reserva registrada con este celular para esta misma fecha y hora — no se puede enviar dos veces la misma solicitud. Si quieres hacer otra reserva aparte, cambia la fecha o la hora.';
+        errorMsg.style.display = 'block';
+        errorMsg.scrollIntoView({behavior:'smooth', block:'center'});
+        return;
+      }
+      continuarEnvioSolicitud();
+    }).catch(err => {
+      // Si la verificación falla (por ejemplo, si todavía no están puestos
+      // los permisos de Firestore para esta consulta), no se bloquea al
+      // cliente — se deja continuar igual, y el error queda en consola
+      // para que el restaurante lo revise.
+      console.error('No se pudo verificar si la solicitud está duplicada:', err);
+      continuarEnvioSolicitud();
+    });
+
+    function continuarEnvioSolicitud(){
     btn.textContent = 'Enviando...';
+
+    const obsFinal = obsTexto;
 
     const datos = {
       fecha, turno: turnoSel, hora, nombre, celular, pax,
@@ -730,6 +764,7 @@ const firebaseConfig = {
       btn.disabled = false;
       btn.textContent = 'Enviar solicitud de reserva';
     });
+    } // fin continuarEnvioSolicitud
   }
 
   // ===== Base de datos de clientes: registro automático =====
