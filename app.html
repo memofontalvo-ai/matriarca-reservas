@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.27</div>
+<div class="version-tag">v4.28</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1710,6 +1710,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <input type="text" id="fCelular" placeholder="300 000 0000" onblur="buscarClienteExistente()">
         </div>
         <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12px; color:#2e8b57;">✓ Cliente ya registrado — datos completados automáticamente.</div>
+        <div id="avisoReservaDuplicadaModal" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--cancelled-bg); border:1px solid var(--cancelled); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
       </div>
 
       <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
@@ -2156,38 +2157,55 @@ function normalizarTelefono(celularCompleto){
   return (celularCompleto||'').replace(/\D/g,'');
 }
 // ===== Detección de solicitudes/reservas duplicadas =====
-// Antes de guardar, revisa si YA existe otra reserva (venga de solicitud.html
+// Antes de guardar (y también apenas se escribe el celular, para avisar
+// de una vez), revisa si YA existe otra reserva (venga de solicitud.html
 // por WhatsApp/web, o cargada acá por teléfono/presencial) para el MISMO
-// cliente (celular normalizado), en la MISMA fecha Y la MISMA hora, y que
-// no esté cancelada. Se valida también la hora (no solo la fecha) porque
-// un mismo cliente puede tener varias reservas distintas el mismo día
-// (una al mediodía y otra en la noche, por ejemplo) — eso no es un
-// duplicado. Esto evita que la misma reserva quede registrada dos veces
-// solo porque entró por dos canales distintos (ej: el cliente la pide por
-// WhatsApp y el mismo día, a la misma hora, alguien del restaurante
-// también la toma por teléfono).
-function buscarReservaDuplicada(fecha, hora, celularCompleto, excludeId){
+// cliente (celular normalizado), en la MISMA fecha Y el MISMO turno, y que
+// no esté cancelada. Se valida por TURNO (desayuno/almuerzo/cena) y no por
+// la hora exacta, porque la misma reserva puede llegar con una hora un
+// poco distinta según el canal (ej: el cliente pidió las 7:00pm por
+// WhatsApp y el staff toma la llamada y anota las 7:30pm) y aun así es la
+// MISMA reserva. Lo que sí distingue reservas de verdad distintas del
+// mismo cliente el mismo día es el turno (almuerzo vs. cena, por ejemplo).
+function buscarReservaDuplicada(fecha, turno, celularCompleto, excludeId){
   const telNuevo = normalizarTelefono(celularCompleto);
-  if(!telNuevo || !fecha || !hora) return null;
+  if(!telNuevo || !fecha || !turno) return null;
   return reservas.find(r =>
     r.id !== excludeId &&
     r.estado !== 'cancelada' &&
     r.fecha === fecha &&
-    r.hora === hora &&
+    r.turno === turno &&
     normalizarTelefono(r.celular) === telNuevo
   ) || null;
+}
+function mensajeReservaDuplicada(r){
+  return `⚠️ Este celular ya tiene una reserva registrada para esta fecha y turno: ${r.nombre||'(sin nombre)'} · ${r.hora||'sin hora'} · ${r.pax||'?'} personas · ${estadoLabel(r.estado)} · Canal: ${r.canal||'—'}`;
 }
 // En cuanto el staff termina de escribir/pegar el celular (al salir del
 // campo), se busca si ese cliente ya existe en la base de datos. Si sí,
 // se completan nombre/correo/cumpleaños automáticamente — pero SOLO los
 // campos que estén vacíos en ese momento, para no pisar algo que ya se
 // haya escrito a mano (por ejemplo, al editar una reserva ya cargada).
+// En el mismo momento, también se avisa de una vez (sin esperar a que
+// guarde) si ese celular ya tiene otra reserva activa para esta fecha y
+// turno — así el staff se entera apenas empieza a cargar los datos, no
+// hasta el final cuando ya llenó todo el formulario.
 function buscarClienteExistente(){
   const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
-  if(celularLocal.length < 7) return;
+  const avisoDup = document.getElementById('avisoReservaDuplicadaModal');
+  if(celularLocal.length < 7){ if(avisoDup) avisoDup.style.display = 'none'; return; }
   const celularCod = document.getElementById('fCelularCod').value;
   const tel = normalizarTelefono(`+${celularCod} ${celularLocal}`);
   const aviso = document.getElementById('clienteReconocidoAviso');
+  if(avisoDup){
+    const dup = buscarReservaDuplicada(modalFecha, modalTurno, `+${celularCod} ${celularLocal}`, editandoId);
+    if(dup){
+      avisoDup.textContent = mensajeReservaDuplicada(dup);
+      avisoDup.style.display = 'block';
+    } else {
+      avisoDup.style.display = 'none';
+    }
+  }
   clientesRef.doc(tel).get().then(doc => {
     if(!doc.exists){ if(aviso) aviso.style.display = 'none'; return; }
     const data = doc.data() || {};
@@ -5381,6 +5399,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fCorreo').value = r.correo || '';
     document.getElementById('fCumpleanos').value = r.cumpleanos || '';
     document.getElementById('clienteReconocidoAviso').style.display = 'none';
+    document.getElementById('avisoReservaDuplicadaModal').style.display = 'none';
     document.getElementById('fMesa').value = r.mesa;
     actualizarBotonMesa();
     document.getElementById('fCanal').value = r.canal;
@@ -5447,6 +5466,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fCorreo').value = '';
     document.getElementById('fCumpleanos').value = '';
     document.getElementById('clienteReconocidoAviso').style.display = 'none';
+    document.getElementById('avisoReservaDuplicadaModal').style.display = 'none';
     document.getElementById('fMesa').value = mesaId || '';
     actualizarBotonMesa();
     document.getElementById('fCanal').value = 'Teléfono';
@@ -5904,13 +5924,13 @@ function guardarReserva(){
     data.pasoPorSolicitud = true;
   }
   // Antes de guardar: si hay otra reserva activa (de cualquier canal) para
-  // este mismo cliente en esta misma fecha, se avisa para no duplicar la
-  // información — el staff decide si de verdad quiere crear otra reserva
-  // aparte (ej: dos mesas distintas el mismo día) o si era la misma.
-  const posibleDuplicada = buscarReservaDuplicada(data.fecha, data.hora, data.celular, editandoId);
+  // este mismo cliente en esta misma fecha y turno, se avisa para no
+  // duplicar la información — el staff decide si de verdad quiere crear
+  // otra reserva aparte (ej: dos mesas distintas el mismo día) o si era
+  // la misma.
+  const posibleDuplicada = buscarReservaDuplicada(data.fecha, data.turno, data.celular, editandoId);
   if(posibleDuplicada){
-    const detalle = `${posibleDuplicada.nombre||'(sin nombre)'} · ${posibleDuplicada.hora||'sin hora'} · ${posibleDuplicada.pax||'?'} personas · ${estadoLabel(posibleDuplicada.estado)} · Canal: ${posibleDuplicada.canal||'—'}`;
-    if(!confirm(`⚠️ Ya existe una solicitud/reserva registrada para este cliente en esta misma fecha y hora:\n\n${detalle}\n\n¿Seguro que quieres guardar esta reserva de todas formas (como una reserva aparte)?`)){
+    if(!confirm(`${mensajeReservaDuplicada(posibleDuplicada)}\n\n¿Seguro que quieres guardar esta reserva de todas formas (como una reserva aparte)?`)){
       return;
     }
   }
@@ -6009,11 +6029,11 @@ function enviarParaAprobacion(){
   }
   // Mismo chequeo de duplicados que en el guardado normal — aquí también
   // se puede estar creando una reserva por teléfono para un cliente que
-  // ya tiene una solicitud/reserva activa ese mismo día por otro canal.
-  const posibleDuplicadaAprob = buscarReservaDuplicada(data.fecha, data.hora, data.celular, editandoId);
+  // ya tiene una solicitud/reserva activa ese mismo día y turno por otro
+  // canal.
+  const posibleDuplicadaAprob = buscarReservaDuplicada(data.fecha, data.turno, data.celular, editandoId);
   if(posibleDuplicadaAprob){
-    const detalleAprob = `${posibleDuplicadaAprob.nombre||'(sin nombre)'} · ${posibleDuplicadaAprob.hora||'sin hora'} · ${posibleDuplicadaAprob.pax||'?'} personas · ${estadoLabel(posibleDuplicadaAprob.estado)} · Canal: ${posibleDuplicadaAprob.canal||'—'}`;
-    if(!confirm(`⚠️ Ya existe una solicitud/reserva registrada para este cliente en esta misma fecha y hora:\n\n${detalleAprob}\n\n¿Seguro que quieres continuar de todas formas (como una reserva aparte)?`)){
+    if(!confirm(`${mensajeReservaDuplicada(posibleDuplicadaAprob)}\n\n¿Seguro que quieres continuar de todas formas (como una reserva aparte)?`)){
       if(ventana) ventana.close();
       return;
     }

@@ -190,7 +190,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.9</div>
+<div class="version-tag">v3.10</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -275,6 +275,7 @@ button{cursor:pointer}
           <input type="tel" id="fCelular" maxlength="20" placeholder="300 000 0000" onblur="buscarClienteExistente()">
         </div>
         <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12.5px; color:#2e8b57;">✓ ¡Qué bueno tenerte de vuelta! Ya completamos tus datos.</div>
+        <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
       </div>
 
       <div class="field" style="margin-top:9px">
@@ -678,22 +679,19 @@ const firebaseConfig = {
     btn.textContent = 'Verificando...';
 
     // Antes de guardar: revisa si este mismo celular YA tiene una reserva
-    // activa (no cancelada) registrada para esta misma fecha y esta misma
-    // hora — sea que haya entrado antes por este mismo formulario o por
-    // teléfono/presencial desde el panel del restaurante. Si es así, NO
-    // se deja enviar de nuevo (para no duplicar la reserva): se le pide
-    // al cliente que cambie la fecha o la hora si de verdad quiere hacer
-    // otra reserva aparte.
-    db.collection('reservas').where('celular', '==', celular).get().then(snap => {
-      const duplicada = snap.docs.find(doc => {
-        if(doc.id === idExistente) return false; // es este mismo registro, no cuenta
-        const d = doc.data() || {};
-        return d.fecha === fecha && d.hora === hora && d.estado !== 'cancelada';
-      });
+    // activa (no cancelada) registrada para esta misma fecha y el mismo
+    // turno — sea que haya entrado antes por este mismo formulario o por
+    // teléfono/presencial desde el panel del restaurante. Se valida por
+    // turno y no por hora exacta, porque la misma reserva puede llegar
+    // con una hora un poco distinta según el canal y aun así ser la misma
+    // reserva. Si es así, NO se deja enviar de nuevo (para no duplicar la
+    // reserva): se le pide al cliente que cambie la fecha o el turno si
+    // de verdad quiere hacer otra reserva aparte.
+    revisarSolicitudDuplicada(fecha, turnoSel, celular, idExistente).then(duplicada => {
       if(duplicada){
         btn.disabled = false;
         btn.textContent = 'Enviar solicitud de reserva';
-        errorMsg.textContent = 'Ya tienes una reserva registrada con este celular para esta misma fecha y hora — no se puede enviar dos veces la misma solicitud. Si quieres hacer otra reserva aparte, cambia la fecha o la hora.';
+        errorMsg.textContent = 'Ya tienes una reserva registrada con este celular para esta misma fecha y turno — no se puede enviar dos veces la misma solicitud. Si quieres hacer otra reserva aparte, cambia la fecha o el turno.';
         errorMsg.style.display = 'block';
         errorMsg.scrollIntoView({behavior:'smooth', block:'center'});
         return;
@@ -774,6 +772,24 @@ const firebaseConfig = {
   function normalizarTelefono(celularCompleto){
     return (celularCompleto||'').replace(/\D/g,'');
   }
+  // ===== Detección de solicitudes/reservas duplicadas =====
+  // Consulta si este celular ya tiene una reserva activa (no cancelada)
+  // para la MISMA fecha y el MISMO turno — sea que haya entrado antes por
+  // este mismo formulario o por teléfono/presencial desde el panel del
+  // restaurante. Se valida por turno (desayuno/almuerzo/cena) y no por la
+  // hora exacta, porque la misma reserva puede llegar con una hora un
+  // poco distinta según el canal y aun así ser la misma reserva.
+  function revisarSolicitudDuplicada(fecha, turno, celularCompleto, excluirId){
+    if(!celularCompleto || !fecha || !turno) return Promise.resolve(null);
+    return db.collection('reservas').where('celular', '==', celularCompleto).get().then(snap => {
+      const match = snap.docs.find(doc => {
+        if(doc.id === excluirId) return false;
+        const d = doc.data() || {};
+        return d.fecha === fecha && d.turno === turno && d.estado !== 'cancelada';
+      });
+      return match ? match.data() : null;
+    });
+  }
   // En cuanto el cliente termina de escribir su celular (al salir del
   // campo), se busca si ya existe en la base de datos de clientes. Si sí,
   // se le completan nombre/correo/cumpleaños automáticamente — pero SOLO
@@ -795,10 +811,23 @@ const firebaseConfig = {
 
   function buscarClienteExistente(){
     const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
-    if(celularLocal.length < 7) return; // aún no terminó de escribir un número plausible
+    const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
+    if(celularLocal.length < 7){ if(avisoDup) avisoDup.style.display = 'none'; return; } // aún no terminó de escribir un número plausible
     const celularCod = document.getElementById('fCelularCod').value;
     const tel = normalizarTelefono(`+${celularCod} ${celularLocal}`);
+    const celularCompleto = `+${celularCod} ${celularLocal}`;
     const aviso = document.getElementById('clienteReconocidoAviso');
+    const fecha = document.getElementById('fFecha').value;
+    if(avisoDup){
+      revisarSolicitudDuplicada(fecha, turnoSel, celularCompleto, idExistente).then(dup => {
+        if(dup){
+          avisoDup.textContent = `⚠️ Ya tienes una reserva registrada con este celular para esta fecha (${dup.hora||'sin hora'} · ${dup.pax||'?'} personas). Si quieres hacer otra reserva aparte, cambia la fecha o el turno.`;
+          avisoDup.style.display = 'block';
+        } else {
+          avisoDup.style.display = 'none';
+        }
+      }).catch(err => console.error('No se pudo verificar si la solicitud está duplicada:', err));
+    }
     db.collection('clientes').doc(tel).get().then(doc => {
       if(!doc.exists) return;
       const data = doc.data() || {};
