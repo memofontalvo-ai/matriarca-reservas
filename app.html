@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.28</div>
+<div class="version-tag">v4.29</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1713,6 +1713,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <div id="avisoReservaDuplicadaModal" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--cancelled-bg); border:1px solid var(--cancelled); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
       </div>
 
+      <div id="bloqueDatosPostCelular">
       <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
 
       <div class="field-row phone-two-cols">
@@ -1774,6 +1775,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <button class="btn btn-primary" id="btnGuardarReserva" onclick="guardarReserva()">Guardar reserva</button>
       </div>
       <button class="btn btn-aprobacion phone-approval-btn" onclick="enviarParaAprobacion()">✉ Enviar para aprobación del cliente</button>
+      </div>
       </div>
 
       <div class="modal-actions modal-actions-wrap phone-actions" style="margin-top:8px;">
@@ -2179,7 +2181,7 @@ function buscarReservaDuplicada(fecha, turno, celularCompleto, excludeId){
   ) || null;
 }
 function mensajeReservaDuplicada(r){
-  return `⚠️ Este celular ya tiene una reserva registrada para esta fecha y turno: ${r.nombre||'(sin nombre)'} · ${r.hora||'sin hora'} · ${r.pax||'?'} personas · ${estadoLabel(r.estado)} · Canal: ${r.canal||'—'}`;
+  return `⚠️ Este cliente ya tiene una reserva registrada para la fecha y hora seleccionadas. Por favor, verifique la reserva existente o cambie la fecha o la hora para continuar.\n\n${r.nombre||'(sin nombre)'} · ${r.hora||'sin hora'} · ${r.pax||'?'} personas · ${estadoLabel(r.estado)} · Canal: ${r.canal||'—'}`;
 }
 // En cuanto el staff termina de escribir/pegar el celular (al salir del
 // campo), se busca si ese cliente ya existe en la base de datos. Si sí,
@@ -2192,20 +2194,11 @@ function mensajeReservaDuplicada(r){
 // hasta el final cuando ya llenó todo el formulario.
 function buscarClienteExistente(){
   const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
-  const avisoDup = document.getElementById('avisoReservaDuplicadaModal');
-  if(celularLocal.length < 7){ if(avisoDup) avisoDup.style.display = 'none'; return; }
+  if(celularLocal.length < 7){ revisarDuplicadoEnModalTelefono(); return; }
   const celularCod = document.getElementById('fCelularCod').value;
   const tel = normalizarTelefono(`+${celularCod} ${celularLocal}`);
   const aviso = document.getElementById('clienteReconocidoAviso');
-  if(avisoDup){
-    const dup = buscarReservaDuplicada(modalFecha, modalTurno, `+${celularCod} ${celularLocal}`, editandoId);
-    if(dup){
-      avisoDup.textContent = mensajeReservaDuplicada(dup);
-      avisoDup.style.display = 'block';
-    } else {
-      avisoDup.style.display = 'none';
-    }
-  }
+  revisarDuplicadoEnModalTelefono();
   clientesRef.doc(tel).get().then(doc => {
     if(!doc.exists){ if(aviso) aviso.style.display = 'none'; return; }
     const data = doc.data() || {};
@@ -3225,6 +3218,38 @@ function desbloquearFormularioTelefonoComoConfirmado(){
   resto.style.display = 'block';
   if(btn){ btn.classList.add('confirmada'); btn.textContent = '✓ Hora confirmada'; }
   if(aviso) aviso.style.display = 'none';
+}
+// ============ BLOQUEO POR RESERVA DUPLICADA ============
+// Apenas se detecta que el celular ingresado ya tiene otra reserva activa
+// para esta fecha y turno, se oculta TODO lo que viene después (nombre,
+// pax, mesa, botón de guardar, etc.) — el staff no puede seguir cargando
+// datos ni guardar nada hasta que cambie la fecha o el turno (o el
+// celular), porque ya se sabe que hay un problema y no tiene sentido
+// seguir llenando un formulario que no se va a poder guardar así.
+function bloquearFormularioTelefonoPorDuplicado(mensaje){
+  const bloque = document.getElementById('bloqueDatosPostCelular');
+  const aviso = document.getElementById('avisoReservaDuplicadaModal');
+  if(bloque) bloque.style.display = 'none';
+  if(aviso){ aviso.textContent = mensaje; aviso.style.display = 'block'; }
+}
+function desbloquearFormularioTelefonoPorDuplicado(){
+  const bloque = document.getElementById('bloqueDatosPostCelular');
+  const aviso = document.getElementById('avisoReservaDuplicadaModal');
+  if(bloque) bloque.style.display = 'block';
+  if(aviso) aviso.style.display = 'none';
+}
+function revisarDuplicadoEnModalTelefono(){
+  const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+  if(celularLocal.length < 7){ desbloquearFormularioTelefonoPorDuplicado(); return; }
+  const celularCod = document.getElementById('fCelularCod').value;
+  const fecha = document.getElementById('fFechaReservaEdit').value || modalFecha;
+  const turno = document.getElementById('fTurnoReservaEdit').value || modalTurno;
+  const dup = buscarReservaDuplicada(fecha, turno, `+${celularCod} ${celularLocal}`, editandoId);
+  if(dup){
+    bloquearFormularioTelefonoPorDuplicado(mensajeReservaDuplicada(dup));
+  } else {
+    desbloquearFormularioTelefonoPorDuplicado();
+  }
 }
 function confirmarHoraSeleccionadaTelefono(){
   const fecha = document.getElementById('fFechaReservaEdit').value;
@@ -5399,7 +5424,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fCorreo').value = r.correo || '';
     document.getElementById('fCumpleanos').value = r.cumpleanos || '';
     document.getElementById('clienteReconocidoAviso').style.display = 'none';
-    document.getElementById('avisoReservaDuplicadaModal').style.display = 'none';
+    desbloquearFormularioTelefonoPorDuplicado();
     document.getElementById('fMesa').value = r.mesa;
     actualizarBotonMesa();
     document.getElementById('fCanal').value = r.canal;
@@ -5466,7 +5491,7 @@ function abrirModal(id, mesaId){
     document.getElementById('fCorreo').value = '';
     document.getElementById('fCumpleanos').value = '';
     document.getElementById('clienteReconocidoAviso').style.display = 'none';
-    document.getElementById('avisoReservaDuplicadaModal').style.display = 'none';
+    desbloquearFormularioTelefonoPorDuplicado();
     document.getElementById('fMesa').value = mesaId || '';
     actualizarBotonMesa();
     document.getElementById('fCanal').value = 'Teléfono';
@@ -5924,15 +5949,15 @@ function guardarReserva(){
     data.pasoPorSolicitud = true;
   }
   // Antes de guardar: si hay otra reserva activa (de cualquier canal) para
-  // este mismo cliente en esta misma fecha y turno, se avisa para no
-  // duplicar la información — el staff decide si de verdad quiere crear
-  // otra reserva aparte (ej: dos mesas distintas el mismo día) o si era
-  // la misma.
+  // este mismo cliente en esta misma fecha y turno, se BLOQUEA el guardado
+  // por completo (no se deja crear la reserva duplicada) — el staff tiene
+  // que cambiar la fecha, el turno o el celular si de verdad se trata de
+  // otra reserva aparte. Esto es un refuerzo por si se llegara a disparar
+  // el guardado sin pasar por el bloqueo visual del formulario.
   const posibleDuplicada = buscarReservaDuplicada(data.fecha, data.turno, data.celular, editandoId);
   if(posibleDuplicada){
-    if(!confirm(`${mensajeReservaDuplicada(posibleDuplicada)}\n\n¿Seguro que quieres guardar esta reserva de todas formas (como una reserva aparte)?`)){
-      return;
-    }
+    alert(mensajeReservaDuplicada(posibleDuplicada));
+    return;
   }
   sellarUsuarioEnReserva(data, !editandoId);
   const promesaCodigo = (!editandoId) ? generarCodigoReserva() : Promise.resolve(null);
@@ -6027,16 +6052,16 @@ function enviarParaAprobacion(){
     data.fechaSolicitud = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
     data.horaSolicitud = horaSolicitudActual();
   }
-  // Mismo chequeo de duplicados que en el guardado normal — aquí también
-  // se puede estar creando una reserva por teléfono para un cliente que
-  // ya tiene una solicitud/reserva activa ese mismo día y turno por otro
-  // canal.
+  // Mismo bloqueo que en el guardado normal — aquí también se puede estar
+  // creando una reserva por teléfono para un cliente que ya tiene una
+  // solicitud/reserva activa ese mismo día y turno por otro canal. Se
+  // bloquea por completo (ya se abrió la pestaña para el link, así que
+  // hay que cerrarla también).
   const posibleDuplicadaAprob = buscarReservaDuplicada(data.fecha, data.turno, data.celular, editandoId);
   if(posibleDuplicadaAprob){
-    if(!confirm(`${mensajeReservaDuplicada(posibleDuplicadaAprob)}\n\n¿Seguro que quieres continuar de todas formas (como una reserva aparte)?`)){
-      if(ventana) ventana.close();
-      return;
-    }
+    alert(mensajeReservaDuplicada(posibleDuplicadaAprob));
+    if(ventana) ventana.close();
+    return;
   }
   sellarUsuarioEnReserva(data, !editandoId);
 
@@ -6569,8 +6594,8 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     requestAnimationFrame(()=>{ if(document.getElementById('formCompletoBlock').style.display!=='none') initPhoneUI(); });
   };
 
-  document.getElementById('fFechaReservaEdit').addEventListener('change',()=>{renderPhoneDates(); bloquearFormularioTelefonoPorHoraSinConfirmar();});
-  document.getElementById('fTurnoReservaEdit').addEventListener('change',renderTurnButtons);
+  document.getElementById('fFechaReservaEdit').addEventListener('change',()=>{renderPhoneDates(); bloquearFormularioTelefonoPorHoraSinConfirmar(); revisarDuplicadoEnModalTelefono();});
+  document.getElementById('fTurnoReservaEdit').addEventListener('change',()=>{renderTurnButtons(); revisarDuplicadoEnModalTelefono();});
 
   // Calendario completo del primer cuadrito.
   const calOverlay=document.getElementById('phoneCalendarOverlay');
