@@ -190,7 +190,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.10</div>
+<div class="version-tag">v3.12</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -237,6 +237,30 @@ button{cursor:pointer}
           </div>
         </div>
         <input type="time" id="fHora" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
+
+        <div class="field" style="margin-top:14px; text-align:left;">
+          <label>Celular de contacto <span style="font-weight:400; color:var(--muted); text-transform:none;">(lo necesitamos primero, para validar tu reserva)</span></label>
+          <div class="celular-con-codigo">
+            <select id="fCelularCod">
+              <option value="57" selected>🇨🇴 +57</option>
+              <option value="58">🇻🇪 +58</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="52">🇲🇽 +52</option>
+              <option value="507">🇵🇦 +507</option>
+              <option value="593">🇪🇨 +593</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="55">🇧🇷 +55</option>
+              <option value="34">🇪🇸 +34</option>
+              <option value="506">🇨🇷 +506</option>
+            </select>
+            <input type="tel" id="fCelular" maxlength="20" placeholder="300 000 0000" onblur="buscarClienteExistente()">
+          </div>
+          <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12.5px; color:#2e8b57;">✓ ¡Qué bueno tenerte de vuelta! Ya completamos tus datos.</div>
+          <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
+        </div>
+
         <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()">✓ Confirmar hora seleccionada</button>
         <div id="avisoHoraSinConfirmar" style="margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">⏱️ Confirma la hora para poder continuar con tu reserva.</div>
       </div>
@@ -255,30 +279,9 @@ button{cursor:pointer}
 
     <section class="section">
       <div class="field-subtitulo">● Datos del cliente</div>
-      <div class="field">
-        <label>Celular de contacto</label>
-        <div class="celular-con-codigo">
-          <select id="fCelularCod">
-            <option value="57" selected>🇨🇴 +57</option>
-            <option value="58">🇻🇪 +58</option>
-            <option value="1">🇺🇸 +1</option>
-            <option value="52">🇲🇽 +52</option>
-            <option value="507">🇵🇦 +507</option>
-            <option value="593">🇪🇨 +593</option>
-            <option value="51">🇵🇪 +51</option>
-            <option value="54">🇦🇷 +54</option>
-            <option value="56">🇨🇱 +56</option>
-            <option value="55">🇧🇷 +55</option>
-            <option value="34">🇪🇸 +34</option>
-            <option value="506">🇨🇷 +506</option>
-          </select>
-          <input type="tel" id="fCelular" maxlength="20" placeholder="300 000 0000" onblur="buscarClienteExistente()">
-        </div>
-        <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12.5px; color:#2e8b57;">✓ ¡Qué bueno tenerte de vuelta! Ya completamos tus datos.</div>
-        <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
-      </div>
 
-      <div class="field" style="margin-top:9px">
+      <div id="bloqueDatosPostCelularPublico">
+      <div class="field">
         <label>Nombre completo</label>
         <input type="text" id="fNombre" maxlength="100" placeholder="Tu nombre completo">
       </div>
@@ -298,9 +301,10 @@ button{cursor:pointer}
         <label>Personas</label>
         <input type="number" id="fPax" min="1" max="500" inputmode="numeric" placeholder="?">
       </div>
+      </div>
     </section>
 
-    <section class="section">
+    <section class="section" id="seccionVipPublico">
       <div class="section-title">¿Qué tipo de reserva deseas?</div>
       <div class="vip-opts" id="vipOpts">
         <button type="button" class="vip-opt" data-val="si" onclick="elegirVip('si')">♛ Sala VIP</button>
@@ -311,7 +315,7 @@ button{cursor:pointer}
 
 
 
-    <section class="section">
+    <section class="section" id="seccionObsPublico">
       <div class="section-title">Observaciones (opcional)</div>
       <div class="field">
         <textarea id="fObs" maxlength="500" placeholder="Ocasión especial, alguna solicitud particular..."></textarea>
@@ -471,6 +475,7 @@ const firebaseConfig = {
     turnoSel = t;
     document.querySelectorAll('.turno-opt').forEach(b => b.classList.toggle('on', b.dataset.val === t));
     actualizarAvisoBloqueo();
+    validarDuplicadoYDesbloquear();
   }
 
   // ---- Modal de decisión para "sin disponibilidad" ----
@@ -502,11 +507,13 @@ const firebaseConfig = {
     turnoPendienteModal = null;
     document.getElementById('overlayListaEspera').style.display = 'none';
     actualizarAvisoBloqueo();
-    if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
-    if(reintentarEnvioAlConfirmar){
-      reintentarEnvioAlConfirmar = false;
-      enviarSolicitud();
-    }
+    buscarClienteExistente();
+    validarDuplicadoYDesbloquear(() => {
+      if(reintentarEnvioAlConfirmar){
+        reintentarEnvioAlConfirmar = false;
+        enviarSolicitud();
+      }
+    });
   }
 
   // ---- Modal de publicidad para "show especial / concierto" ----
@@ -540,11 +547,13 @@ const firebaseConfig = {
     turnoPendienteShow = null;
     document.getElementById('overlayShowEspecial').style.display = 'none';
     actualizarAvisoBloqueo();
-    if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
-    if(reintentarEnvioAlConfirmarShow){
-      reintentarEnvioAlConfirmarShow = false;
-      enviarSolicitud();
-    }
+    buscarClienteExistente();
+    validarDuplicadoYDesbloquear(() => {
+      if(reintentarEnvioAlConfirmarShow){
+        reintentarEnvioAlConfirmarShow = false;
+        enviarSolicitud();
+      }
+    });
   }
 
   // Aviso pasivo (no reemplaza el modal): solo recuerda el estado actual
@@ -585,6 +594,7 @@ const firebaseConfig = {
     });
     bloquearFormularioPorHoraSinConfirmar();
     actualizarAvisoBloqueo();
+    buscarClienteExistente();
   }
   function elegirVip(v){
     vipSel = v;
@@ -790,6 +800,42 @@ const firebaseConfig = {
       return match ? match.data() : null;
     });
   }
+  // Se llama justo después de que el turno queda resuelto (sin bloqueo, o
+  // tras confirmar lista de espera / show especial) — es el ÚLTIMO paso
+  // antes de dejar ver el resto del formulario. Si este celular ya tiene
+  // una reserva activa para esta fecha y turno, el formulario NO se
+  // desbloquea: se queda tal como estaba, mostrando el aviso, y hay que
+  // cambiar la fecha, el turno o el celular para poder continuar.
+  function validarDuplicadoYDesbloquear(alDesbloquear){
+    const fecha = document.getElementById('fFecha').value;
+    const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+    const celularCod = document.getElementById('fCelularCod').value;
+    const celular = celularLocal ? `+${celularCod} ${celularLocal}` : '';
+    const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
+    revisarSolicitudDuplicada(fecha, turnoSel, celular, idExistente).then(dup => {
+      if(dup){
+        if(avisoDup){
+          avisoDup.textContent = `⚠️ Ya tienes una reserva registrada con este celular para esta fecha y turno: ${dup.nombre||''} · ${dup.hora||'sin hora'} · ${dup.pax||'?'} personas. Cambia la fecha, el turno o el celular para continuar.`;
+          avisoDup.style.display = 'block';
+        }
+        const btn = document.getElementById('btnConfirmarHora');
+        if(btn){ btn.classList.remove('confirmada'); btn.textContent = '✓ Confirmar hora seleccionada'; }
+        window.horaConfirmada = false;
+      } else {
+        if(avisoDup) avisoDup.style.display = 'none';
+        if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
+        if(typeof alDesbloquear === 'function') alDesbloquear();
+      }
+    }).catch(err => {
+      // Si la verificación falla (por ejemplo, si todavía no están puestos
+      // los permisos de Firestore para esta consulta), no se bloquea al
+      // cliente — se deja continuar igual, y el error queda en consola
+      // para que el restaurante lo revise.
+      console.error('No se pudo verificar si la solicitud está duplicada:', err);
+      if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
+      if(typeof alDesbloquear === 'function') alDesbloquear();
+    });
+  }
   // En cuanto el cliente termina de escribir su celular (al salir del
   // campo), se busca si ya existe en la base de datos de clientes. Si sí,
   // se le completan nombre/correo/cumpleaños automáticamente — pero SOLO
@@ -811,23 +857,10 @@ const firebaseConfig = {
 
   function buscarClienteExistente(){
     const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
-    const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
-    if(celularLocal.length < 7){ if(avisoDup) avisoDup.style.display = 'none'; return; } // aún no terminó de escribir un número plausible
+    if(celularLocal.length < 7) return; // aún no terminó de escribir un número plausible
     const celularCod = document.getElementById('fCelularCod').value;
     const tel = normalizarTelefono(`+${celularCod} ${celularLocal}`);
-    const celularCompleto = `+${celularCod} ${celularLocal}`;
     const aviso = document.getElementById('clienteReconocidoAviso');
-    const fecha = document.getElementById('fFecha').value;
-    if(avisoDup){
-      revisarSolicitudDuplicada(fecha, turnoSel, celularCompleto, idExistente).then(dup => {
-        if(dup){
-          avisoDup.textContent = `⚠️ Ya tienes una reserva registrada con este celular para esta fecha (${dup.hora||'sin hora'} · ${dup.pax||'?'} personas). Si quieres hacer otra reserva aparte, cambia la fecha o el turno.`;
-          avisoDup.style.display = 'block';
-        } else {
-          avisoDup.style.display = 'none';
-        }
-      }).catch(err => console.error('No se pudo verificar si la solicitud está duplicada:', err));
-    }
     db.collection('clientes').doc(tel).get().then(doc => {
       if(!doc.exists) return;
       const data = doc.data() || {};
@@ -1003,10 +1036,14 @@ const firebaseConfig = {
     turnoConfirmadoShow = null;
     ultimoTurnoAutoPreguntado = null;
     document.getElementById('restoFormulario').style.display = 'none';
-    document.getElementById('avisoHoraSinConfirmar').style.display = 'block';
+    const avisoHora = document.getElementById('avisoHoraSinConfirmar');
+    avisoHora.textContent = '⏱️ Confirma la hora para poder continuar con tu reserva.';
+    avisoHora.style.display = 'block';
     const btn = document.getElementById('btnConfirmarHora');
     btn.classList.remove('confirmada');
     btn.textContent = '✓ Confirmar hora seleccionada';
+    const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
+    if(avisoDup) avisoDup.style.display = 'none';
   }
   // Esta función la llama también actualizarDisponibilidadTurnos(), que
   // vive en el otro bloque <script> (fuera de este IIFE) — por eso hay que
@@ -1043,6 +1080,19 @@ const firebaseConfig = {
   // (b) se queda bloqueado hasta que la persona resuelva el modal (y si
   // lo cancela, sigue bloqueado, tal como debe ser).
   function confirmarHoraSeleccionada(){
+    // Primero el celular: es la entrada para poder validar si esta
+    // reserva puede continuar (fecha/turno bloqueados, o si ya existe una
+    // reserva igual con este mismo celular) — sin el celular no se puede
+    // validar nada, así que se pide antes de seguir.
+    const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+    if(celularLocal.length < 7){
+      const aviso = document.getElementById('avisoHoraSinConfirmar');
+      if(aviso){
+        aviso.textContent = '📱 Ingresa tu celular de contacto antes de confirmar la hora — lo necesitamos para validar tu reserva.';
+        aviso.style.display = 'block';
+      }
+      return;
+    }
     const { h24, min } = horaActual24();
     const minutosDelDia = h24*60 + min;
     let turnoAuto;
@@ -1052,7 +1102,7 @@ const firebaseConfig = {
     ultimoTurnoAutoPreguntado = turnoAuto;
     elegirTurno(turnoAuto);
     if(turnoSel){
-      desbloquearFormularioComoConfirmado();
+      validarDuplicadoYDesbloquear();
     }
   }
   // El botón del HTML lo llama con onclick="confirmarHoraSeleccionada()",

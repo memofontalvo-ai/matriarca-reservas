@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.29</div>
+<div class="version-tag">v4.30</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1655,6 +1655,30 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <div class="phone-wheel-col"><label>AM/PM</label><div class="phone-wheel" id="phoneAmPmWheel"></div></div>
         </div>
         <input type="time" id="fHora" class="phone-hidden-control">
+
+        <div class="field" style="margin-top:12px;">
+          <label>Celular de contacto <span style="font-weight:400; text-transform:none; color:var(--text-muted);">(primero esto, para validar la reserva)</span></label>
+          <div class="celular-con-codigo">
+            <select id="fCelularCod">
+              <option value="57" selected>🇨🇴 +57</option>
+              <option value="58">🇻🇪 +58</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="52">🇲🇽 +52</option>
+              <option value="507">🇵🇦 +507</option>
+              <option value="593">🇪🇨 +593</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="55">🇧🇷 +55</option>
+              <option value="34">🇪🇸 +34</option>
+              <option value="506">🇨🇷 +506</option>
+            </select>
+            <input type="text" id="fCelular" placeholder="300 000 0000" onblur="buscarClienteExistente()">
+          </div>
+          <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12px; color:#2e8b57;">✓ Cliente ya registrado — datos completados automáticamente.</div>
+          <div id="avisoReservaDuplicadaModal" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--cancelled-bg); border:1px solid var(--cancelled); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
+        </div>
+
         <button type="button" class="btn-confirmar-hora" id="btnConfirmarHoraTelefono" onclick="confirmarHoraSeleccionadaTelefono()" style="display:none;">✓ Confirmar hora seleccionada</button>
         <div id="avisoHoraSinConfirmarTelefono" style="display:none; margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">⏱️ Confirma la hora y el turno para poder continuar.</div>
       </div>
@@ -1689,29 +1713,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
 
       <div class="phone-section-title phone-client-title">● <span>Datos del cliente</span></div>
-
-      <div class="field">
-        <label>Celular de contacto</label>
-        <div class="celular-con-codigo">
-          <select id="fCelularCod">
-            <option value="57" selected>🇨🇴 +57</option>
-            <option value="58">🇻🇪 +58</option>
-            <option value="1">🇺🇸 +1</option>
-            <option value="52">🇲🇽 +52</option>
-            <option value="507">🇵🇦 +507</option>
-            <option value="593">🇪🇨 +593</option>
-            <option value="51">🇵🇪 +51</option>
-            <option value="54">🇦🇷 +54</option>
-            <option value="56">🇨🇱 +56</option>
-            <option value="55">🇧🇷 +55</option>
-            <option value="34">🇪🇸 +34</option>
-            <option value="506">🇨🇷 +506</option>
-          </select>
-          <input type="text" id="fCelular" placeholder="300 000 0000" onblur="buscarClienteExistente()">
-        </div>
-        <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12px; color:#2e8b57;">✓ Cliente ya registrado — datos completados automáticamente.</div>
-        <div id="avisoReservaDuplicadaModal" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:var(--cancelled-bg); border:1px solid var(--cancelled); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
-      </div>
 
       <div id="bloqueDatosPostCelular">
       <div class="field"><label>Nombre completo</label><input type="text" id="fNombre" placeholder="Nombre del cliente"></div>
@@ -3252,14 +3253,44 @@ function revisarDuplicadoEnModalTelefono(){
   }
 }
 function confirmarHoraSeleccionadaTelefono(){
+  // El celular es la entrada: sin él no se puede validar nada (ni si la
+  // fecha está bloqueada, ni si ya existe una reserva igual), así que se
+  // pide primero.
+  const celularLocalCheck = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+  if(celularLocalCheck.length < 7){
+    alert('Ingresa el celular del cliente antes de confirmar la hora — lo necesitamos para validar la reserva (fecha bloqueada, reserva duplicada, etc.).');
+    return;
+  }
   const fecha = document.getElementById('fFechaReservaEdit').value;
   const turno = document.getElementById('fTurnoReservaEdit').value;
   const info = infoBloqueoTurno(fecha, turno);
   if(!info){
-    desbloquearFormularioTelefonoComoConfirmado();
+    validarDuplicadoYDesbloquearTelefono();
     return;
   }
   abrirModalAvisoBloqueoTelefono(fecha, turno, info);
+}
+// Último paso antes de dejar ver el resto del formulario: ya se sabe que
+// el turno no está bloqueado (o el staff decidió seguir de todas formas),
+// así que ahora se revisa si el celular ya tiene otra reserva activa para
+// esta fecha y turno. Si es así, NO se desbloquea — se queda tal como
+// estaba, mostrando el aviso, hasta que cambien la fecha, el turno o el
+// celular.
+function validarDuplicadoYDesbloquearTelefono(){
+  const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+  const celularCod = document.getElementById('fCelularCod').value;
+  const fecha = document.getElementById('fFechaReservaEdit').value || modalFecha;
+  const turno = document.getElementById('fTurnoReservaEdit').value || modalTurno;
+  const dup = buscarReservaDuplicada(fecha, turno, `+${celularCod} ${celularLocal}`, editandoId);
+  const aviso = document.getElementById('avisoReservaDuplicadaModal');
+  if(dup){
+    if(aviso){ aviso.textContent = mensajeReservaDuplicada(dup); aviso.style.display = 'block'; }
+    const btn = document.getElementById('btnConfirmarHoraTelefono');
+    if(btn){ btn.classList.remove('confirmada'); btn.textContent = '✓ Confirmar hora seleccionada'; }
+    return;
+  }
+  if(aviso) aviso.style.display = 'none';
+  desbloquearFormularioTelefonoComoConfirmado();
 }
 function abrirModalAvisoBloqueoTelefono(fecha, turno, info){
   const dia = FECHAS_BLOQUEADAS[fecha] || {};
@@ -3287,7 +3318,7 @@ function cancelarAvisoBloqueoTelefono(){
 }
 function confirmarAvisoBloqueoTelefono(){
   document.getElementById('overlayAvisoBloqueoTelefono').classList.remove('open');
-  desbloquearFormularioTelefonoComoConfirmado();
+  validarDuplicadoYDesbloquearTelefono();
 }
 
 function diaTieneAlgunBloqueo(fechaIso){
