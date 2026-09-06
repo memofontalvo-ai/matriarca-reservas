@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.32</div>
+<div class="version-tag">v4.33</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2084,6 +2084,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </label>
       </div>
     </div>
+    <div class="field" id="fUsuSonidoWrap">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:400;">
+        <input type="checkbox" id="fUsuSonidoAviso" checked style="width:auto;">
+        🔔 Sonido de aviso cuando llegue una solicitud nueva
+      </label>
+      <span style="font-size:12px; color:var(--text-muted);">Activado por defecto para todos. Solo suena mientras esta persona tenga la app abierta en su celular o computador.</span>
+    </div>
     <div class="login-error" id="usuarioModalError"></div>
     <div class="modal-actions modal-actions-wrap">
       <button class="btn btn-ghost" onclick="cerrarModalUsuario()">Cancelar</button>
@@ -2431,6 +2438,9 @@ auth.onAuthStateChanged(user => {
         // campo "rol" guardado — a esas las tratamos como admin, para no
         // dejar a nadie fuera de golpe con esta actualización.
         rol: perfil.rol || 'admin',
+        // Igual que con el rol: si el campo no existe (cuentas de antes de
+        // que existiera esta opción), se trata como activado por defecto.
+        sonidoAvisoActivo: perfil.sonidoAvisoActivo !== false,
       };
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appRoot').style.display = 'flex';
@@ -2567,6 +2577,7 @@ function abrirModalUsuario(){
   document.getElementById('fUsuRolWrap').style.display = esBootstrap ? 'none' : 'block';
   const radioOperativo = document.querySelector('input[name="fUsuRol"][value="operativo"]');
   if(radioOperativo) radioOperativo.checked = true;
+  document.getElementById('fUsuSonidoAviso').checked = true;
   document.getElementById('overlayUsuario').classList.add('open');
 }
 
@@ -2593,6 +2604,10 @@ function abrirModalEditarUsuario(uid){
   const rol = u.rol || 'admin';
   const radio = document.querySelector(`input[name="fUsuRol"][value="${rol}"]`);
   if(radio) radio.checked = true;
+  // Si el campo no existe todavía (usuarios creados antes de que
+  // existiera esta opción), se trata como activado — igual que queda
+  // activado por defecto para cualquier usuario nuevo.
+  document.getElementById('fUsuSonidoAviso').checked = (u.sonidoAvisoActivo !== false);
   document.getElementById('overlayUsuario').classList.add('open');
 }
 function cerrarModalUsuario(){
@@ -2616,7 +2631,8 @@ function guardarEdicionUsuario(uid){
 
   const btn = document.getElementById('btnCrearUsuario');
   btn.disabled = true; btn.textContent = 'Guardando…';
-  db.collection('usuarios').doc(uid).update({nombre, iniciales, rol}).then(() => {
+  const sonidoAvisoActivo = document.getElementById('fUsuSonidoAviso').checked;
+  db.collection('usuarios').doc(uid).update({nombre, iniciales, rol, sonidoAvisoActivo}).then(() => {
     cerrarModalUsuario();
     cargarUsuariosConfig();
   }).catch(err => {
@@ -2661,10 +2677,11 @@ function crearUsuario(){
   btn.disabled = true; btn.textContent = 'Creando…';
 
   const emailInterno = emailInternoDesdeUsuario(usuario);
+  const sonidoAvisoActivo = document.getElementById('fUsuSonidoAviso').checked;
   authSecundaria.createUserWithEmailAndPassword(emailInterno, pass).then(cred => {
     const uid = cred.user.uid;
     return db.collection('usuarios').doc(uid).set({
-      nombre, iniciales, usuario, email: emailInterno, activo: true, rol, creadoEn: new Date().toISOString(),
+      nombre, iniciales, usuario, email: emailInterno, activo: true, rol, sonidoAvisoActivo, creadoEn: new Date().toISOString(),
     }).then(() => authSecundaria.signOut());
   }).then(() => {
     cerrarModalUsuario();
@@ -3594,9 +3611,60 @@ function liberarCandadoReserva(celularCompleto, fecha, turno){
 // realidad eran estos datos de prueba resucitando. Se quitó por completo:
 // cuando se borra algo, se borra, y la base de datos puede quedar vacía
 // sin que nada la vuelva a llenar sola.
+// ===== Sonido de aviso cuando llega una solicitud nueva =====
+// Se activa o desactiva por usuario desde Config → Usuarios y accesos
+// (solo un administrador puede cambiarlo). Por defecto queda activado
+// para todos. El sonido se genera con el propio navegador (no depende
+// de ningún archivo de audio externo), así que no hay que subir nada
+// aparte ni preocuparse por hosting.
+let audioCtxAviso = null;
+function tono(freq, inicio, duracion, ctx){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = freq;
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(0, ctx.currentTime + inicio);
+  gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + inicio + 0.02);
+  gain.gain.linearRampToValueAtTime(0, ctx.currentTime + inicio + duracion);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime + inicio);
+  osc.stop(ctx.currentTime + inicio + duracion + 0.05);
+}
+function reproducirTonoAviso(){
+  try{
+    if(!audioCtxAviso) audioCtxAviso = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtxAviso;
+    if(ctx.state === 'suspended') ctx.resume();
+    // "Campanita": dos notas ascendentes, cortas y suaves.
+    tono(880, 0, 0.16, ctx);
+    tono(1318.5, 0.14, 0.22, ctx);
+  } catch(err){
+    console.error('No se pudo reproducir el sonido de aviso:', err);
+  }
+}
+function sonarAvisoNuevaSolicitud(){
+  if(!usuarioActual || usuarioActual.sonidoAvisoActivo === false) return;
+  reproducirTonoAviso();
+}
+
+let primerCargaReservas = true;
 reservasRef.onSnapshot(snap => {
   reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   actualizarEstadoConexion(true);
+  // Ojo: docChanges() con type:'added' incluye TODOS los documentos la
+  // primera vez que carga la app (es como Firestore entrega la carga
+  // inicial) — por eso solo se activa el sonido desde la SEGUNDA vez que
+  // llega este evento en adelante, para no sonar de golpe con todas las
+  // solicitudes que ya existían al abrir la app.
+  if(primerCargaReservas){
+    primerCargaReservas = false;
+  } else {
+    const llegoSolicitudNueva = snap.docChanges().some(ch =>
+      ch.type === 'added' && ['solicitud','lista_espera'].includes(ch.doc.data().estado)
+    );
+    if(llegoSolicitudNueva) sonarAvisoNuevaSolicitud();
+  }
   vencerSolicitudesAtrasadas();
   renderAll();
 }, err => {
