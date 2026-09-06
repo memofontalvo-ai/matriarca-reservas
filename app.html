@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.30</div>
+<div class="version-tag">v4.32</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3529,6 +3529,63 @@ let reservas = [];
 // o de otro) se refleja automáticamente en la app.
 const reservasRef = db.collection('reservas');
 
+// ============ CANDADO ATÓMICO CONTRA DUPLICADOS SIMULTÁNEOS ============
+// La validación de "buscarReservaDuplicada" (arriba) revisa contra los
+// datos que ya están cargados en memoria — funciona bien para el caso
+// normal, pero si DOS reservas para el mismo celular+fecha+turno se
+// mandan casi al mismo instante (ej: el cliente por WhatsApp y el staff
+// por teléfono, con segundos de diferencia), las dos podrían alcanzar a
+// revisar "no existe" antes de que la otra termine de guardar, y ambas
+// pasarían. Para cerrar esa rendija se usa una colección aparte,
+// "bloqueosReserva", con un identificador de documento fijo y
+// predecible (celular + fecha + turno) que Firestore solo deja crear
+// UNA vez de forma segura mediante una transacción — la segunda
+// solicitud que llegue, aunque sea un instante después, encuentra el
+// candado ya puesto y no puede pasar.
+// No se toca ninguna reserva existente: esto es una colección nueva,
+// vacía, que se va llenando solo con las reservas que se creen de aquí
+// en adelante.
+const bloqueosReservaRef = db.collection('bloqueosReserva');
+
+function idCandadoReserva(celularCompleto, fecha, turno){
+  return `${normalizarTelefono(celularCompleto)}_${fecha}_${turno}`;
+}
+
+// Crea la reserva y su candado en una sola transacción atómica. Si el
+// candado ya existe y sigue activo (no cancelado), la transacción se
+// aborta sin escribir nada — ni la reserva ni el candado — y se avisa
+// al que llamó a esta función mediante el motivo 'DUPLICADO_SIMULTANEO'.
+function crearReservaConCandado(data){
+  const lockId = idCandadoReserva(data.celular, data.fecha, data.turno);
+  const lockRef = bloqueosReservaRef.doc(lockId);
+  const reservaRef = reservasRef.doc();
+  return db.runTransaction(tx => {
+    return tx.get(lockRef).then(lockDoc => {
+      if(lockDoc.exists && lockDoc.data().estado !== 'cancelada'){
+        const err = new Error('Ya se creó una reserva para este celular, fecha y turno justo en este momento.');
+        err.motivo = 'DUPLICADO_SIMULTANEO';
+        throw err;
+      }
+      tx.set(reservaRef, data);
+      tx.set(lockRef, { reservaId: reservaRef.id, estado: data.estado || 'pendiente' });
+      return reservaRef;
+    });
+  });
+}
+
+// Cuando una reserva pasa a 'cancelada' (o se elimina), su candado se
+// libera para que ese mismo celular/fecha/turno se pueda volver a
+// reservar más adelante sin quedar bloqueado para siempre. Si esto
+// falla (por ejemplo, si la reserva es de antes de que existiera este
+// candado y nunca tuvo uno), no pasa nada grave — solo queda en
+// consola, no debe interrumpir el guardado de la reserva en sí.
+function liberarCandadoReserva(celularCompleto, fecha, turno){
+  if(!celularCompleto || !fecha || !turno) return Promise.resolve();
+  const lockId = idCandadoReserva(celularCompleto, fecha, turno);
+  return bloqueosReservaRef.doc(lockId).set({ estado: 'cancelada' }, {merge:true})
+    .catch(err => console.error('No se pudo liberar el candado de duplicados:', err));
+}
+
 // NOTA IMPORTANTE: antes, si esta colección quedaba vacía (por ejemplo,
 // porque Guillermo borró varios días de reservas ya procesadas), la app
 // volvía a sembrar automáticamente 7 reservas de ejemplo/prueba que
@@ -3540,6 +3597,7 @@ const reservasRef = db.collection('reservas');
 reservasRef.onSnapshot(snap => {
   reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   actualizarEstadoConexion(true);
+  vencerSolicitudesAtrasadas();
   renderAll();
 }, err => {
   console.error('Error de conexión en reservas:', err);
@@ -4019,6 +4077,33 @@ function verObservacionesDeReserva(id){
 
 function estadoLabel(e){
   return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar', lista_espera:'Lista de espera'}[e]||e;
+}
+// ===== Vencimiento automático de solicitudes/reservas atrasadas =====
+// Si una solicitud o reserva sigue en un estado "por gestionar" (en
+// proceso, pendiente, lista de espera, mensaje enviado o por aprobar) y
+// su fecha YA PASÓ, ya no tiene sentido que siga apareciendo como algo
+// pendiente de atender — no se puede hacer nada con una fecha que ya
+// pasó. Se marca sola como cancelada, con un motivo claro que dice que
+// venció automáticamente, para que no quede esperando gestión para
+// siempre y sin tener que revisarla ni borrarla a mano. No se pierde
+// ningún dato: la reserva queda guardada igual, solo cambia su estado.
+const ESTADOS_QUE_VENCEN_AL_PASAR_LA_FECHA = ['solicitud','pendiente','lista_espera','mensaje_enviado','pendiente_aprobacion'];
+function vencerSolicitudesAtrasadas(){
+  // Solo un rol que SÍ puede editar reservas debe intentar esto —
+  // consulta no tiene permiso de escritura y no debe ni intentarlo.
+  const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
+  if(rol !== 'admin' && rol !== 'operativo') return;
+  const hoyISO = fechaISO(new Date());
+  reservas.forEach(r => {
+    if(ESTADOS_QUE_VENCEN_AL_PASAR_LA_FECHA.includes(r.estado) && r.fecha && r.fecha < hoyISO){
+      reservasRef.doc(r.id).update({
+        estado: 'cancelada',
+        motivoCancelacion: 'Vencida automáticamente: la fecha de la reserva ya pasó sin ser gestionada.',
+        vencidaAutomaticamente: true,
+        fueAprobadaAntesDeCancelar: false
+      }).catch(err => console.error('No se pudo vencer automáticamente la reserva', r.id, err));
+    }
+  });
 }
 function mesaLabel(id){
   for(const s of SALONES) for(const m of s.mesas) if(m.id===id) return m.id;
@@ -5991,12 +6076,19 @@ function guardarReserva(){
     return;
   }
   sellarUsuarioEnReserva(data, !editandoId);
+  // Si esta edición está cancelando una reserva que antes NO estaba
+  // cancelada, se libera su candado de duplicados para que ese celular
+  // pueda volver a reservar en esa fecha y turno más adelante.
+  const seEstaCancelandoAhora = editandoId && estadoSeleccionado === 'cancelada' && reservaAnterior && reservaAnterior.estado !== 'cancelada';
   const promesaCodigo = (!editandoId) ? generarCodigoReserva() : Promise.resolve(null);
   const promesa = promesaCodigo.then(codigo => {
     if(codigo) data.codigoReserva = codigo;
-    return editandoId
-      ? reservasRef.doc(editandoId).update(data)
-      : reservasRef.add(data);
+    if(editandoId){
+      return reservasRef.doc(editandoId).update(data).then(() => {
+        if(seEstaCancelandoAhora) liberarCandadoReserva(data.celular, data.fecha, data.turno);
+      });
+    }
+    return crearReservaConCandado(data);
   });
 
   guardandoReserva = true;
@@ -6016,6 +6108,10 @@ function guardarReserva(){
     guardandoReserva = false;
     if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; }
     console.error('Error guardando reserva:', err);
+    if(err && err.motivo === 'DUPLICADO_SIMULTANEO'){
+      alert('⚠️ Justo en este instante se acaba de crear otra reserva para este mismo celular, fecha y turno (probablemente desde otro canal). No se guardó para evitar el duplicado — revisa la reserva que ya quedó registrada.');
+      return;
+    }
     alert('No se pudo guardar la reserva. Revisa tu conexión e intenta de nuevo.');
   });
 }
@@ -6100,9 +6196,10 @@ function enviarParaAprobacion(){
   const promesaCodigo = necesitaCodigo ? generarCodigoReserva() : Promise.resolve(null);
   const promesa = promesaCodigo.then(codigo => {
     if(codigo) data.codigoReserva = codigo;
-    return editandoId
-      ? reservasRef.doc(editandoId).update(data).then(()=>editandoId)
-      : reservasRef.add(data).then(docRef=>docRef.id);
+    if(editandoId){
+      return reservasRef.doc(editandoId).update(data).then(()=>editandoId);
+    }
+    return crearReservaConCandado(data).then(reservaRef => reservaRef.id);
   });
 
   promesa.then(id => {
@@ -6122,6 +6219,10 @@ function enviarParaAprobacion(){
   }).catch(err => {
     console.error('Error enviando para aprobación:', err);
     if(ventana) ventana.close();
+    if(err && err.motivo === 'DUPLICADO_SIMULTANEO'){
+      alert('⚠️ Justo en este instante se acaba de crear otra reserva para este mismo celular, fecha y turno (probablemente desde otro canal). No se guardó para evitar el duplicado — revisa la reserva que ya quedó registrada.');
+      return;
+    }
     alert('No se pudo enviar. Revisa tu conexión e intenta de nuevo.');
   });
 }
@@ -6143,7 +6244,9 @@ function eliminarReserva(){
   // sin ningún aviso — con esto, sea cual sea el problema, siempre se ve
   // algo en pantalla en vez de que el botón no haga nada.
   try {
+    const rBorrada = reservas.find(x => x.id === editandoId);
     reservasRef.doc(editandoId).delete().then(() => {
+      if(rBorrada) liberarCandadoReserva(rBorrada.celular, rBorrada.fecha, rBorrada.turno);
       cerrarModal();
     }).catch(err => {
       console.error('Error eliminando reserva:', err);
@@ -6160,7 +6263,10 @@ function eliminarReservaDirecta(id, nombre){
   if(rol !== 'admin'){ alert('Solo un administrador puede eliminar una reserva. Si ya no aplica, márcala como Cancelada — así queda el registro de que existió.'); return; }
   if(!confirm(`¿Eliminar la reserva de "${nombre}"? Esta acción no se puede deshacer.`)) return;
   try {
-    reservasRef.doc(id).delete().catch(err => {
+    const rBorrada = reservas.find(x => x.id === id);
+    reservasRef.doc(id).delete().then(() => {
+      if(rBorrada) liberarCandadoReserva(rBorrada.celular, rBorrada.fecha, rBorrada.turno);
+    }).catch(err => {
       console.error('Error eliminando reserva:', err);
       alert('No se pudo eliminar la reserva (' + (err && err.message ? err.message : 'error desconocido') + '). Revisa tu conexión e intenta de nuevo.');
     });
