@@ -1561,7 +1561,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.33</div>
+<div class="version-tag">v4.34</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3643,10 +3643,62 @@ function reproducirTonoAviso(){
     console.error('No se pudo reproducir el sonido de aviso:', err);
   }
 }
+// Los navegadores bloquean que una página reproduzca sonido "sola" si la
+// persona todavía no ha tocado la pantalla desde que la abrió — es una
+// protección normal para que las páginas no hagan ruido sin permiso. Por
+// eso, apenas alguien toca la app UNA sola vez (cualquier toque, clic o
+// tecla), se aprovecha ese permiso para "despertar" el sonido de una vez.
+// De ahí en adelante, el aviso puede sonar solo cuando llegue una
+// solicitud, sin necesitar que la persona vuelva a tocar nada — mientras
+// el celular esté desbloqueado y la pestaña siga abierta (si el celular
+// se bloquea o se apaga la pantalla, ningún sonido de una página web
+// puede sonar; eso ya es una limitación del sistema operativo, no de la
+// app, y solo se resolvería con notificaciones push reales — la Opción 2
+// de la que hablamos, que necesita activar Cloud Functions).
+let audioAvisoDesbloqueado = false;
+function desbloquearAudioAviso(){
+  if(audioAvisoDesbloqueado) return;
+  try{
+    if(!audioCtxAviso) audioCtxAviso = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtxAviso.state === 'suspended') audioCtxAviso.resume();
+    audioAvisoDesbloqueado = true;
+  } catch(err){
+    console.error('No se pudo preparar el sonido de aviso:', err);
+  }
+}
+['click','touchstart','keydown'].forEach(evt =>
+  document.addEventListener(evt, desbloquearAudioAviso, {once:true})
+);
 function sonarAvisoNuevaSolicitud(){
   if(!usuarioActual || usuarioActual.sonidoAvisoActivo === false) return;
   reproducirTonoAviso();
 }
+
+// ===== Aviso visual de respaldo (parpadeo del título de la pestaña) =====
+// El sonido puede fallar por cosas fuera de nuestro control (el
+// celular en silencio, el navegador bloqueándolo, etc.), así que además
+// se pone a parpadear el título de la pestaña/ventana cuando llega una
+// solicitud nueva y la persona no está viendo la app en ese momento —
+// apenas vuelve a mirarla, el título regresa a la normalidad solo.
+const tituloOriginalApp = document.title;
+let parpadeoTituloInterval = null;
+function avisarVisualmenteNuevaSolicitud(){
+  if(document.visibilityState === 'visible') return; // ya la está viendo, no hace falta
+  if(parpadeoTituloInterval) return;
+  let mostrandoAviso = false;
+  parpadeoTituloInterval = setInterval(() => {
+    document.title = mostrandoAviso ? tituloOriginalApp : '🔔 Nueva solicitud';
+    mostrandoAviso = !mostrandoAviso;
+  }, 1000);
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && parpadeoTituloInterval){
+    clearInterval(parpadeoTituloInterval);
+    parpadeoTituloInterval = null;
+    document.title = tituloOriginalApp;
+  }
+});
+
 
 let primerCargaReservas = true;
 reservasRef.onSnapshot(snap => {
@@ -3663,7 +3715,10 @@ reservasRef.onSnapshot(snap => {
     const llegoSolicitudNueva = snap.docChanges().some(ch =>
       ch.type === 'added' && ['solicitud','lista_espera'].includes(ch.doc.data().estado)
     );
-    if(llegoSolicitudNueva) sonarAvisoNuevaSolicitud();
+    if(llegoSolicitudNueva && usuarioActual && usuarioActual.sonidoAvisoActivo !== false){
+      sonarAvisoNuevaSolicitud();
+      avisarVisualmenteNuevaSolicitud();
+    }
   }
   vencerSolicitudesAtrasadas();
   renderAll();
