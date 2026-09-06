@@ -190,7 +190,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.16</div>
+<div class="version-tag">v3.17</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -460,6 +460,18 @@ const firebaseConfig = {
       document.getElementById('fFecha').value = eventoActual.fecha;
       document.getElementById('fFecha').dispatchEvent(new Event('change'));
       document.getElementById('fHora').value = eventoActual.horaEntrada || '';
+      // El resumen de hora que se ve arriba (junto a la fecha) se maneja
+      // con una variable interna de la rueda que aquí no tocamos — por
+      // eso hay que actualizar el texto directamente, o se queda
+      // mostrando la hora por defecto de la rueda (08:20 PM) aunque el
+      // valor real ya esté fijado correctamente por debajo.
+      if(eventoActual.horaEntrada){
+        const [hhEv, mmEv] = eventoActual.horaEntrada.split(':').map(Number);
+        const ampmEv = hhEv >= 12 ? 'PM' : 'AM';
+        let h12Ev = hhEv % 12; if(h12Ev === 0) h12Ev = 12;
+        const horaResumenEl = document.getElementById('horaResumen');
+        if(horaResumenEl) horaResumenEl.textContent = `${String(h12Ev).padStart(2,'0')}:${String(mmEv).padStart(2,'0')} ${ampmEv}`;
+      }
       const dateCarousel = document.getElementById('dateCarousel');
       if(dateCarousel) dateCarousel.style.display = 'none';
       const turnoOptsEl = document.getElementById('turnoOpts');
@@ -935,13 +947,22 @@ const firebaseConfig = {
       window.location.href = 'index.html';
       return;
     }
-    const camposConDatos = [
-      document.getElementById('fCelular')?.value,
-      document.getElementById('fNombre')?.value,
-      document.getElementById('fCorreo')?.value,
+    // Si el cliente ya estaba registrado, el nombre/correo/cumpleaños se
+    // llenaron solos (autocompletado) — no es información que el cliente
+    // haya escrito ahora mismo, así que no cuenta como "algo que se
+    // pierde". El celular tampoco cuenta (se retipea rápido). Solo
+    // cuentan los campos que nunca se autocompletan: personas y
+    // observaciones — esos sí representan trabajo real ya hecho.
+    const clienteFueAutocompletado = document.getElementById('clienteReconocidoAviso')?.style.display === 'block';
+    const camposAContar = [
       document.getElementById('fPax')?.value,
-      document.getElementById('fObs')?.value
-    ].some(v => (v || '').trim().length > 0);
+      document.getElementById('fObs')?.value,
+    ];
+    if(!clienteFueAutocompletado){
+      camposAContar.push(document.getElementById('fNombre')?.value);
+      camposAContar.push(document.getElementById('fCorreo')?.value);
+    }
+    const camposConDatos = camposAContar.some(v => (v || '').trim().length > 0);
     if(camposConDatos){
       if(!confirm('¿Seguro que quieres salir? Vas a perder los datos que ya escribiste.')) return;
     }
