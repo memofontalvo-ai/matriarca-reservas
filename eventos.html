@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+<title>Eventos especiales · La Matriarca Barranquilla</title>
+<style>
+:root{
+  --bg:#12151a; --panel:#191d25; --panel2:#1f242e; --panel-raised:#262c38;
+  --border:#2b313d; --text:#edeef1; --text-muted:#8b93a3; --text-dim:#5c6472;
+  --gold:#c9a15a; --gold-bright:#e0bb78;
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+.wrap{max-width:520px; margin:0 auto; padding:18px 16px 40px;}
+.logo-header{text-align:center; margin-bottom:18px;}
+.logo-header .marca{font-family:Georgia,'Iowan Old Style',serif; font-size:26px; font-weight:700; color:var(--gold-bright); letter-spacing:.5px;}
+.logo-header .sub{font-size:11px; letter-spacing:2px; color:var(--text-muted); text-transform:uppercase; margin-top:2px;}
+.titulo-seccion{font-size:19px; font-weight:700; margin:10px 0 4px;}
+.sub-seccion{font-size:13.5px; color:var(--text-muted); margin-bottom:18px;}
+.evento-card{
+  background:var(--panel2); border:1px solid var(--border); border-radius:14px;
+  padding:0; margin-bottom:14px; cursor:pointer; overflow:hidden;
+}
+.evento-card:active{background:var(--panel-raised);}
+.evento-card-img{width:100%; height:160px; object-fit:cover; display:block;}
+.evento-card-body{padding:16px;}
+.evento-nombre{font-size:17px; font-weight:700; margin-bottom:4px;}
+.evento-fecha{font-size:13px; color:var(--gold-bright); font-weight:600;}
+.evento-valor{font-size:12.5px; color:var(--text-muted); margin-top:4px;}
+.vacio{text-align:center; color:var(--text-muted); font-size:14px; padding:40px 20px;}
+.detalle-imagen{width:100%; max-height:220px; object-fit:cover; border-radius:12px; margin-bottom:14px;}
+.detalle-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+  align-items:flex-end; justify-content:center; z-index:500;
+}
+.detalle-overlay.open{display:flex;}
+.detalle-panel{
+  background:var(--panel); width:100%; max-width:520px; border-radius:18px 18px 0 0;
+  padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+}
+.detalle-cerrar{float:right; background:none; border:none; color:var(--text-muted); font-size:20px;}
+.detalle-nombre{font-size:20px; font-weight:700; margin-bottom:6px;}
+.detalle-fecha{color:var(--gold-bright); font-weight:600; font-size:14px; margin-bottom:10px;}
+.detalle-desc{font-size:14.5px; color:var(--text); line-height:1.5; margin-bottom:10px;}
+.detalle-valor{font-size:14px; color:var(--text-muted); margin-bottom:18px;}
+.btn-reservar{
+  display:block; width:100%; padding:13px; text-align:center; background:var(--gold);
+  color:#1a1a1a; font-weight:700; border:none; border-radius:12px; font-size:15px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo-header">
+    <div class="marca">La Matriarca</div>
+    <div class="sub">Barranquilla</div>
+  </div>
+  <div class="titulo-seccion">🎤 Eventos especiales</div>
+  <div class="sub-seccion">Elige el evento al que quieres ir — al reservar, tu solicitud queda amarrada a esa fecha.</div>
+  <div id="listaEventosPublica"></div>
+</div>
+
+<div class="detalle-overlay" id="detalleOverlay">
+  <div class="detalle-panel">
+    <button class="detalle-cerrar" onclick="cerrarDetalle()">✕</button>
+    <img class="detalle-imagen" id="detalleImagen" style="display:none;">
+    <div class="detalle-nombre" id="detalleNombre"></div>
+    <div class="detalle-fecha" id="detalleFecha"></div>
+    <div class="detalle-desc" id="detalleDesc"></div>
+    <div class="detalle-valor" id="detalleValor"></div>
+    <button class="btn-reservar" id="btnReservarEvento">Reservar para este evento</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDJCy93GCOhDySnC_OLo6pcV-wK_pC48_A",
+  authDomain: "matriarca-reservas.firebaseapp.com",
+  projectId: "matriarca-reservas",
+  storageBucket: "matriarca-reservas.firebasestorage.app",
+  messagingSenderId: "370240403780",
+  appId: "1:370240403780:web:2ccceaf8da9daf37b8bf11"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+
+function formatearFechaLarga(fechaISO){
+  if(!fechaISO) return '';
+  const [y,m,d] = fechaISO.split('-').map(Number);
+  const fecha = new Date(y, m-1, d);
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${dias[fecha.getDay()]}, ${d} de ${meses[m-1]} de ${y}`;
+}
+
+let eventosPublicos = [];
+
+function hoyISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+db.collection('eventos').get().then(snap => {
+  const hoy = hoyISO();
+  eventosPublicos = snap.docs
+    .map(d => ({id:d.id, ...d.data()}))
+    .filter(ev => ev.activo !== false && ev.fecha >= hoy)
+    .sort((a,b) => a.fecha.localeCompare(b.fecha));
+  const el = document.getElementById('listaEventosPublica');
+  if(eventosPublicos.length === 0){
+    el.innerHTML = '<div class="vacio">Por ahora no hay eventos especiales programados. Vuelve pronto.</div>';
+    return;
+  }
+  el.innerHTML = eventosPublicos.map(ev => `
+    <div class="evento-card" onclick="abrirDetalle(${JSON.stringify(ev.id)})">
+      ${ev.imagen ? `<img class="evento-card-img" src="${ev.imagen}">` : ''}
+      <div class="evento-card-body">
+        <div class="evento-nombre">${ev.nombre}</div>
+        <div class="evento-fecha">${formatearFechaLarga(ev.fecha)}${ev.horaEntrada?` · Entrada ${ev.horaEntrada}`:''}</div>
+        ${ev.valorEntrada ? `<div class="evento-valor">Valor de entrada: $${Number(ev.valorEntrada).toLocaleString('es-CO')}</div>` : ''}
+      </div>
+    </div>`).join('');
+}).catch(err => {
+  console.error('Error cargando eventos:', err);
+  document.getElementById('listaEventosPublica').innerHTML = '<div class="vacio">No se pudieron cargar los eventos. Intenta de nuevo más tarde.</div>';
+});
+
+function abrirDetalle(id){
+  const ev = eventosPublicos.find(e => e.id === id);
+  if(!ev) return;
+  document.getElementById('detalleNombre').textContent = ev.nombre;
+  document.getElementById('detalleFecha').textContent = `${formatearFechaLarga(ev.fecha)}${ev.horaEntrada?` · Entrada ${ev.horaEntrada}`:''}`;
+  document.getElementById('detalleDesc').textContent = ev.descripcion || '';
+  document.getElementById('detalleValor').textContent = ev.valorEntrada ? `Valor de entrada: $${Number(ev.valorEntrada).toLocaleString('es-CO')}` : '';
+  const img = document.getElementById('detalleImagen');
+  if(ev.imagen){ img.src = ev.imagen; img.style.display = 'block'; } else { img.style.display = 'none'; }
+  document.getElementById('btnReservarEvento').onclick = () => {
+    window.location.href = `solicitud.html?evento=${ev.id}`;
+  };
+  document.getElementById('detalleOverlay').classList.add('open');
+}
+function cerrarDetalle(){
+  document.getElementById('detalleOverlay').classList.remove('open');
+}
+
+// Si llegan con ?evento=xxx directo (ej: link específico compartido), abre
+// el detalle de una vez en cuanto cargue la lista.
+const idDirecto = new URLSearchParams(location.search).get('evento');
+if(idDirecto){
+  const intentar = setInterval(() => {
+    if(eventosPublicos.length > 0 || document.getElementById('listaEventosPublica').innerHTML){
+      clearInterval(intentar);
+      if(eventosPublicos.find(e => e.id === idDirecto)) abrirDetalle(idDirecto);
+    }
+  }, 200);
+}
+</script>
+</body>
+</html>

@@ -190,7 +190,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.14</div>
+<div class="version-tag">v3.16</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -201,6 +201,13 @@ button{cursor:pointer}
   <div id="formulario">
     <div class="subtitle">Cuéntanos los detalles de tu reserva</div>
     <div class="subtitle-small">Completa la información para asegurar tu mesa.</div>
+
+    <div id="bannerEvento" style="display:none; margin:12px 0 18px; padding:14px 16px; border-radius:12px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); text-align:center;">
+      <div style="font-size:11px; letter-spacing:1px; color:var(--gold-bright); text-transform:uppercase; margin-bottom:3px;">🎤 Reserva para el evento especial</div>
+      <div id="bannerEventoNombre" style="font-size:16px; font-weight:700; margin-bottom:2px;"></div>
+      <div id="bannerEventoFecha" style="font-size:13px; color:var(--muted);"></div>
+      <div id="bannerEventoValor" style="font-size:12.5px; color:var(--muted); margin-top:4px;"></div>
+    </div>
 
     <section class="section">
       <div class="section-title">Selecciona la fecha</div>
@@ -219,6 +226,7 @@ button{cursor:pointer}
 
     
     <section class="section">
+      <div id="horaWheelBlockPublico">
       <div class="section-title">Selecciona la hora</div>
       <div class="time-panel">
         <div class="wheel-time-grid">
@@ -236,6 +244,8 @@ button{cursor:pointer}
             <div class="rueda" id="wheelAmPm" aria-label="Seleccionar AM o PM"></div>
           </div>
         </div>
+      </div>
+      </div>
         <input type="time" id="fHora" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
 
         <div class="field" style="margin-top:14px; text-align:left;">
@@ -263,7 +273,6 @@ button{cursor:pointer}
 
         <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()">✓ Confirmar hora seleccionada</button>
         <div id="avisoHoraSinConfirmar" style="margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">⏱️ Confirma la hora para poder continuar con tu reserva.</div>
-      </div>
     </section>
 
     <div id="restoFormulario" style="display:none;">
@@ -423,6 +432,44 @@ const firebaseConfig = {
   // ACTUALIZAR ese mismo registro con lo que el cliente llene aquí, para
   // no duplicar ni perder el rastro desde el primer contacto.
   const idExistente = new URLSearchParams(location.search).get('id');
+
+  // Si el link trae ?evento=XXXX, esta solicitud viene de la parrilla
+  // pública de eventos especiales (eventos.html) — la fecha, el turno y
+  // la hora quedan fijos al evento (el cliente no los toca), y la
+  // solicitud se guarda amarrada a él. IMPORTANTE: no se desbloquea el
+  // formulario todavía aquí — eso sigue pasando solo cuando el cliente
+  // escribe su celular y toca "Confirmar" (ver confirmarHoraSeleccionada),
+  // para no saltarse la validación de duplicados.
+  const eventoIdActual = new URLSearchParams(location.search).get('evento');
+  let eventoActual = null;
+  if(eventoIdActual){
+    db.collection('eventos').doc(eventoIdActual).get().then(doc => {
+      if(!doc.exists || doc.data().activo === false) return; // link viejo o evento ya no disponible: sigue como solicitud normal
+      eventoActual = doc.data();
+      const TURNO_LABEL_EVT = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+      document.getElementById('bannerEventoNombre').textContent = eventoActual.nombre;
+      document.getElementById('bannerEventoFecha').textContent = `${eventoActual.fecha} · Entrada ${eventoActual.horaEntrada||''} · ${TURNO_LABEL_EVT[eventoActual.turno]||eventoActual.turno}`;
+      if(eventoActual.valorEntrada){
+        document.getElementById('bannerEventoValor').textContent = `Valor de entrada: $${Number(eventoActual.valorEntrada).toLocaleString('es-CO')}`;
+      }
+      document.getElementById('bannerEvento').style.display = 'block';
+      // Fecha, turno y hora quedan fijos al evento — se oculta todo lo
+      // que el cliente normalmente elegiría (carrusel de fecha, ruedas
+      // de hora, botones de turno). Solo queda visible el celular y el
+      // botón de continuar, más abajo.
+      document.getElementById('fFecha').value = eventoActual.fecha;
+      document.getElementById('fFecha').dispatchEvent(new Event('change'));
+      document.getElementById('fHora').value = eventoActual.horaEntrada || '';
+      const dateCarousel = document.getElementById('dateCarousel');
+      if(dateCarousel) dateCarousel.style.display = 'none';
+      const turnoOptsEl = document.getElementById('turnoOpts');
+      if(turnoOptsEl) turnoOptsEl.style.display = 'none';
+      const horaWheelBlockEl = document.getElementById('horaWheelBlockPublico');
+      if(horaWheelBlockEl) horaWheelBlockEl.style.display = 'none';
+      const btnConfirmar = document.getElementById('btnConfirmarHora');
+      if(btnConfirmar) btnConfirmar.textContent = '✓ Continuar con esta reserva';
+    }).catch(err => console.error('No se pudo cargar el evento:', err));
+  }
 
   let turnoSel = null;
   let vipSel = null;
@@ -730,6 +777,10 @@ const firebaseConfig = {
       listaEspera: enListaEspera,
       estado: enListaEspera ? 'lista_espera' : 'solicitud', canal: 'WhatsApp (autogestión)'
     };
+    if(eventoActual){
+      datos.eventoId = eventoIdActual;
+      datos.eventoNombre = eventoActual.nombre;
+    }
 
     let operacion;
     if(idExistente){
@@ -1135,12 +1186,19 @@ const firebaseConfig = {
       }
       return;
     }
-    const { h24, min } = horaActual24();
-    const minutosDelDia = h24*60 + min;
+    // Si es una reserva para un evento especial, la hora ya viene fija
+    // desde la configuración del evento (hora de entrada) — no se calcula
+    // a partir de lo que marque la rueda, que además está oculta.
     let turnoAuto;
-    if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
-    else if(minutosDelDia >= 660 && minutosDelDia < 1080) turnoAuto = 'almuerzo';
-    else turnoAuto = 'cena';
+    if(eventoActual){
+      turnoAuto = eventoActual.turno;
+    } else {
+      const { h24, min } = horaActual24();
+      const minutosDelDia = h24*60 + min;
+      if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
+      else if(minutosDelDia >= 660 && minutosDelDia < 1080) turnoAuto = 'almuerzo';
+      else turnoAuto = 'cena';
+    }
     ultimoTurnoAutoPreguntado = turnoAuto;
     elegirTurno(turnoAuto);
     if(turnoSel){

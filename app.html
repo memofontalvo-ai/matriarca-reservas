@@ -1405,6 +1405,23 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </div>
       </div>
 
+      <!-- ===== GRUPO: EVENTOS ESPECIALES ===== -->
+      <div class="config-grupo">
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoEventos')">
+          <span>🎤 Eventos especiales</span>
+          <span class="config-grupo-chevron" id="chevron_grupoEventos">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoEventos" style="display:none;">
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-sub">Crea aquí cada show o evento especial (conciertos, shows en vivo, etc). Cada uno aparece en <code>eventos.html</code> — esa es la página que compartes en redes sociales para que el cliente elija el evento y reserve directo para esa fecha. Las solicitudes que lleguen por ahí se marcan aparte en el módulo de Solicitudes, para que no se pierdan entre las normales.</div>
+          <div id="listaEventos" style="margin:10px 0;"></div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="abrirModalEvento()">+ Crear evento</button>
+          </div>
+        </div>
+        </div>
+      </div>
+
       <!-- ===== GRUPO: USUARIOS Y ACCESOS ===== -->
       <div class="config-grupo">
         <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoUsuarios')">
@@ -1561,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.35</div>
+<div class="version-tag">v4.37</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1622,6 +1639,20 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
     <div id="formCompletoBlock">
       <!-- Mismos campos originales; solo cambia la presentación visual. -->
+      <div class="field" id="tipoReservaBlock">
+        <div class="phone-section-title">◆ <span>Tipo de reserva</span></div>
+        <div class="modal-actions modal-actions-wrap">
+          <button type="button" class="btn btn-ghost" id="btnTipoNormal" onclick="elegirTipoReserva('normal')">🍽 Reserva normal</button>
+          <button type="button" class="btn btn-ghost" id="btnTipoEvento" onclick="elegirTipoReserva('evento')">🎤 Evento especial</button>
+        </div>
+        <div id="eventoSeleccionBlock" style="display:none; margin-top:10px;">
+          <label>Elige el evento</label>
+          <select id="fEventoSeleccionado" onchange="aplicarEventoSeleccionado()" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text); font-size:14px;">
+            <option value="">— Selecciona un evento —</option>
+          </select>
+          <div id="eventoSeleccionadoResumen" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); font-size:12.5px; line-height:1.4;"></div>
+        </div>
+      </div>
       <div class="field phone-date-section" id="fechaReservaEditBlock" style="display:none;">
         <div class="phone-section-title">▣ <span>Fecha y turno de la reserva</span></div>
         <div class="phone-date-carousel" id="phoneDateCarousel">
@@ -1647,12 +1678,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
 
       <div class="field phone-time-section">
+        <div id="horaWheelBlock">
         <div class="phone-section-title">◷ <span>Selecciona la hora</span></div>
         <div class="phone-time-grid">
           <div class="phone-wheel-col"><label>Hora</label><div class="phone-wheel" id="phoneHourWheel"></div></div>
           <div class="phone-time-colon">:</div>
           <div class="phone-wheel-col"><label>Minutos</label><div class="phone-wheel" id="phoneMinuteWheel"></div></div>
           <div class="phone-wheel-col"><label>AM/PM</label><div class="phone-wheel" id="phoneAmPmWheel"></div></div>
+        </div>
         </div>
         <input type="time" id="fHora" class="phone-hidden-control">
 
@@ -2058,6 +2091,44 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   </div>
 </div>
 
+<div class="overlay" id="overlayEvento">
+  <div class="modal">
+    <h3 id="eventoModalTitulo">Crear evento especial</h3>
+    <div class="modal-sub">Esto es lo que va a ver el cliente en la página pública de eventos, y lo que queda amarrado a su solicitud.</div>
+    <input type="hidden" id="fEventoEditId" value="">
+    <div class="field"><label>Nombre del evento</label><input type="text" id="fEventoNombre" placeholder="Ej: De Lucho con Amor — Lucho Torres"></div>
+    <div class="field"><label>Fecha</label><input type="date" id="fEventoFecha"></div>
+    <div class="field"><label>Hora de entrada (open doors)</label><input type="time" id="fEventoHoraEntrada"></div>
+    <div class="field">
+      <label>Turno (para saber en qué franja del día cae la reserva)</label>
+      <div class="modal-actions modal-actions-wrap">
+        <button type="button" class="btn btn-ghost" data-turno="desayuno" onclick="elegirTurnoEvento('desayuno')">☕ Desayuno</button>
+        <button type="button" class="btn btn-ghost" data-turno="almuerzo" onclick="elegirTurnoEvento('almuerzo')">☀ Almuerzo</button>
+        <button type="button" class="btn btn-ghost" data-turno="cena" onclick="elegirTurnoEvento('cena')">🌙 Cena</button>
+      </div>
+      <input type="hidden" id="fEventoTurno" value="cena">
+    </div>
+    <div class="field">
+      <label>Imagen del evento (la que ya usas en redes sociales)</label>
+      <input type="file" id="fEventoImagenArchivo" accept="image/*" onchange="previsualizarImagenEvento(this)">
+      <img id="fEventoImagenPreview" style="display:none; width:100%; margin-top:10px; border-radius:10px; max-height:220px; object-fit:cover;">
+    </div>
+    <div class="field"><label>Descripción</label><textarea id="fEventoDescripcion" rows="3" placeholder="Show en vivo, música, artista invitado..."></textarea></div>
+    <div class="field"><label>Valor de entrada (opcional)</label><input type="number" id="fEventoValor" placeholder="Déjalo vacío si no aplica"></div>
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:400;">
+        <input type="checkbox" id="fEventoActivo" checked style="width:auto;"> Visible para el público en eventos.html
+      </label>
+    </div>
+    <div class="modal-sub" style="margin-top:-6px;">El cliente NO elige fecha ni hora para este evento — ya quedan fijas con lo que pongas aquí. Solo llena sus datos y reserva.</div>
+    <div class="login-error" id="eventoModalError"></div>
+    <div class="modal-actions modal-actions-wrap">
+      <button class="btn btn-ghost" onclick="cerrarModalEvento()">Cancelar</button>
+      <button class="btn btn-primary" id="btnGuardarEvento" onclick="guardarEvento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlayUsuario">
   <div class="modal">
     <h3 id="usuarioModalTitulo">Nuevo usuario</h3>
@@ -2452,6 +2523,7 @@ auth.onAuthStateChanged(user => {
       aplicarRestriccionesRol();
       cargarUsuariosConfig();
       cargarCarruselConfig();
+      cargarEventosConfig();
       iniciarPresencia();
     });
   } else {
@@ -2703,6 +2775,234 @@ function crearUsuario(){
   }).finally(() => {
     btn.disabled = false; btn.textContent = 'Crear usuario';
   });
+}
+
+// ===== EVENTOS ESPECIALES (shows, conciertos) =====
+// Colección aparte "eventos" — cada documento es un evento independiente,
+// creado desde acá. La página pública eventos.html solo lee los que
+// tengan activo:true y fecha de hoy en adelante. Cuando el cliente
+// reserva desde ahí, la solicitud llega con eventoId/eventoNombre
+// amarrados, y se distingue en el módulo de Solicitudes.
+const eventosRef = db.collection('eventos');
+let eventosCache = [];
+let eventoImagenBase64Temp = null;
+const TURNO_LABEL_EVENTO = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+
+function cargarEventosConfig(){
+  const el = document.getElementById('listaEventos');
+  if(!el) return;
+  eventosRef.orderBy('fecha').get().then(snap => {
+    eventosCache = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    if(eventosCache.length === 0){
+      el.innerHTML = '<div class="config-mensaje-sub">Todavía no has creado ningún evento.</div>';
+      return;
+    }
+    el.innerHTML = eventosCache.map(ev => `
+      <div class="config-mensaje-bloque" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+          <div>
+            <div class="config-mensaje-titulo">${escapeHtml(ev.nombre)}${ev.activo===false ? ' <span style="color:var(--text-dim); font-weight:400;">(oculto)</span>' : ''}</div>
+            <div class="config-mensaje-sub">${escapeHtml(ev.fecha)} · Entrada ${escapeHtml(ev.horaEntrada||'—')} · ${TURNO_LABEL_EVENTO[ev.turno]||ev.turno}${ev.valorEntrada ? ' · $'+Number(ev.valorEntrada).toLocaleString('es-CO') : ''}</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            <button class="btn-config-guardar" style="padding:6px 10px; font-size:12px;" onclick='copiarLinkEvento(${JSON.stringify(ev.id)})'>🔗 Link</button>
+            <button class="btn-config-guardar" style="padding:6px 10px; font-size:12px;" onclick='editarEvento(${JSON.stringify(ev.id)})'>Editar</button>
+            <button class="btn-config-restaurar" style="padding:6px 10px; font-size:12px;" onclick='eliminarEvento(${JSON.stringify(ev.id)})'>Borrar</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }).catch(err => {
+    console.error('Error cargando eventos:', err);
+    el.innerHTML = '<div class="config-mensaje-sub">No se pudieron cargar los eventos.</div>';
+  });
+}
+
+function copiarLinkEvento(id){
+  const base = location.href.replace(/app\.html.*$/, '');
+  const url = `${base}eventos.html?evento=${id}`;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(() => alert('Link copiado — pégalo en Instagram:\n' + url)).catch(() => prompt('Copia este link:', url));
+  } else {
+    prompt('Copia este link:', url);
+  }
+}
+
+function elegirTurnoEvento(t){
+  document.getElementById('fEventoTurno').value = t;
+  document.querySelectorAll('#overlayEvento [data-turno]').forEach(b => {
+    const on = b.dataset.turno === t;
+    b.style.background = on ? 'var(--gold)' : '';
+    b.style.color = on ? '#1a1a1a' : '';
+    b.style.borderColor = on ? 'var(--gold)' : '';
+  });
+}
+
+// Misma compresión que ya se usa para el carrusel: reduce la foto a un
+// ancho máximo de 1000px en JPEG de calidad media, para no pasarse del
+// límite de 1MB por documento en Firestore.
+function previsualizarImagenEvento(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1000;
+      const escala = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      eventoImagenBase64Temp = canvas.toDataURL('image/jpeg', 0.72);
+      const preview = document.getElementById('fEventoImagenPreview');
+      preview.src = eventoImagenBase64Temp;
+      preview.style.display = 'block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function abrirModalEvento(){
+  document.getElementById('eventoModalTitulo').textContent = 'Crear evento especial';
+  document.getElementById('fEventoEditId').value = '';
+  document.getElementById('fEventoNombre').value = '';
+  document.getElementById('fEventoFecha').value = '';
+  document.getElementById('fEventoHoraEntrada').value = '';
+  document.getElementById('fEventoDescripcion').value = '';
+  document.getElementById('fEventoValor').value = '';
+  document.getElementById('fEventoActivo').checked = true;
+  document.getElementById('fEventoImagenArchivo').value = '';
+  document.getElementById('fEventoImagenPreview').style.display = 'none';
+  eventoImagenBase64Temp = null;
+  elegirTurnoEvento('cena');
+  document.getElementById('eventoModalError').textContent = '';
+  document.getElementById('overlayEvento').classList.add('open');
+}
+function editarEvento(id){
+  const ev = eventosCache.find(e => e.id === id);
+  if(!ev) return;
+  document.getElementById('eventoModalTitulo').textContent = 'Editar evento especial';
+  document.getElementById('fEventoEditId').value = id;
+  document.getElementById('fEventoNombre').value = ev.nombre || '';
+  document.getElementById('fEventoFecha').value = ev.fecha || '';
+  document.getElementById('fEventoHoraEntrada').value = ev.horaEntrada || '';
+  document.getElementById('fEventoDescripcion').value = ev.descripcion || '';
+  document.getElementById('fEventoValor').value = ev.valorEntrada || '';
+  document.getElementById('fEventoActivo').checked = ev.activo !== false;
+  document.getElementById('fEventoImagenArchivo').value = '';
+  eventoImagenBase64Temp = ev.imagen || null;
+  const preview = document.getElementById('fEventoImagenPreview');
+  if(ev.imagen){ preview.src = ev.imagen; preview.style.display = 'block'; }
+  else { preview.style.display = 'none'; }
+  elegirTurnoEvento(ev.turno || 'cena');
+  document.getElementById('eventoModalError').textContent = '';
+  document.getElementById('overlayEvento').classList.add('open');
+}
+function cerrarModalEvento(){
+  document.getElementById('overlayEvento').classList.remove('open');
+}
+function guardarEvento(){
+  const errEl = document.getElementById('eventoModalError');
+  errEl.textContent = '';
+  const nombre = document.getElementById('fEventoNombre').value.trim();
+  const fecha = document.getElementById('fEventoFecha').value;
+  const horaEntrada = document.getElementById('fEventoHoraEntrada').value;
+  const turno = document.getElementById('fEventoTurno').value;
+  const descripcion = document.getElementById('fEventoDescripcion').value.trim();
+  const valorRaw = document.getElementById('fEventoValor').value;
+  const valorEntrada = valorRaw ? Number(valorRaw) : null;
+  const activo = document.getElementById('fEventoActivo').checked;
+  if(!nombre || !fecha || !horaEntrada){ errEl.textContent = 'El nombre, la fecha y la hora de entrada son obligatorios.'; return; }
+  const editId = document.getElementById('fEventoEditId').value;
+  const data = {nombre, fecha, horaEntrada, turno, descripcion, valorEntrada, activo, imagen: eventoImagenBase64Temp || null};
+  const btn = document.getElementById('btnGuardarEvento');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const promesa = editId ? eventosRef.doc(editId).update(data) : eventosRef.add(data);
+  promesa.then(() => {
+    cerrarModalEvento();
+    cargarEventosConfig();
+  }).catch(err => {
+    console.error('Error guardando evento:', err);
+    errEl.textContent = 'No se pudo guardar el evento. Intenta de nuevo.';
+  }).finally(() => {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  });
+}
+function eliminarEvento(id){
+  const ev = eventosCache.find(e => e.id === id);
+  if(!confirm(`¿Eliminar el evento "${ev ? ev.nombre : ''}"? Esto NO borra las reservas que ya se hicieron para él — solo deja de aparecer en la página pública.`)) return;
+  eventosRef.doc(id).delete().then(cargarEventosConfig).catch(err => {
+    console.error('Error eliminando evento:', err);
+    alert('No se pudo eliminar el evento.');
+  });
+}
+
+// ===== Reserva por teléfono para un evento especial =====
+// El staff puede indicar, al crear una reserva nueva por teléfono, si es
+// una reserva normal o si es para uno de los eventos especiales ya
+// configurados en Config → Eventos especiales. Si elige un evento, la
+// fecha, el turno y la hora quedan fijos a lo que ya se configuró para
+// ese evento (el staff no los toca) — solo sigue con el resto del
+// formulario (celular, nombre, pax, etc.) igual que siempre.
+let tipoReservaActual = 'normal';
+let eventosActivosCache = [];
+let eventoSeleccionadoParaReserva = null;
+
+function elegirTipoReserva(tipo){
+  tipoReservaActual = tipo;
+  const btnN = document.getElementById('btnTipoNormal');
+  const btnE = document.getElementById('btnTipoEvento');
+  if(btnN){ btnN.style.background = tipo==='normal' ? 'var(--gold)' : ''; btnN.style.color = tipo==='normal' ? '#1a1a1a' : ''; }
+  if(btnE){ btnE.style.background = tipo==='evento' ? 'var(--gold)' : ''; btnE.style.color = tipo==='evento' ? '#1a1a1a' : ''; }
+  const evBlock = document.getElementById('eventoSeleccionBlock');
+  if(evBlock) evBlock.style.display = (tipo==='evento') ? 'block' : 'none';
+  if(tipo === 'normal'){
+    eventoSeleccionadoParaReserva = null;
+    const sel = document.getElementById('fEventoSeleccionado');
+    if(sel) sel.value = '';
+    const resumen = document.getElementById('eventoSeleccionadoResumen');
+    if(resumen) resumen.style.display = 'none';
+    const wheelBlock = document.getElementById('horaWheelBlock');
+    if(wheelBlock) wheelBlock.style.display = 'block';
+  }
+}
+
+function cargarEventosActivosParaSelector(){
+  const sel = document.getElementById('fEventoSeleccionado');
+  if(!sel) return;
+  const hoy = fechaISO(new Date());
+  eventosRef.where('fecha', '>=', hoy).get().then(snap => {
+    eventosActivosCache = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .filter(ev => ev.activo !== false)
+      .sort((a,b) => a.fecha.localeCompare(b.fecha));
+    sel.innerHTML = '<option value="">— Selecciona un evento —</option>' +
+      eventosActivosCache.map(ev => `<option value="${ev.id}">${escapeHtml(ev.nombre)} — ${escapeHtml(ev.fecha)}</option>`).join('');
+  }).catch(err => console.error('No se pudieron cargar los eventos activos:', err));
+}
+
+function aplicarEventoSeleccionado(){
+  const id = document.getElementById('fEventoSeleccionado').value;
+  const resumen = document.getElementById('eventoSeleccionadoResumen');
+  if(!id){
+    eventoSeleccionadoParaReserva = null;
+    resumen.style.display = 'none';
+    document.getElementById('horaWheelBlock').style.display = 'block';
+    return;
+  }
+  const ev = eventosActivosCache.find(e => e.id === id);
+  if(!ev) return;
+  eventoSeleccionadoParaReserva = ev;
+  modalFecha = ev.fecha;
+  modalTurno = ev.turno;
+  document.getElementById('fFechaReservaEdit').value = ev.fecha;
+  document.getElementById('fTurnoReservaEdit').value = ev.turno;
+  document.getElementById('fHora').value = ev.horaEntrada;
+  document.getElementById('horaWheelBlock').style.display = 'none';
+  resumen.textContent = `🎤 ${ev.nombre} — ${ev.fecha} · Hora de entrada: ${ev.horaEntrada}`;
+  resumen.style.display = 'block';
+  document.getElementById('modalSub').textContent = `${ev.nombre} · ${ev.fecha}`;
 }
 
 // ===== CARRUSEL DE EVENTOS (página pública reservasbq.com) =====
@@ -4009,6 +4309,7 @@ function renderLista(){
     const isVip = mesaEsVip(r.mesa) || !!salonVipNombre;
     const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
     return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+      ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
       <div class="res-top">
         <div>
           <div class="res-hora">${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
@@ -5318,7 +5619,7 @@ function toggleConfigGrupo(id){
   const contenido = document.getElementById(id);
   const chevron = document.getElementById('chevron_' + id);
   const yaAbierto = contenido.style.display !== 'none';
-  ['grupoMensajes', 'grupoCarrusel', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoPeligro'].forEach(otroId => {
+  ['grupoMensajes', 'grupoCarrusel', 'grupoEventos', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoPeligro'].forEach(otroId => {
     const otroContenido = document.getElementById(otroId);
     const otroChevron = document.getElementById('chevron_' + otroId);
     if(otroContenido) otroContenido.style.display = 'none';
@@ -5514,6 +5815,7 @@ function renderSolicitudesScreen(){
     }
     return `
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+      ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
@@ -5637,6 +5939,7 @@ function abrirModal(id, mesaId){
     canalNuevoBlock.style.display = 'none';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'block';
+    document.getElementById('tipoReservaBlock').style.display = 'none';
     document.getElementById('modalTitle').textContent = r.estado==='mensaje_enviado' ? 'Solicitud: mensaje enviado' : 'Editar reserva';
     document.getElementById('modalSub').textContent = r.turno
       ? `${r.turno.charAt(0).toUpperCase()+r.turno.slice(1)} · ${r.fecha}`
@@ -5725,6 +6028,10 @@ function abrirModal(id, mesaId){
     modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
+    document.getElementById('tipoReservaBlock').style.display = 'block';
+    elegirTipoReserva('normal');
+    cargarEventosActivosParaSelector();
+    bloquearFormularioTelefonoPorHoraSinConfirmar();
     canalNuevoBlock.style.display = 'block';
     whatsappBlock.style.display = 'none';
     formCompletoBlock.style.display = 'none';
@@ -6158,6 +6465,10 @@ function guardarReserva(){
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
   };
+  if(!editandoId && tipoReservaActual === 'evento' && eventoSeleccionadoParaReserva){
+    data.eventoId = eventoSeleccionadoParaReserva.id;
+    data.eventoNombre = eventoSeleccionadoParaReserva.nombre;
+  }
   // Para el seguimiento de canceladas en los informes: guarda el motivo, y
   // si esta reserva YA estaba aprobada (confirmada/pendiente/walk-in)
   // antes de que se cancelara justo ahora — eso es lo que distingue "una
@@ -6299,6 +6610,10 @@ function enviarParaAprobacion(){
     aprobadaPorCliente: false,
     pasoPorSolicitud: true,
   };
+  if(!editandoId && tipoReservaActual === 'evento' && eventoSeleccionadoParaReserva){
+    data.eventoId = eventoSeleccionadoParaReserva.id;
+    data.eventoNombre = eventoSeleccionadoParaReserva.nombre;
+  }
 
   // La fecha de "solicitud" (cuándo entró al flujo de aprobación) no se
   // debe pisar si esta reserva ya tenía una — por ejemplo si originalmente
