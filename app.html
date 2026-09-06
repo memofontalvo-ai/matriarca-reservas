@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.38</div>
+<div class="version-tag">v4.39</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3002,13 +3002,24 @@ function cargarEventosActivosParaSelector(){
   const sel = document.getElementById('fEventoSeleccionado');
   if(!sel) return;
   const hoy = fechaISO(new Date());
-  eventosRef.where('fecha', '>=', hoy).get().then(snap => {
+  // Se trae la colección completa y se filtra aquí mismo (no con
+  // .where() en la consulta) — así no depende de que Firestore tenga
+  // listo un índice para el filtro, que es la causa más común de que
+  // esto falle en silencio.
+  eventosRef.get().then(snap => {
     eventosActivosCache = snap.docs.map(d => ({id:d.id, ...d.data()}))
-      .filter(ev => ev.activo !== false)
+      .filter(ev => ev.activo !== false && ev.fecha >= hoy)
       .sort((a,b) => a.fecha.localeCompare(b.fecha));
+    if(eventosActivosCache.length === 0){
+      sel.innerHTML = '<option value="">— No hay eventos próximos creados —</option>';
+      return;
+    }
     sel.innerHTML = '<option value="">— Selecciona un evento —</option>' +
       eventosActivosCache.map(ev => `<option value="${ev.id}">${escapeHtml(ev.nombre)} — ${escapeHtml(ev.fecha)}</option>`).join('');
-  }).catch(err => console.error('No se pudieron cargar los eventos activos:', err));
+  }).catch(err => {
+    console.error('No se pudieron cargar los eventos activos:', err);
+    sel.innerHTML = '<option value="">— No se pudieron cargar los eventos —</option>';
+  });
 }
 
 function aplicarEventoSeleccionado(){
