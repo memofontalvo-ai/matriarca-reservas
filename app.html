@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.37</div>
+<div class="version-tag">v4.38</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2843,18 +2843,38 @@ function elegirTurnoEvento(t){
 function previsualizarImagenEvento(input){
   const file = input.files[0];
   if(!file) return;
+  const errEl = document.getElementById('eventoModalError');
+  errEl.textContent = '';
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
     img.onload = () => {
-      const maxW = 1000;
+      // Los pósters de eventos suelen tener mucho detalle (fotos, texto,
+      // texturas) y pesan más que las fotos del carrusel — por eso acá se
+      // usa un ancho más chico (700px) y, si aun así queda pesado, se va
+      // bajando la calidad varias veces hasta quedar bien por debajo del
+      // límite de 1MB por documento que tiene Firestore.
+      const maxW = 700;
       const escala = Math.min(1, maxW / img.width);
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.width * escala);
       canvas.height = Math.round(img.height * escala);
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      eventoImagenBase64Temp = canvas.toDataURL('image/jpeg', 0.72);
+      let calidad = 0.72;
+      let resultado = canvas.toDataURL('image/jpeg', calidad);
+      // 700,000 caracteres de base64 ≈ ~525KB reales — deja margen de
+      // sobra para el resto de los campos del evento dentro del límite
+      // de 1MB del documento.
+      while(resultado.length > 700000 && calidad > 0.2){
+        calidad -= 0.12;
+        resultado = canvas.toDataURL('image/jpeg', calidad);
+      }
+      if(resultado.length > 900000){
+        errEl.textContent = 'Esta imagen sigue muy pesada incluso comprimida — prueba con una foto más simple o de menor resolución.';
+        return;
+      }
+      eventoImagenBase64Temp = resultado;
       const preview = document.getElementById('fEventoImagenPreview');
       preview.src = eventoImagenBase64Temp;
       preview.style.display = 'block';
@@ -2925,7 +2945,16 @@ function guardarEvento(){
     cargarEventosConfig();
   }).catch(err => {
     console.error('Error guardando evento:', err);
-    errEl.textContent = 'No se pudo guardar el evento. Intenta de nuevo.';
+    // Mostramos el motivo real, no un mensaje genérico — así se sabe de
+    // una vez si es un tema de permisos (falta la regla de Firestore
+    // para "eventos") o si la imagen quedó demasiado pesada.
+    if(err.code === 'permission-denied'){
+      errEl.textContent = 'No tienes permiso para guardar esto — falta agregar la regla de "eventos" en Firestore (pídesela a Claude si no la has puesto).';
+    } else if(err.message && err.message.includes('longer than')){
+      errEl.textContent = 'La imagen quedó demasiado pesada para guardarla. Intenta con una foto más liviana o más simple.';
+    } else {
+      errEl.textContent = `No se pudo guardar el evento (${err.code || err.message || 'error desconocido'}).`;
+    }
   }).finally(() => {
     btn.disabled = false; btn.textContent = 'Guardar';
   });
