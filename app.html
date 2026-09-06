@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.41</div>
+<div class="version-tag">v4.42</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2993,6 +2993,15 @@ function elegirTipoReserva(tipo){
   if(btnE){ btnE.style.background = tipo==='evento' ? 'var(--gold)' : ''; btnE.style.color = tipo==='evento' ? '#1a1a1a' : ''; }
   const evBlock = document.getElementById('eventoSeleccionBlock');
   if(evBlock) evBlock.style.display = (tipo==='evento') ? 'block' : 'none';
+  if(tipo === 'evento'){
+    // Todos los eventos especiales ya tienen su propia fecha y hora
+    // configurada — no tiene sentido mostrar el selector genérico de
+    // fecha/turno/hora ni siquiera antes de elegir cuál evento es, así
+    // que se oculta de una vez al entrar a este modo, no solo después
+    // de tocar una tarjeta puntual.
+    document.getElementById('fechaReservaEditBlock').style.display = 'none';
+    document.getElementById('horaWheelBlock').style.display = 'none';
+  }
   if(tipo === 'normal'){
     eventoSeleccionadoParaReserva = null;
     const sel = document.getElementById('fEventoSeleccionado');
