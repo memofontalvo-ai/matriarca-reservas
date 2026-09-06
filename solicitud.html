@@ -190,7 +190,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.12</div>
+<div class="version-tag">v3.14</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -747,7 +747,7 @@ const firebaseConfig = {
       datos.horaSolicitud = ahora.toISOString();
       operacion = generarCodigoReserva().then(codigo => {
         datos.codigoReserva = codigo;
-        return db.collection('reservas').add(datos);
+        return crearReservaConCandado(datos);
       });
     }
 
@@ -767,7 +767,11 @@ const firebaseConfig = {
       document.getElementById('confirmacion').style.display = 'block';
     }).catch(err => {
       console.error(err);
-      errorMsg.textContent = 'No se pudo enviar la solicitud. Revisa tu conexión e intenta de nuevo.';
+      if(err && err.motivo === 'DUPLICADO_SIMULTANEO'){
+        errorMsg.textContent = 'Justo en este instante ya se registró una reserva con este mismo celular para esta fecha y turno. Revisa si ya está registrada antes de intentar de nuevo.';
+      } else {
+        errorMsg.textContent = 'No se pudo enviar la solicitud. Revisa tu conexión e intenta de nuevo.';
+      }
       errorMsg.style.display = 'block';
       btn.disabled = false;
       btn.textContent = 'Enviar solicitud de reserva';
@@ -781,6 +785,35 @@ const firebaseConfig = {
   // "573001234567" cuenten como LA MISMA persona y no se dupliquen.
   function normalizarTelefono(celularCompleto){
     return (celularCompleto||'').replace(/\D/g,'');
+  }
+  // ============ CANDADO ATÓMICO CONTRA DUPLICADOS SIMULTÁNEOS ============
+  // Mismo mecanismo que usa app.html: un documento de "candado" con un id
+  // predecible (celular + fecha + turno) que Firestore solo deja crear
+  // una vez de forma seaura mediante una transacción — si dos solicitudes
+  // para el mismo celular/fecha/turno llegan casi al mismo instante (por
+  // ejemplo, dos personas de la misma familia mandando la misma reserva
+  // por error, o el cliente y el staff casi al tiempo), la segunda
+  // encuentra el candado ya puesto y no se guarda duplicada.
+  const bloqueosReservaRef = db.collection('bloqueosReserva');
+  function idCandadoReserva(celularCompleto, fecha, turno){
+    return `${normalizarTelefono(celularCompleto)}_${fecha}_${turno}`;
+  }
+  function crearReservaConCandado(datos){
+    const lockId = idCandadoReserva(datos.celular, datos.fecha, datos.turno);
+    const lockRef = bloqueosReservaRef.doc(lockId);
+    const reservaRef = db.collection('reservas').doc();
+    return db.runTransaction(tx => {
+      return tx.get(lockRef).then(lockDoc => {
+        if(lockDoc.exists && lockDoc.data().estado !== 'cancelada'){
+          const err = new Error('Ya se registró una reserva para este celular, fecha y turno justo en este momento.');
+          err.motivo = 'DUPLICADO_SIMULTANEO';
+          throw err;
+        }
+        tx.set(reservaRef, datos);
+        tx.set(lockRef, { reservaId: reservaRef.id, estado: datos.estado || 'solicitud' });
+        return reservaRef;
+      });
+    });
   }
   // ===== Detección de solicitudes/reservas duplicadas =====
   // Consulta si este celular ya tiene una reserva activa (no cancelada)
@@ -842,6 +875,15 @@ const firebaseConfig = {
   // los campos que todavía tenga vacíos, para no pisarle algo que ya
   // escribió a mano en este mismo formulario.
   function cerrarFormularioSolicitud(){
+    // Si ya se ve la pantalla de "¡Solicitud enviada!" (o "en lista de
+    // espera"), ya no hay nada que perder — los datos ya quedaron
+    // guardados en Firestore. En ese caso se cierra directo, sin
+    // preguntar, para no confundir al cliente con un aviso que no aplica.
+    const yaSeEnvio = document.getElementById('confirmacion')?.style.display === 'block';
+    if(yaSeEnvio){
+      window.location.href = 'index.html';
+      return;
+    }
     const camposConDatos = [
       document.getElementById('fCelular')?.value,
       document.getElementById('fNombre')?.value,
