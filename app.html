@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.39</div>
+<div class="version-tag">v4.40</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1647,10 +1647,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </div>
         <div id="eventoSeleccionBlock" style="display:none; margin-top:10px;">
           <label>Elige el evento</label>
-          <select id="fEventoSeleccionado" onchange="aplicarEventoSeleccionado()" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text); font-size:14px;">
-            <option value="">— Selecciona un evento —</option>
-          </select>
-          <div id="eventoSeleccionadoResumen" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); font-size:12.5px; line-height:1.4;"></div>
+          <input type="hidden" id="fEventoSeleccionado" value="">
+          <div id="parrillaEventosTelefono" style="display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; padding:2px;"></div>
+          <div id="eventoSeleccionadoResumen" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); font-size:12.5px; line-height:1.4;">
+            <div id="eventoSeleccionadoResumenTexto"></div>
+            <button type="button" onclick="cambiarEventoSeleccionado()" style="margin-top:6px; padding:5px 9px; border-radius:7px; border:1px solid var(--border); background:var(--panel); color:var(--text-muted); font-size:11.5px;">Cambiar evento</button>
+          </div>
         </div>
       </div>
       <div class="field phone-date-section" id="fechaReservaEditBlock" style="display:none;">
@@ -2993,14 +2995,17 @@ function elegirTipoReserva(tipo){
     if(sel) sel.value = '';
     const resumen = document.getElementById('eventoSeleccionadoResumen');
     if(resumen) resumen.style.display = 'none';
+    const parrilla = document.getElementById('parrillaEventosTelefono');
+    if(parrilla) parrilla.style.display = 'flex';
     const wheelBlock = document.getElementById('horaWheelBlock');
     if(wheelBlock) wheelBlock.style.display = 'block';
   }
 }
 
 function cargarEventosActivosParaSelector(){
-  const sel = document.getElementById('fEventoSeleccionado');
-  if(!sel) return;
+  const cont = document.getElementById('parrillaEventosTelefono');
+  if(!cont) return;
+  cont.innerHTML = '<div style="color:var(--text-muted); font-size:12.5px; padding:8px;">Cargando eventos…</div>';
   const hoy = fechaISO(new Date());
   // Se trae la colección completa y se filtra aquí mismo (no con
   // .where() en la consulta) — así no depende de que Firestore tenga
@@ -3010,29 +3015,37 @@ function cargarEventosActivosParaSelector(){
     eventosActivosCache = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .filter(ev => ev.activo !== false && ev.fecha >= hoy)
       .sort((a,b) => a.fecha.localeCompare(b.fecha));
-    if(eventosActivosCache.length === 0){
-      sel.innerHTML = '<option value="">— No hay eventos próximos creados —</option>';
-      return;
-    }
-    sel.innerHTML = '<option value="">— Selecciona un evento —</option>' +
-      eventosActivosCache.map(ev => `<option value="${ev.id}">${escapeHtml(ev.nombre)} — ${escapeHtml(ev.fecha)}</option>`).join('');
+    renderParrillaEventosTelefono();
   }).catch(err => {
     console.error('No se pudieron cargar los eventos activos:', err);
-    sel.innerHTML = '<option value="">— No se pudieron cargar los eventos —</option>';
+    cont.innerHTML = '<div style="color:var(--text-muted); font-size:12.5px; padding:8px;">No se pudieron cargar los eventos.</div>';
   });
 }
 
-function aplicarEventoSeleccionado(){
-  const id = document.getElementById('fEventoSeleccionado').value;
-  const resumen = document.getElementById('eventoSeleccionadoResumen');
-  if(!id){
-    eventoSeleccionadoParaReserva = null;
-    resumen.style.display = 'none';
-    document.getElementById('horaWheelBlock').style.display = 'block';
+// Pinta la misma idea de "parrilla" que ve el cliente en eventos.html,
+// pero como tarjetas chiquitas dentro del modal — con foto, nombre y
+// fecha — para que el staff elija tocando, igual de fácil que el cliente.
+function renderParrillaEventosTelefono(){
+  const cont = document.getElementById('parrillaEventosTelefono');
+  if(!cont) return;
+  if(eventosActivosCache.length === 0){
+    cont.innerHTML = '<div style="color:var(--text-muted); font-size:12.5px; padding:8px;">No hay eventos próximos creados. Créalos en Config → Eventos especiales.</div>';
     return;
   }
+  cont.innerHTML = eventosActivosCache.map(ev => `
+    <div class="parrilla-evento-card" data-evento-id="${ev.id}" onclick='elegirEventoTelefono(${JSON.stringify(ev.id)})' style="display:flex; gap:10px; align-items:center; padding:8px; border-radius:10px; border:1px solid ${eventoSeleccionadoParaReserva && eventoSeleccionadoParaReserva.id===ev.id ? 'var(--gold)' : 'var(--border)'}; background:${eventoSeleccionadoParaReserva && eventoSeleccionadoParaReserva.id===ev.id ? 'rgba(201,161,90,0.14)' : 'var(--panel-alt)'}; cursor:pointer;">
+      ${ev.imagen ? `<img src="${ev.imagen}" style="width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;">` : `<div style="width:56px; height:56px; border-radius:8px; background:var(--panel); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px;">🎤</div>`}
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(ev.nombre)}</div>
+        <div style="font-size:12px; color:var(--text-muted);">${escapeHtml(ev.fecha)} · Entrada ${escapeHtml(ev.horaEntrada||'—')}</div>
+      </div>
+    </div>`).join('');
+}
+
+function elegirEventoTelefono(id){
   const ev = eventosActivosCache.find(e => e.id === id);
   if(!ev) return;
+  document.getElementById('fEventoSeleccionado').value = id;
   eventoSeleccionadoParaReserva = ev;
   modalFecha = ev.fecha;
   modalTurno = ev.turno;
@@ -3040,9 +3053,21 @@ function aplicarEventoSeleccionado(){
   document.getElementById('fTurnoReservaEdit').value = ev.turno;
   document.getElementById('fHora').value = ev.horaEntrada;
   document.getElementById('horaWheelBlock').style.display = 'none';
-  resumen.textContent = `🎤 ${ev.nombre} — ${ev.fecha} · Hora de entrada: ${ev.horaEntrada}`;
-  resumen.style.display = 'block';
+  document.getElementById('parrillaEventosTelefono').style.display = 'none';
+  document.getElementById('eventoSeleccionadoResumenTexto').textContent = `🎤 ${ev.nombre} — ${ev.fecha} · Hora de entrada: ${ev.horaEntrada}`;
+  document.getElementById('eventoSeleccionadoResumen').style.display = 'block';
   document.getElementById('modalSub').textContent = `${ev.nombre} · ${ev.fecha}`;
+}
+
+// Por si el staff se equivocó de evento y quiere volver a ver la
+// parrilla completa para elegir otro.
+function cambiarEventoSeleccionado(){
+  document.getElementById('fEventoSeleccionado').value = '';
+  eventoSeleccionadoParaReserva = null;
+  document.getElementById('eventoSeleccionadoResumen').style.display = 'none';
+  document.getElementById('parrillaEventosTelefono').style.display = 'flex';
+  document.getElementById('horaWheelBlock').style.display = 'block';
+  renderParrillaEventosTelefono();
 }
 
 // ===== CARRUSEL DE EVENTOS (página pública reservasbq.com) =====
