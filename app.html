@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.40</div>
+<div class="version-tag">v4.41</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1654,6 +1654,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button type="button" onclick="cambiarEventoSeleccionado()" style="margin-top:6px; padding:5px 9px; border-radius:7px; border:1px solid var(--border); background:var(--panel); color:var(--text-muted); font-size:11.5px;">Cambiar evento</button>
           </div>
         </div>
+      </div>
+      <div id="eventoFechaFijaResumen" style="display:none; margin:10px 0; padding:12px 14px; border-radius:10px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); text-align:center;">
+        <div style="font-size:11px; letter-spacing:1px; color:var(--gold-bright); text-transform:uppercase; margin-bottom:4px;">🎤 Fecha y hora fijas al evento</div>
+        <div id="eventoFechaFijaResumenTexto" style="font-size:14px; font-weight:700;"></div>
       </div>
       <div class="field phone-date-section" id="fechaReservaEditBlock" style="display:none;">
         <div class="phone-section-title">▣ <span>Fecha y turno de la reserva</span></div>
@@ -2999,6 +3003,12 @@ function elegirTipoReserva(tipo){
     if(parrilla) parrilla.style.display = 'flex';
     const wheelBlock = document.getElementById('horaWheelBlock');
     if(wheelBlock) wheelBlock.style.display = 'block';
+    const eventoFija = document.getElementById('eventoFechaFijaResumen');
+    if(eventoFija) eventoFija.style.display = 'none';
+    // Vuelve al estado por defecto de una reserva nueva de "hoy": la
+    // sección de fecha/turno queda oculta hasta que el staff la abra a
+    // propósito (igual que siempre ha funcionado para reservas normales).
+    document.getElementById('fechaReservaEditBlock').style.display = 'none';
   }
 }
 
@@ -3052,7 +3062,15 @@ function elegirEventoTelefono(id){
   document.getElementById('fFechaReservaEdit').value = ev.fecha;
   document.getElementById('fTurnoReservaEdit').value = ev.turno;
   document.getElementById('fHora').value = ev.horaEntrada;
+  // Fecha, turno y hora quedan fijos al evento — se oculta TODA esa
+  // sección (no solo la rueda de hora) para que el staff no la pueda
+  // tocar, y se muestra en su lugar un resumen fijo con lo que ya quedó
+  // configurado al crear el evento.
+  document.getElementById('fechaReservaEditBlock').style.display = 'none';
   document.getElementById('horaWheelBlock').style.display = 'none';
+  const TURNO_LABEL_TEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  document.getElementById('eventoFechaFijaResumenTexto').textContent = `${ev.fecha} · ${TURNO_LABEL_TEL[ev.turno]||ev.turno} · Hora de entrada ${ev.horaEntrada}`;
+  document.getElementById('eventoFechaFijaResumen').style.display = 'block';
   document.getElementById('parrillaEventosTelefono').style.display = 'none';
   document.getElementById('eventoSeleccionadoResumenTexto').textContent = `🎤 ${ev.nombre} — ${ev.fecha} · Hora de entrada: ${ev.horaEntrada}`;
   document.getElementById('eventoSeleccionadoResumen').style.display = 'block';
@@ -3066,6 +3084,8 @@ function cambiarEventoSeleccionado(){
   eventoSeleccionadoParaReserva = null;
   document.getElementById('eventoSeleccionadoResumen').style.display = 'none';
   document.getElementById('parrillaEventosTelefono').style.display = 'flex';
+  document.getElementById('eventoFechaFijaResumen').style.display = 'none';
+  document.getElementById('fechaReservaEditBlock').style.display = 'block';
   document.getElementById('horaWheelBlock').style.display = 'block';
   renderParrillaEventosTelefono();
 }
