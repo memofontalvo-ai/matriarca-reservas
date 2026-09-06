@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.42</div>
+<div class="version-tag">v4.43</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3087,15 +3087,15 @@ function elegirEventoTelefono(id){
 }
 
 // Por si el staff se equivocó de evento y quiere volver a ver la
-// parrilla completa para elegir otro.
+// parrilla completa para elegir otro. OJO: sigue en modo "evento", así
+// que la fecha/turno/hora genéricas NO se vuelven a mostrar — cualquier
+// evento que elija después también trae la suya propia.
 function cambiarEventoSeleccionado(){
   document.getElementById('fEventoSeleccionado').value = '';
   eventoSeleccionadoParaReserva = null;
   document.getElementById('eventoSeleccionadoResumen').style.display = 'none';
   document.getElementById('parrillaEventosTelefono').style.display = 'flex';
   document.getElementById('eventoFechaFijaResumen').style.display = 'none';
-  document.getElementById('fechaReservaEditBlock').style.display = 'block';
-  document.getElementById('horaWheelBlock').style.display = 'block';
   renderParrillaEventosTelefono();
 }
 
@@ -4158,7 +4158,7 @@ let editandoId = null;
 let mesaPreseleccionada = null;
 let modalFecha = null;
 let modalTurno = null;
-let estadoSeleccionado = 'confirmada';
+let estadoSeleccionado = 'pendiente';
 
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -6150,7 +6150,11 @@ function abrirModal(id, mesaId){
     document.getElementById('fWhatsTelefonoCod').value = '57';
     document.getElementById('fWhatsTelefono').value = '';
     document.getElementById('fWhatsContacto').value = '';
-    estadoSeleccionado = 'confirmada';
+    // Por defecto queda "pendiente" — la persona que toma la llamada no
+    // siempre puede confirmar de una vez (puede depender de disponibilidad,
+    // de que el cliente confirme algo, etc.). Si ya está confirmada de
+    // verdad, el staff la cambia a "Confirmada" a mano.
+    estadoSeleccionado = 'pendiente';
     document.getElementById('fMotivoCancelacion').value = '';
     actualizarEstadoUI();
     btnEliminar.style.display = 'none';
