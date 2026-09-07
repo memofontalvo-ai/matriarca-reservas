@@ -191,7 +191,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.18</div>
+<div class="version-tag">v3.19</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -506,6 +506,15 @@ const firebaseConfig = {
     btnE.classList.toggle('activo-tipo', tipo==='evento');
     const parrilla = document.getElementById('parrillaEventosPublica');
     if(tipo === 'evento'){
+      // Apenas se elige "Evento especial" se oculta la fecha/hora
+      // genérica — no hace falta esperar a que elija un evento puntual,
+      // porque cualquier evento que escoja ya trae su propia fecha fija.
+      const dateCarouselHide = document.getElementById('dateCarousel');
+      if(dateCarouselHide) dateCarouselHide.style.display = 'none';
+      const turnoOptsHide = document.getElementById('turnoOpts');
+      if(turnoOptsHide) turnoOptsHide.style.display = 'none';
+      const horaWheelHide = document.getElementById('horaWheelBlockPublico');
+      if(horaWheelHide) horaWheelHide.style.display = 'none';
       parrilla.style.display = 'block';
       if(parrilla.dataset.cargado !== '1'){
         parrilla.dataset.cargado = '1';
