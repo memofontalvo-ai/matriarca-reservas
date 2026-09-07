@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.43</div>
+<div class="version-tag">v4.44</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3014,10 +3014,12 @@ function elegirTipoReserva(tipo){
     if(wheelBlock) wheelBlock.style.display = 'block';
     const eventoFija = document.getElementById('eventoFechaFijaResumen');
     if(eventoFija) eventoFija.style.display = 'none';
-    // Vuelve al estado por defecto de una reserva nueva de "hoy": la
-    // sección de fecha/turno queda oculta hasta que el staff la abra a
-    // propósito (igual que siempre ha funcionado para reservas normales).
-    document.getElementById('fechaReservaEditBlock').style.display = 'none';
+    // A diferencia de lo que se pensó antes: una reserva nueva por
+    // teléfono SIEMPRE arranca mostrando "Fecha y turno de la reserva"
+    // visible (no solo la hora) — por eso, al volver de "Evento especial"
+    // a "Reserva normal", hay que restaurar esa sección a la vista,
+    // no dejarla oculta.
+    document.getElementById('fechaReservaEditBlock').style.display = 'block';
   }
 }
 
