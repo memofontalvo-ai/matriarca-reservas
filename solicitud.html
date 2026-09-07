@@ -59,6 +59,7 @@ button{cursor:pointer}
 }
 .subtitle{text-align:center;color:#dfe1e5;font-size:17px;font-weight:700;margin:8px 0 2px}
 .subtitle-small{text-align:center;color:var(--muted);font-size:12px;margin-bottom:18px}
+.activo-tipo{background:linear-gradient(180deg,var(--gold-bright),var(--gold)) !important; color:#111 !important; border-color:var(--gold-bright) !important;}
 
 .section{margin-top:18px}
 .section-title{
@@ -190,7 +191,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.17</div>
+<div class="version-tag">v3.18</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -201,6 +202,15 @@ button{cursor:pointer}
   <div id="formulario">
     <div class="subtitle">Cuéntanos los detalles de tu reserva</div>
     <div class="subtitle-small">Completa la información para asegurar tu mesa.</div>
+
+    <div id="tipoReservaBlockPublico" style="display:none; margin:14px 0;">
+      <div style="font-size:11px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; margin-bottom:8px; text-align:center;">¿Qué tipo de reserva quieres hacer?</div>
+      <div style="display:flex; gap:10px;">
+        <button type="button" id="btnTipoNormalPublico" class="activo-tipo" onclick="elegirTipoReservaPublico('normal')" style="flex:1; padding:12px; border-radius:12px; border:1px solid var(--border); background:#1c1c1c; color:#fff; font-size:14px; font-weight:700;">🍽 Reserva normal</button>
+        <button type="button" id="btnTipoEventoPublico" onclick="elegirTipoReservaPublico('evento')" style="flex:1; padding:12px; border-radius:12px; border:1px solid var(--border); background:#1c1c1c; color:#fff; font-size:14px; font-weight:700;">🎤 Evento especial</button>
+      </div>
+      <div id="parrillaEventosPublica" style="display:none; margin-top:12px;"></div>
+    </div>
 
     <div id="bannerEvento" style="display:none; margin:12px 0 18px; padding:14px 16px; border-radius:12px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); text-align:center;">
       <div style="font-size:11px; letter-spacing:1px; color:var(--gold-bright); text-transform:uppercase; margin-bottom:3px;">🎤 Reserva para el evento especial</div>
@@ -442,45 +452,108 @@ const firebaseConfig = {
   // para no saltarse la validación de duplicados.
   const eventoIdActual = new URLSearchParams(location.search).get('evento');
   let eventoActual = null;
+  const TURNO_LABEL_EVT = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+
+  // Aplica un evento (venga del link directo ?evento=xxx o de que el
+  // cliente lo haya elegido de la parrilla dentro del mismo formulario) —
+  // misma lógica en los dos casos, para no duplicar código.
+  function aplicarEventoPublico(ev){
+    eventoActual = ev;
+    document.getElementById('bannerEventoNombre').textContent = eventoActual.nombre;
+    document.getElementById('bannerEventoFecha').textContent = `${eventoActual.fecha} · Entrada ${eventoActual.horaEntrada||''} · ${TURNO_LABEL_EVT[eventoActual.turno]||eventoActual.turno}`;
+    document.getElementById('bannerEventoValor').textContent = eventoActual.valorEntrada ? `Valor de entrada: $${Number(eventoActual.valorEntrada).toLocaleString('es-CO')}` : '';
+    document.getElementById('bannerEvento').style.display = 'block';
+    document.getElementById('fFecha').value = eventoActual.fecha;
+    document.getElementById('fFecha').dispatchEvent(new Event('change'));
+    document.getElementById('fHora').value = eventoActual.horaEntrada || '';
+    if(eventoActual.horaEntrada){
+      const [hhEv, mmEv] = eventoActual.horaEntrada.split(':').map(Number);
+      const ampmEv = hhEv >= 12 ? 'PM' : 'AM';
+      let h12Ev = hhEv % 12; if(h12Ev === 0) h12Ev = 12;
+      const horaResumenEl = document.getElementById('horaResumen');
+      if(horaResumenEl) horaResumenEl.textContent = `${String(h12Ev).padStart(2,'0')}:${String(mmEv).padStart(2,'0')} ${ampmEv}`;
+    }
+    const dateCarousel = document.getElementById('dateCarousel');
+    if(dateCarousel) dateCarousel.style.display = 'none';
+    const turnoOptsEl = document.getElementById('turnoOpts');
+    if(turnoOptsEl) turnoOptsEl.style.display = 'none';
+    const horaWheelBlockEl = document.getElementById('horaWheelBlockPublico');
+    if(horaWheelBlockEl) horaWheelBlockEl.style.display = 'none';
+    const btnConfirmar = document.getElementById('btnConfirmarHora');
+    if(btnConfirmar) btnConfirmar.textContent = '✓ Continuar con esta reserva';
+    const parrilla = document.getElementById('parrillaEventosPublica');
+    if(parrilla) parrilla.style.display = 'none';
+  }
+
   if(eventoIdActual){
+    // Llegó por un link directo de un evento (compartido en redes) — se
+    // amarra de una vez, sin mostrarle el selector de tipo de reserva.
     db.collection('eventos').doc(eventoIdActual).get().then(doc => {
       if(!doc.exists || doc.data().activo === false) return; // link viejo o evento ya no disponible: sigue como solicitud normal
-      eventoActual = doc.data();
-      const TURNO_LABEL_EVT = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-      document.getElementById('bannerEventoNombre').textContent = eventoActual.nombre;
-      document.getElementById('bannerEventoFecha').textContent = `${eventoActual.fecha} · Entrada ${eventoActual.horaEntrada||''} · ${TURNO_LABEL_EVT[eventoActual.turno]||eventoActual.turno}`;
-      if(eventoActual.valorEntrada){
-        document.getElementById('bannerEventoValor').textContent = `Valor de entrada: $${Number(eventoActual.valorEntrada).toLocaleString('es-CO')}`;
-      }
-      document.getElementById('bannerEvento').style.display = 'block';
-      // Fecha, turno y hora quedan fijos al evento — se oculta todo lo
-      // que el cliente normalmente elegiría (carrusel de fecha, ruedas
-      // de hora, botones de turno). Solo queda visible el celular y el
-      // botón de continuar, más abajo.
-      document.getElementById('fFecha').value = eventoActual.fecha;
-      document.getElementById('fFecha').dispatchEvent(new Event('change'));
-      document.getElementById('fHora').value = eventoActual.horaEntrada || '';
-      // El resumen de hora que se ve arriba (junto a la fecha) se maneja
-      // con una variable interna de la rueda que aquí no tocamos — por
-      // eso hay que actualizar el texto directamente, o se queda
-      // mostrando la hora por defecto de la rueda (08:20 PM) aunque el
-      // valor real ya esté fijado correctamente por debajo.
-      if(eventoActual.horaEntrada){
-        const [hhEv, mmEv] = eventoActual.horaEntrada.split(':').map(Number);
-        const ampmEv = hhEv >= 12 ? 'PM' : 'AM';
-        let h12Ev = hhEv % 12; if(h12Ev === 0) h12Ev = 12;
-        const horaResumenEl = document.getElementById('horaResumen');
-        if(horaResumenEl) horaResumenEl.textContent = `${String(h12Ev).padStart(2,'0')}:${String(mmEv).padStart(2,'0')} ${ampmEv}`;
-      }
-      const dateCarousel = document.getElementById('dateCarousel');
-      if(dateCarousel) dateCarousel.style.display = 'none';
-      const turnoOptsEl = document.getElementById('turnoOpts');
-      if(turnoOptsEl) turnoOptsEl.style.display = 'none';
-      const horaWheelBlockEl = document.getElementById('horaWheelBlockPublico');
-      if(horaWheelBlockEl) horaWheelBlockEl.style.display = 'none';
-      const btnConfirmar = document.getElementById('btnConfirmarHora');
-      if(btnConfirmar) btnConfirmar.textContent = '✓ Continuar con esta reserva';
+      document.getElementById('tipoReservaBlockPublico').style.display = 'none';
+      aplicarEventoPublico({ id: eventoIdActual, ...doc.data() });
     }).catch(err => console.error('No se pudo cargar el evento:', err));
+  } else {
+    // Llegó de forma general (ej. desde "Reservar ahora" en la página de
+    // inicio) — se le pregunta qué tipo de reserva quiere hacer.
+    document.getElementById('tipoReservaBlockPublico').style.display = 'block';
+  }
+
+  function elegirTipoReservaPublico(tipo){
+    const btnN = document.getElementById('btnTipoNormalPublico');
+    const btnE = document.getElementById('btnTipoEventoPublico');
+    btnN.classList.toggle('activo-tipo', tipo==='normal');
+    btnE.classList.toggle('activo-tipo', tipo==='evento');
+    const parrilla = document.getElementById('parrillaEventosPublica');
+    if(tipo === 'evento'){
+      parrilla.style.display = 'block';
+      if(parrilla.dataset.cargado !== '1'){
+        parrilla.dataset.cargado = '1';
+        parrilla.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:13px; padding:14px;">Cargando eventos…</div>';
+        const hoy = fechaISOPublica(new Date());
+        db.collection('eventos').get().then(snap => {
+          const activos = snap.docs.map(d => ({id:d.id, ...d.data()}))
+            .filter(ev => ev.activo !== false && ev.fecha >= hoy)
+            .sort((a,b) => a.fecha.localeCompare(b.fecha));
+          if(activos.length === 0){
+            parrilla.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:13px; padding:14px;">Por ahora no hay eventos especiales programados.</div>';
+            return;
+          }
+          parrilla.innerHTML = activos.map(ev => `
+            <div onclick='elegirEventoDeParrillaPublica(${JSON.stringify(ev.id)})' style="display:flex; gap:10px; align-items:center; padding:10px; border-radius:12px; border:1px solid var(--border); background:#1c1c1c; margin-bottom:8px; cursor:pointer;">
+              ${ev.imagen ? `<img src="${ev.imagen}" style="width:56px; height:56px; object-fit:cover; border-radius:8px; flex-shrink:0;">` : ''}
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:14px; color:#fff;">${ev.nombre}</div>
+                <div style="font-size:12px; color:var(--muted);">${ev.fecha} · Entrada ${ev.horaEntrada||'—'}</div>
+              </div>
+            </div>`).join('');
+          window._eventosPublicosCache = activos;
+        }).catch(err => {
+          console.error('No se pudieron cargar los eventos:', err);
+          parrilla.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:13px; padding:14px;">No se pudieron cargar los eventos.</div>';
+        });
+      }
+    } else {
+      parrilla.style.display = 'none';
+      eventoActual = null;
+      document.getElementById('bannerEvento').style.display = 'none';
+      const dateCarousel = document.getElementById('dateCarousel');
+      if(dateCarousel) dateCarousel.style.display = 'flex';
+      const turnoOptsEl = document.getElementById('turnoOpts');
+      if(turnoOptsEl) turnoOptsEl.style.display = 'flex';
+      const horaWheelBlockEl = document.getElementById('horaWheelBlockPublico');
+      if(horaWheelBlockEl) horaWheelBlockEl.style.display = 'block';
+      const btnConfirmar = document.getElementById('btnConfirmarHora');
+      if(btnConfirmar) btnConfirmar.textContent = '✓ Confirmar hora seleccionada';
+    }
+  }
+  function elegirEventoDeParrillaPublica(id){
+    const ev = (window._eventosPublicosCache||[]).find(e => e.id === id);
+    if(!ev) return;
+    aplicarEventoPublico(ev);
+  }
+  function fechaISOPublica(d){
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
   let turnoSel = null;
@@ -790,7 +863,7 @@ const firebaseConfig = {
       estado: enListaEspera ? 'lista_espera' : 'solicitud', canal: 'WhatsApp (autogestión)'
     };
     if(eventoActual){
-      datos.eventoId = eventoIdActual;
+      datos.eventoId = eventoActual.id;
       datos.eventoNombre = eventoActual.nombre;
     }
 
