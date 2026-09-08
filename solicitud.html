@@ -195,7 +195,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.23</div>
+<div class="version-tag">v3.24</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -1218,6 +1218,15 @@ const firebaseConfig = {
         // anterior y esta vez los dejó en blanco, no se borran.
         if(datos.correo) update.correo = datos.correo;
         if(datos.cumpleanos) update.cumpleanos = datos.cumpleanos;
+        // La autorización de WhatsApp vive también a nivel de cliente (no
+        // solo en cada reserva individual) — así se puede filtrar la base
+        // de datos completa por quién autorizó y quién no. Se actualiza
+        // con la respuesta MÁS RECIENTE que dio el cliente.
+        if(datos.estadoAutorizacionWhatsApp){
+          update.autorizacionWhatsApp = datos.autorizacionWhatsApp;
+          update.estadoAutorizacionWhatsApp = datos.estadoAutorizacionWhatsApp;
+          update.fechaAutorizacionWhatsApp = datos.fechaAutorizacionWhatsApp;
+        }
         t.update(ref, update);
       } else {
         t.set(ref, {
@@ -1229,7 +1238,10 @@ const firebaseConfig = {
           fechaPrimeraSolicitud: hoyISO,
           fechaUltimaSolicitud: hoyISO,
           cantidadSolicitudes: 1,
-          estadoUltimaSolicitud: datos.estado || ''
+          estadoUltimaSolicitud: datos.estado || '',
+          autorizacionWhatsApp: datos.autorizacionWhatsApp || false,
+          estadoAutorizacionWhatsApp: datos.estadoAutorizacionWhatsApp || 'no_autorizado',
+          fechaAutorizacionWhatsApp: datos.fechaAutorizacionWhatsApp || null
         });
       }
     }));
