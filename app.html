@@ -1553,13 +1553,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button class="btn-config-guardar" id="btnMigrarClientes" onclick="migrarClientesDesdeReservas()">🔄 Construir base de datos desde reservas existentes</button>
           </div>
         </div>
-        <div class="config-mensaje-bloque">
-          <div class="config-mensaje-titulo">✅ Marcar clientes actuales como autorizados</div>
-          <div class="config-mensaje-sub">Botón de una sola vez: marca TODOS los clientes que ya tienes registrados como autorizados a recibir información por WhatsApp (son clientes frecuentes conocidos). De ahora en adelante, cada cliente nuevo decide por su cuenta al hacer la solicitud — este botón es solo para ponerse al día con los que ya estaban. Cuando lo uses, bórralo de aquí (avísame y te lo quito).</div>
-          <div class="config-mensaje-acciones">
-            <button class="btn-config-guardar" id="btnAutorizarClientesExistentes" onclick="autorizarTodosLosClientesExistentes()">✅ Marcar todos como autorizados</button>
-          </div>
-        </div>
         </div>
       </div>
 
@@ -1585,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.54</div>
+<div class="version-tag">v4.55</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2419,47 +2412,6 @@ async function migrarClientesDesdeReservas(){
   } catch(err){
     console.error('Error migrando clientes:', err);
     alert('Ocurrió un error durante la migración. Revisa tu conexión e intenta de nuevo — no se perdió nada de lo ya procesado.');
-  } finally {
-    if(btn){ btn.disabled = false; btn.textContent = textoOriginal; }
-  }
-}
-
-// Botón de una sola vez: marca TODOS los clientes ya registrados como
-// autorizados a recibir información por WhatsApp (decisión del negocio,
-// para ponerse al día con clientes frecuentes conocidos, de antes de que
-// existiera esta pregunta). De ahí en adelante cada cliente nuevo decide
-// por su cuenta en solicitud.html. Usa batch de Firestore por eficiencia
-// (no hace falta leer cada documento, solo escribir el mismo cambio).
-async function autorizarTodosLosClientesExistentes(){
-  if(!confirm('Esto va a marcar a TODOS los clientes que ya tienes registrados como "autorizados" a recibir información por WhatsApp — pensado para clientes frecuentes conocidos. De ahora en adelante, cada cliente nuevo elige por su cuenta al hacer una solicitud. ¿Continuar?')) return;
-
-  const btn = document.getElementById('btnAutorizarClientesExistentes');
-  const textoOriginal = btn ? btn.textContent : '';
-  if(btn){ btn.disabled = true; btn.textContent = 'Procesando…'; }
-
-  try{
-    const snap = await clientesRef.get();
-    const docs = snap.docs;
-    let procesados = 0;
-    const TAMANO_LOTE = 450; // debajo del límite de 500 escrituras por batch de Firestore
-    for(let i = 0; i < docs.length; i += TAMANO_LOTE){
-      const lote = docs.slice(i, i + TAMANO_LOTE);
-      const batch = db.batch();
-      lote.forEach(doc => {
-        batch.update(doc.ref, {
-          autorizacionWhatsApp: true,
-          estadoAutorizacionWhatsApp: 'autorizado',
-          fechaAutorizacionWhatsApp: firebase.firestore.FieldValue.serverTimestamp(),
-          origenAutorizacionWhatsApp: 'migracion_masiva_admin'
-        });
-      });
-      await batch.commit();
-      procesados += lote.length;
-    }
-    alert(`Listo. Se marcaron ${procesados} clientes como autorizados.`);
-  } catch(err){
-    console.error('Error marcando clientes como autorizados:', err);
-    alert('Ocurrió un error. Revisa tu conexión e intenta de nuevo — los que ya se procesaron antes del error quedaron guardados.');
   } finally {
     if(btn){ btn.disabled = false; btn.textContent = textoOriginal; }
   }
