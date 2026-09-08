@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.48</div>
+<div class="version-tag">v4.49</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1620,12 +1620,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="34">🇪🇸 +34</option>
             <option value="506">🇨🇷 +506</option>
           </select>
-          <input type="tel" id="fWhatsTelefono" placeholder="300 000 0000">
+          <input type="tel" id="fWhatsTelefono" placeholder="300 000 0000" onblur="reconocerClienteWhatsapp()">
         </div>
       </div>
       <div class="field">
         <label>¿Con quién estás hablando? (solo para el saludo)</label>
         <input type="text" id="fWhatsContacto" placeholder="Nombre de quien contesta">
+        <div id="clienteWhatsReconocidoAviso" style="display:none; margin-top:6px; font-size:12.5px; color:#2e8b57;">✓ Cliente ya registrado — nombre completado automáticamente.</div>
       </div>
       <div class="whatsapp-nota">
         Se le va a enviar un link de WhatsApp para que la persona llene: fecha, hora, nombre de la reserva, cantidad de personas, si quiere mesa VIP, y observaciones.
@@ -6196,6 +6197,8 @@ function abrirModal(id, mesaId){
     document.getElementById('fWhatsTelefonoCod').value = '57';
     document.getElementById('fWhatsTelefono').value = '';
     document.getElementById('fWhatsContacto').value = '';
+    const avisoWhatsReset = document.getElementById('clienteWhatsReconocidoAviso');
+    if(avisoWhatsReset) avisoWhatsReset.style.display = 'none';
     // Por defecto queda "pendiente" — la persona que toma la llamada no
     // siempre puede confirmar de una vez (puede depender de disponibilidad,
     // de que el cliente confirme algo, etc.). Si ya está confirmada de
@@ -6332,6 +6335,27 @@ function mostrarConfirmacionWhatsapp(ventana, url){
     console.error('No se pudo preparar la pantalla de confirmación:', err);
     ventana.location.href = url;
   }
+}
+
+// El teléfono es la "cédula" del cliente en la base de datos — apenas se
+// termina de escribir, se revisa si ese número ya pertenece a un cliente
+// registrado, y si es así, se completa el nombre solo (el staff lo
+// puede corregir igual, por si esta vez contesta alguien distinto).
+function reconocerClienteWhatsapp(){
+  const cod = document.getElementById('fWhatsTelefonoCod').value;
+  const local = document.getElementById('fWhatsTelefono').value.trim();
+  const aviso = document.getElementById('clienteWhatsReconocidoAviso');
+  if(aviso) aviso.style.display = 'none';
+  if(local.replace(/\D/g,'').length < 7) return;
+  const tel = normalizarTelefono(armarCelularCompleto(cod, local));
+  if(!tel) return;
+  db.collection('clientes').doc(tel).get().then(doc => {
+    if(!doc.exists) return;
+    const data = doc.data() || {};
+    const fContacto = document.getElementById('fWhatsContacto');
+    if(fContacto && data.nombre) fContacto.value = data.nombre;
+    if(aviso) aviso.style.display = 'block';
+  }).catch(err => console.error('No se pudo revisar el cliente:', err));
 }
 
 function enviarSolicitudWhatsapp(){
