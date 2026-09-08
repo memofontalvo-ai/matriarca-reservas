@@ -152,8 +152,6 @@ button{cursor:pointer}
 }
 .vip-note{color:#9aa0aa;font-size:10.5px;margin-top:6px}
 .autorizacion-whatsapp{background:#181818; border:1px solid var(--border); border-radius:12px; padding:14px}
-.autorizacion-whatsapp__label{display:flex; align-items:flex-start; gap:10px; cursor:pointer}
-.autorizacion-whatsapp__checkbox{margin-top:3px; width:18px; height:18px; flex-shrink:0; accent-color:var(--gold)}
 .autorizacion-whatsapp__texto{font-size:12.5px; line-height:1.5; color:#dfe1e5}
 .autorizacion-whatsapp__nota{font-size:11px; color:#9aa0aa; margin-top:10px; line-height:1.4}
 .autorizacion-whatsapp__politica{display:inline-block; font-size:11.5px; color:var(--gold-bright); margin-top:8px; text-decoration:underline}
@@ -197,7 +195,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.22</div>
+<div class="version-tag">v3.23</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -349,10 +347,11 @@ button{cursor:pointer}
 
     <section class="section autorizacion-whatsapp">
       <div class="section-title">Autorización para recibir información</div>
-      <label class="autorizacion-whatsapp__label" for="fAutorizacionWhatsApp">
-        <input type="checkbox" id="fAutorizacionWhatsApp" class="autorizacion-whatsapp__checkbox">
-        <span class="autorizacion-whatsapp__texto">Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.</span>
-      </label>
+      <div class="autorizacion-whatsapp__texto">Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.</div>
+      <div class="vip-opts" id="autorizacionOpts" style="margin-top:10px;">
+        <button type="button" class="vip-opt" data-val="si" onclick="elegirAutorizacionWhatsApp('si')">✅ Sí, autorizo</button>
+        <button type="button" class="vip-opt" data-val="no" onclick="elegirAutorizacionWhatsApp('no')">❌ No autorizo</button>
+      </div>
       <div class="autorizacion-whatsapp__nota">Esta autorización es voluntaria y no es necesaria para solicitar una reserva. Los mensajes relacionados directamente con tu solicitud o reserva podrán ser enviados independientemente de esta autorización.</div>
       <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" target="_blank" rel="noopener">Consultar Política de Tratamiento de Datos Personales</a>
     </section>
@@ -665,6 +664,7 @@ const firebaseConfig = {
 
   let turnoSel = null;
   let vipSel = null;
+  let autorizacionWhatsAppSel = null;
   // Turno para el que YA se le mostró el mensaje de lista de espera y el
   // cliente decidió "Continuar" a propósito. Si cambia de turno o de
   // fecha, esta confirmación se pierde y hay que volver a preguntarle —
@@ -837,7 +837,15 @@ const firebaseConfig = {
   }
   function elegirVip(v){
     vipSel = v;
-    document.querySelectorAll('.vip-opt').forEach(b => b.classList.toggle('on', b.dataset.val === v));
+    document.querySelectorAll('#vipOpts .vip-opt').forEach(b => b.classList.toggle('on', b.dataset.val === v));
+  }
+  function elegirAutorizacionWhatsApp(v){
+    autorizacionWhatsAppSel = v;
+    document.querySelectorAll('#autorizacionOpts .vip-opt').forEach(b => b.classList.toggle('on', b.dataset.val === v));
+    const errorMsg = document.getElementById('errorMsg');
+    if(errorMsg && errorMsg.style.display === 'block' && errorMsg.dataset.motivo === 'autorizacion'){
+      errorMsg.style.display = 'none';
+    }
   }
 
   // Fecha mínima: hoy
@@ -866,6 +874,13 @@ const firebaseConfig = {
     if(!fecha || !turnoSel || !hora || !nombre || !celularLocal || !pax || !vipSel){
       errorMsg.textContent = 'Por favor completa fecha, turno, hora, nombre completo, celular, cantidad de personas y si deseas VIP o mesa — son los datos que el restaurante necesita para poder atenderte.';
       errorMsg.style.display = 'block';
+      return;
+    }
+    if(!autorizacionWhatsAppSel){
+      errorMsg.textContent = 'Por favor indica si autorizas o no recibir información por WhatsApp — puedes elegir cualquiera de las dos opciones, solo necesitamos que elijas una para poder continuar.';
+      errorMsg.dataset.motivo = 'autorizacion';
+      errorMsg.style.display = 'block';
+      errorMsg.scrollIntoView({behavior:'smooth', block:'center'});
       return;
     }
     // Refuerzo de seguridad justo antes de guardar: si el turno elegido
@@ -974,8 +989,7 @@ const firebaseConfig = {
     // detener el envío de la reserva, simplemente queda como "no
     // autorizado". Campos aditivos, no tocan nada de lo que ya existía.
     {
-      const checkboxAutorizacion = document.getElementById('fAutorizacionWhatsApp');
-      const autorizoWhatsApp = checkboxAutorizacion ? checkboxAutorizacion.checked === true : false;
+      const autorizoWhatsApp = autorizacionWhatsAppSel === 'si';
       datos.autorizacionWhatsApp = autorizoWhatsApp;
       datos.estadoAutorizacionWhatsApp = autorizoWhatsApp ? 'autorizado' : 'no_autorizado';
       datos.fechaAutorizacionWhatsApp = autorizoWhatsApp ? firebase.firestore.FieldValue.serverTimestamp() : null;
