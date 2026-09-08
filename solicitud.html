@@ -151,6 +151,12 @@ button{cursor:pointer}
   text-decoration:line-through;
 }
 .vip-note{color:#9aa0aa;font-size:10.5px;margin-top:6px}
+.autorizacion-whatsapp{background:#181818; border:1px solid var(--border); border-radius:12px; padding:14px}
+.autorizacion-whatsapp__label{display:flex; align-items:flex-start; gap:10px; cursor:pointer}
+.autorizacion-whatsapp__checkbox{margin-top:3px; width:18px; height:18px; flex-shrink:0; accent-color:var(--gold)}
+.autorizacion-whatsapp__texto{font-size:12.5px; line-height:1.5; color:#dfe1e5}
+.autorizacion-whatsapp__nota{font-size:11px; color:#9aa0aa; margin-top:10px; line-height:1.4}
+.autorizacion-whatsapp__politica{display:inline-block; font-size:11.5px; color:var(--gold-bright); margin-top:8px; text-decoration:underline}
 
 .pax-control{
   display:grid;grid-template-columns:44px 1fr 44px;height:46px;
@@ -191,7 +197,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.21</div>
+<div class="version-tag">v3.22</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -341,6 +347,16 @@ button{cursor:pointer}
       </div>
     </section>
 
+    <section class="section autorizacion-whatsapp">
+      <div class="section-title">Autorización para recibir información</div>
+      <label class="autorizacion-whatsapp__label" for="fAutorizacionWhatsApp">
+        <input type="checkbox" id="fAutorizacionWhatsApp" class="autorizacion-whatsapp__checkbox">
+        <span class="autorizacion-whatsapp__texto">Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.</span>
+      </label>
+      <div class="autorizacion-whatsapp__nota">Esta autorización es voluntaria y no es necesaria para solicitar una reserva. Los mensajes relacionados directamente con tu solicitud o reserva podrán ser enviados independientemente de esta autorización.</div>
+      <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" target="_blank" rel="noopener">Consultar Política de Tratamiento de Datos Personales</a>
+    </section>
+
     <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">✈ Enviar solicitud de reserva</button>
     </div>
 
@@ -442,6 +458,21 @@ const firebaseConfig = {
   // ACTUALIZAR ese mismo registro con lo que el cliente llene aquí, para
   // no duplicar ni perder el rastro desde el primer contacto.
   const idExistente = new URLSearchParams(location.search).get('id');
+
+  // URL oficial de la Política de Tratamiento de Datos Personales — TODAVÍA
+  // NO EXISTE. Cuando La Matriarca tenga la política publicada, se pone
+  // aquí y el link se activa solo (mientras tanto, el link queda oculto
+  // para no dejar una dirección rota).
+  const URL_POLITICA_DATOS_PERSONALES = '';
+  (function prepararLinkPoliticaDatos(){
+    const link = document.getElementById('linkPoliticaDatos');
+    if(!link) return;
+    if(URL_POLITICA_DATOS_PERSONALES){
+      link.href = URL_POLITICA_DATOS_PERSONALES;
+    } else {
+      link.style.display = 'none';
+    }
+  })();
 
   // Si este link viene de una solicitud que el staff ya inició por
   // WhatsApp, se precarga el celular de una vez — para que el cliente no
@@ -938,6 +969,22 @@ const firebaseConfig = {
       listaEspera: enListaEspera,
       estado: enListaEspera ? 'lista_espera' : 'solicitud', canal: 'WhatsApp (autogestión)'
     };
+    // Autorización voluntaria para campañas de WhatsApp — lectura
+    // defensiva: si el checkbox no existiera por algún motivo, no debe
+    // detener el envío de la reserva, simplemente queda como "no
+    // autorizado". Campos aditivos, no tocan nada de lo que ya existía.
+    {
+      const checkboxAutorizacion = document.getElementById('fAutorizacionWhatsApp');
+      const autorizoWhatsApp = checkboxAutorizacion ? checkboxAutorizacion.checked === true : false;
+      datos.autorizacionWhatsApp = autorizoWhatsApp;
+      datos.estadoAutorizacionWhatsApp = autorizoWhatsApp ? 'autorizado' : 'no_autorizado';
+      datos.fechaAutorizacionWhatsApp = autorizoWhatsApp ? firebase.firestore.FieldValue.serverTimestamp() : null;
+      datos.origenAutorizacionWhatsApp = 'formulario_publico_reservas';
+      datos.versionAutorizacionWhatsApp = 'v1';
+      if(autorizoWhatsApp){
+        datos.textoAutorizacionWhatsApp = 'Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.';
+      }
+    }
     if(eventoActual){
       datos.eventoId = eventoActual.id;
       datos.eventoNombre = eventoActual.nombre;
