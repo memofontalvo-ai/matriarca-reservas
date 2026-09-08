@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.50</div>
+<div class="version-tag">v4.51</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6222,7 +6222,7 @@ function abrirModal(id, mesaId){
     const aprobacionExitoReset = document.getElementById('aprobacionExitoBlock');
     if(aprobacionExitoReset) aprobacionExitoReset.style.display = 'none';
     const formCompletoReset = document.getElementById('formCompletoBlock');
-    if(formCompletoReset) formCompletoReset.style.display = 'block';
+    if(formCompletoReset) formCompletoReset.style.display = 'none';
     // Por defecto queda "pendiente" — la persona que toma la llamada no
     // siempre puede confirmar de una vez (puede depender de disponibilidad,
     // de que el cliente confirme algo, etc.). Si ya está confirmada de
