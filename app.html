@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.46</div>
+<div class="version-tag">v4.48</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6308,6 +6308,32 @@ function urlFormularioSolicitud(id){
   return url.href;
 }
 
+// Reemplaza la pestaña que se abrió al principio (la del "Preparando el
+// link...") con una pantalla de confirmación real: un botón que el
+// staff toca a propósito para abrir WhatsApp. Que sea un toque genuino
+// de la persona (no una redirección automática por código) hace que el
+// sistema operativo maneje mejor la apertura de la app de WhatsApp, y
+// de paso deja clarísimo que el mensaje ya quedó listo — el staff
+// decide cuándo cerrar esa pestaña, sin adivinar tiempos.
+function mostrarConfirmacionWhatsapp(ventana, url){
+  if(!ventana){ window.open(url, '_blank'); return; }
+  try{
+    ventana.document.open();
+    ventana.document.write(`
+      <body style="background:#12151a;color:#edeef1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:60px 28px;text-align:center;margin:0;">
+        <div style="font-size:44px;">✅</div>
+        <h2 style="color:#e0bb78;font-size:20px;margin:14px 0 8px;">La solicitud se guardó correctamente</h2>
+        <p style="color:#8b93a3;font-size:15px;max-width:340px;margin:0 auto;">Toca el botón para abrir WhatsApp y enviarle el mensaje al cliente.</p>
+        <a href="${url}" style="display:inline-block;margin-top:26px;padding:15px 30px;background:#c9a15a;color:#1a1a1a;font-weight:700;border-radius:14px;text-decoration:none;font-size:16px;">💬 Abrir WhatsApp</a>
+        <p style="color:#5c6472;margin-top:36px;font-size:13px;">Cuando termines de enviar el mensaje, puedes cerrar esta pestaña y volver a la aplicación.</p>
+      </body>`);
+    ventana.document.close();
+  } catch(err){
+    console.error('No se pudo preparar la pantalla de confirmación:', err);
+    ventana.location.href = url;
+  }
+}
+
 function enviarSolicitudWhatsapp(){
   const cod = document.getElementById('fWhatsTelefonoCod').value;
   const telefonoLocal = document.getElementById('fWhatsTelefono').value.trim();
@@ -6352,17 +6378,7 @@ function enviarSolicitudWhatsapp(){
   }).then(docRef => {
     const mensaje = armarMensaje(MENSAJES.solicitud, { nombre: contacto, link: urlFormularioSolicitud(docRef.id) });
     const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
-    if(ventana){
-      ventana.location.href = url;
-      // La pestaña que abrimos se queda vacía/negra después de que
-      // WhatsApp toma el control (es la app la que se abre, no esa
-      // pestaña) — se cierra sola un momento después para no dejar esa
-      // pantalla en blanco ahí colgada; la app sigue normal en su
-      // propia pestaña, que nunca se tocó.
-      setTimeout(() => { try{ ventana.close(); }catch(e){} }, 1200);
-    } else {
-      window.open(url, '_blank');
-    }
+    mostrarConfirmacionWhatsapp(ventana, url);
     cerrarModal();
   }).catch(err => {
     console.error('Error creando el registro de solicitud:', err);
@@ -6815,12 +6831,7 @@ function enviarParaAprobacion(){
       menu: data.menu || 'Por definir',
     });
     const waUrl = `https://wa.me/${digitosCliente}?text=${encodeURIComponent(mensaje)}`;
-    if(ventana){
-      ventana.location.href = waUrl;
-      setTimeout(() => { try{ ventana.close(); }catch(e){} }, 1200);
-    } else {
-      window.open(waUrl, '_blank');
-    }
+    mostrarConfirmacionWhatsapp(ventana, waUrl);
     cerrarModal();
   }).catch(err => {
     console.error('Error enviando para aprobación:', err);

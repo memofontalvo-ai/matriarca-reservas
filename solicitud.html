@@ -191,7 +191,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.20</div>
+<div class="version-tag">v3.21</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -444,14 +444,19 @@ const firebaseConfig = {
   const idExistente = new URLSearchParams(location.search).get('id');
 
   // Si este link viene de una solicitud que el staff ya inició por
-  // WhatsApp (ya guardó el celular y el nombre de quien contesta al
-  // crear el registro), se precargan esos datos de una vez — para que
-  // el cliente no tenga que volver a escribir el celular que el
-  // restaurante ya tiene.
+  // WhatsApp, se precarga el celular de una vez — para que el cliente no
+  // tenga que volver a escribirlo. El nombre y los demás datos, ojo,
+  // priorizan SIEMPRE la base de datos de clientes (el teléfono es la
+  // "cédula" del cliente ahí) por encima del nombre de "quién contesta"
+  // que el staff escribió al mandar el link — porque puede contestar
+  // alguien distinto al cliente registrado (la esposa, un familiar,
+  // etc.), y lo que vale es el dato real del cliente dueño de ese
+  // número, no quién tomó el teléfono esta vez.
   if(idExistente){
     db.collection('reservas').doc(idExistente).get().then(doc => {
       if(!doc.exists) return;
       const data = doc.data() || {};
+      let telNormalizado = null;
       if(data.celular){
         const digitos = data.celular.replace(/\D/g,'');
         const codigosConocidos = ['507','593','54','56','55','34','58','52','51','57','1'];
@@ -466,16 +471,42 @@ const firebaseConfig = {
         } else {
           inputCel.value = digitos;
         }
-      }
-      if(data.nombre){
-        const fNombre = document.getElementById('fNombre');
-        if(fNombre && !fNombre.value.trim()) fNombre.value = data.nombre;
+        telNormalizado = normalizarTelefono(data.celular);
       }
       const aviso = document.getElementById('clienteReconocidoAviso');
-      if(aviso) aviso.style.display = 'block';
-      // También revisa si ese celular ya tiene más datos guardados de
-      // antes (correo, cumpleaños) por si fue cliente en otra ocasión.
-      if(typeof buscarClienteExistente === 'function') buscarClienteExistente();
+      const aplicarNombreDeContactoComoRespaldo = () => {
+        // Solo si NO existe ya un cliente registrado con ese número —
+        // ahí sí sirve de algo el nombre de quien contestó, como punto
+        // de partida (el cliente lo puede corregir si hace falta).
+        if(data.nombre){
+          const fNombre = document.getElementById('fNombre');
+          if(fNombre && !fNombre.value.trim()) fNombre.value = data.nombre;
+        }
+        if(aviso) aviso.style.display = 'block';
+      };
+      if(telNormalizado){
+        db.collection('clientes').doc(telNormalizado).get().then(clienteDoc => {
+          if(clienteDoc.exists){
+            // Cliente ya registrado: sus datos guardados mandan sobre
+            // cualquier otra cosa.
+            const cdata = clienteDoc.data() || {};
+            const fNombre = document.getElementById('fNombre');
+            const fCorreo = document.getElementById('fCorreo');
+            const fCumpleanos = document.getElementById('fCumpleanos');
+            if(fNombre && cdata.nombre) fNombre.value = cdata.nombre;
+            if(fCorreo && cdata.correo) fCorreo.value = cdata.correo;
+            if(fCumpleanos && cdata.cumpleanos) fCumpleanos.value = cdata.cumpleanos;
+            if(aviso) aviso.style.display = 'block';
+          } else {
+            aplicarNombreDeContactoComoRespaldo();
+          }
+        }).catch(err => {
+          console.error('No se pudo revisar el cliente registrado:', err);
+          aplicarNombreDeContactoComoRespaldo();
+        });
+      } else {
+        aplicarNombreDeContactoComoRespaldo();
+      }
     }).catch(err => console.error('No se pudo precargar la solicitud existente:', err));
   }
 
