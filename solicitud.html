@@ -191,7 +191,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.19</div>
+<div class="version-tag">v3.20</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -442,6 +442,42 @@ const firebaseConfig = {
   // ACTUALIZAR ese mismo registro con lo que el cliente llene aquí, para
   // no duplicar ni perder el rastro desde el primer contacto.
   const idExistente = new URLSearchParams(location.search).get('id');
+
+  // Si este link viene de una solicitud que el staff ya inició por
+  // WhatsApp (ya guardó el celular y el nombre de quien contesta al
+  // crear el registro), se precargan esos datos de una vez — para que
+  // el cliente no tenga que volver a escribir el celular que el
+  // restaurante ya tiene.
+  if(idExistente){
+    db.collection('reservas').doc(idExistente).get().then(doc => {
+      if(!doc.exists) return;
+      const data = doc.data() || {};
+      if(data.celular){
+        const digitos = data.celular.replace(/\D/g,'');
+        const codigosConocidos = ['507','593','54','56','55','34','58','52','51','57','1'];
+        const codEncontrado = codigosConocidos
+          .sort((a,b)=>b.length-a.length)
+          .find(c => digitos.startsWith(c));
+        const selCod = document.getElementById('fCelularCod');
+        const inputCel = document.getElementById('fCelular');
+        if(codEncontrado && selCod){
+          selCod.value = codEncontrado;
+          inputCel.value = digitos.slice(codEncontrado.length);
+        } else {
+          inputCel.value = digitos;
+        }
+      }
+      if(data.nombre){
+        const fNombre = document.getElementById('fNombre');
+        if(fNombre && !fNombre.value.trim()) fNombre.value = data.nombre;
+      }
+      const aviso = document.getElementById('clienteReconocidoAviso');
+      if(aviso) aviso.style.display = 'block';
+      // También revisa si ese celular ya tiene más datos guardados de
+      // antes (correo, cumpleaños) por si fue cliente en otra ocasión.
+      if(typeof buscarClienteExistente === 'function') buscarClienteExistente();
+    }).catch(err => console.error('No se pudo precargar la solicitud existente:', err));
+  }
 
   // Si el link trae ?evento=XXXX, esta solicitud viene de la parrilla
   // pública de eventos especiales (eventos.html) — la fecha, el turno y
