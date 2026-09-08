@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.44</div>
+<div class="version-tag">v4.45</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5813,9 +5813,17 @@ function renderSolicitudesScreen(){
   const atrasadas = activas.filter(r=>fechaSolicitudEfectiva(r) < hoyISO);
   const alertaEl = document.getElementById('alertaAtrasadas');
   if(atrasadas.length > 0){
-    const fechaMasAntigua = atrasadas.map(r=>fechaSolicitudEfectiva(r)).sort()[0];
-    alertaEl.innerHTML = `<div class="alerta-atrasadas" onclick="irAFechaAtrasada('${fechaMasAntigua}')">
-      ⚠ Tienes <b>${atrasadas.length}</b> solicitud${atrasadas.length===1?'':'es'} atrasada${atrasadas.length===1?'':'s'} de días anteriores sin gestionar o sin aprobar — toca para revisar la más antigua
+    // Cuenta cuántas solicitudes atrasadas hay por cada día, para que el
+    // aviso muestre un desglose y no solo el total — así se sabe de una
+    // vez dónde están, sin tener que ir mirando fecha por fecha.
+    const porDia = {};
+    atrasadas.forEach(r => {
+      const f = fechaSolicitudEfectiva(r);
+      porDia[f] = (porDia[f] || 0) + 1;
+    });
+    window._atrasadasPorDia = porDia;
+    alertaEl.innerHTML = `<div class="alerta-atrasadas" onclick="abrirDesgloseAtrasadas()">
+      ⚠ Tienes <b>${atrasadas.length}</b> solicitud${atrasadas.length===1?'':'es'} atrasada${atrasadas.length===1?'':'s'} de días anteriores sin gestionar o sin aprobar — toca para ver en qué días están
     </div>`;
   } else {
     alertaEl.innerHTML = '';
@@ -6013,6 +6021,42 @@ function irAFechaAtrasada(fechaIso){
   calSolInlineMes = fechaSolicitudes.getMonth();
   calSolInlineAno = fechaSolicitudes.getFullYear();
   renderSolicitudesScreen();
+}
+
+// Desglose de solicitudes atrasadas por día — se abre al tocar el aviso.
+// Muestra cada fecha con solicitudes sin gestionar, cuántas tiene, y al
+// tocar una fecha te lleva directo a ese día en Solicitudes.
+function abrirDesgloseAtrasadas(){
+  const porDia = window._atrasadasPorDia || {};
+  const dias = Object.keys(porDia).sort();
+  if(dias.length === 0) return;
+  const filas = dias.map(f => {
+    const [y,m,d] = f.split('-').map(Number);
+    const fechaObj = new Date(y, m-1, d, 12);
+    const label = `${DIAS[fechaObj.getDay()]} ${d} de ${MESES[m-1]}`;
+    const cant = porDia[f];
+    return `<div onclick="irAFechaAtrasada('${f}'); cerrarDesgloseAtrasadas();" style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:10px; background:var(--panel-alt); margin-bottom:8px; cursor:pointer;">
+      <span style="font-weight:600;">${label}</span>
+      <span style="background:#e8a33d; color:#1a1a1a; font-weight:700; font-size:13px; padding:3px 10px; border-radius:20px;">${cant} solicitud${cant===1?'':'es'}</span>
+    </div>`;
+  }).join('');
+  const overlay = document.createElement('div');
+  overlay.id = 'overlayDesgloseAtrasadas';
+  overlay.className = 'overlay open';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Solicitudes atrasadas por día</h3>
+      <div class="modal-sub">Toca un día para ir directo a revisarlo.</div>
+      <div style="margin:14px 0;">${filas}</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="cerrarDesgloseAtrasadas()">Cerrar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+function cerrarDesgloseAtrasadas(){
+  const el = document.getElementById('overlayDesgloseAtrasadas');
+  if(el) el.remove();
 }
 
 /* ============ MODAL ============ */
