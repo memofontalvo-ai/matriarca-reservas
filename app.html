@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.45</div>
+<div class="version-tag">v4.46</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6352,7 +6352,17 @@ function enviarSolicitudWhatsapp(){
   }).then(docRef => {
     const mensaje = armarMensaje(MENSAJES.solicitud, { nombre: contacto, link: urlFormularioSolicitud(docRef.id) });
     const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
-    if(ventana){ ventana.location.href = url; } else { window.open(url, '_blank'); }
+    if(ventana){
+      ventana.location.href = url;
+      // La pestaña que abrimos se queda vacía/negra después de que
+      // WhatsApp toma el control (es la app la que se abre, no esa
+      // pestaña) — se cierra sola un momento después para no dejar esa
+      // pantalla en blanco ahí colgada; la app sigue normal en su
+      // propia pestaña, que nunca se tocó.
+      setTimeout(() => { try{ ventana.close(); }catch(e){} }, 1200);
+    } else {
+      window.open(url, '_blank');
+    }
     cerrarModal();
   }).catch(err => {
     console.error('Error creando el registro de solicitud:', err);
@@ -6805,7 +6815,12 @@ function enviarParaAprobacion(){
       menu: data.menu || 'Por definir',
     });
     const waUrl = `https://wa.me/${digitosCliente}?text=${encodeURIComponent(mensaje)}`;
-    if(ventana){ ventana.location.href = waUrl; } else { window.open(waUrl, '_blank'); }
+    if(ventana){
+      ventana.location.href = waUrl;
+      setTimeout(() => { try{ ventana.close(); }catch(e){} }, 1200);
+    } else {
+      window.open(waUrl, '_blank');
+    }
     cerrarModal();
   }).catch(err => {
     console.error('Error enviando para aprobación:', err);
