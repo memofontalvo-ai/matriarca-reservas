@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.51</div>
+<div class="version-tag">v4.52</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6189,10 +6189,14 @@ function abrirModal(id, mesaId){
     elegirTipoReserva('normal');
     cargarEventosActivosParaSelector();
     bloquearFormularioTelefonoPorHoraSinConfirmar();
-    canalNuevoBlock.style.display = 'block';
+    // Se simplificó: ya no se pregunta "¿por teléfono o por WhatsApp?" —
+    // toda reserva nueva entra directo al formulario de teléfono. El
+    // envío de link por WhatsApp queda sin usarse por ahora (el código
+    // sigue ahí, sin borrar, por si se quiere reactivar más adelante).
+    canalNuevoBlock.style.display = 'none';
     whatsappBlock.style.display = 'none';
-    formCompletoBlock.style.display = 'none';
-    document.getElementById('modalTitle').textContent = 'Nueva reserva';
+    elegirCanalNuevo('telefono');
+    document.getElementById('modalTitle').textContent = 'Nueva reserva (Teléfono)';
     document.getElementById('modalSub').textContent = `${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha} (hoy)`;
     document.getElementById('fHora').value = '';
     document.getElementById('fHoraSalida').value = '';
