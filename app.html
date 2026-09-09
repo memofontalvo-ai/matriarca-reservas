@@ -179,6 +179,22 @@ header{
 }
 .filtro-especiales-row .especial-btn{width:100%; justify-content:center; padding:11px;}
 
+.buscador-cliente-wrap{
+  display:flex; align-items:center; gap:8px; margin:10px 16px 0;
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:12px;
+  padding:9px 12px; flex-shrink:0;
+}
+.buscador-cliente-icono{font-size:14px; opacity:.7;}
+.buscador-cliente-input{
+  flex:1; background:none; border:none; outline:none; color:var(--text);
+  font-size:14px; font-family:inherit;
+}
+.buscador-cliente-input::placeholder{color:var(--text-dim);}
+.buscador-cliente-limpiar{
+  background:none; border:none; color:var(--text-dim); font-size:13px;
+  cursor:pointer; padding:2px 4px;
+}
+
 /* ===== RESUMEN DE SOLICITUDES DEL DÍA (arriba de la lista) ===== */
 .resumen-sol-dia{
   display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
@@ -1284,6 +1300,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div class="filtro-especiales-row">
       <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()">⭐ Reservas especiales (20+ personas)</button>
     </div>
+    <div class="buscador-cliente-wrap">
+      <span class="buscador-cliente-icono">🔍</span>
+      <input type="text" id="buscarClienteSolicitudes" class="buscador-cliente-input" placeholder="Buscar por nombre o celular..." oninput="renderSolicitudesScreen()">
+      <button type="button" class="buscador-cliente-limpiar" id="btnLimpiarBuscarSolicitudes" style="display:none;" onclick="document.getElementById('buscarClienteSolicitudes').value=''; renderSolicitudesScreen();">✕</button>
+    </div>
     <div id="alertaAtrasadas"></div>
     <div class="solicitudes-panel" id="panelSolicitudes"></div>
   </div>
@@ -1325,6 +1346,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <button class="tab" data-view="resumen" onclick="cambiarVista('resumen')">Resumen</button>
       </div>
       <div class="stats" id="statsBar"></div>
+    </div>
+
+    <div class="buscador-cliente-wrap">
+      <span class="buscador-cliente-icono">🔍</span>
+      <input type="text" id="buscarClientePorDia" class="buscador-cliente-input" placeholder="Buscar por nombre o celular..." oninput="renderLista()">
+      <button type="button" class="buscador-cliente-limpiar" id="btnLimpiarBuscarPorDia" style="display:none;" onclick="document.getElementById('buscarClientePorDia').value=''; renderLista();">✕</button>
     </div>
 
     <main>
@@ -1578,7 +1605,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.56</div>
+<div class="version-tag">v4.57</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4375,9 +4402,28 @@ function renderStats(){
 }
 
 /* ============ RENDER: LISTA ============ */
+// Compara nombre o celular de una reserva contra lo que el staff escribió
+// en el buscador — sin distinguir mayúsculas/acentos para el nombre, y
+// comparando solo dígitos para el celular (así "311 660" o "3116600470"
+// encuentran lo mismo sin importar el formato).
+function coincideBusquedaCliente(r, texto){
+  if(!texto) return true;
+  const t = texto.trim().toLowerCase();
+  const nombreNorm = (r.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const tNorm = t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(nombreNorm.includes(tNorm)) return true;
+  const soloDigitosBusqueda = t.replace(/\D/g,'');
+  if(soloDigitosBusqueda && (r.celular||'').replace(/\D/g,'').includes(soloDigitosBusqueda)) return true;
+  return false;
+}
+
 function renderLista(){
+  const busquedaInput = document.getElementById('buscarClientePorDia');
+  const textoBusqueda = busquedaInput ? busquedaInput.value : '';
+  const btnLimpiarPorDia = document.getElementById('btnLimpiarBuscarPorDia');
+  if(btnLimpiarPorDia) btnLimpiarPorDia.style.display = textoBusqueda ? 'block' : 'none';
   const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
-  const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
+  const rs = reservasDelTurno().filter(r=>coincideBusquedaCliente(r, textoBusqueda)).sort((a,b)=>a.hora.localeCompare(b.hora));
   const el = document.getElementById('panelLista');
   // Aviso de bloqueo: recuerda al staff que este día/turno ya no acepta
   // solicitudes nuevas del cliente (solicitud.html lo respeta). No impide
@@ -4400,6 +4446,10 @@ function renderLista(){
     avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">${icono} Este día tiene: <b>${descripcion}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}.</div>`;
   }
   if(rs.length===0){
+    if(textoBusqueda){
+      el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusqueda)}" en este día/turno.</div>`;
+      return;
+    }
     // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
     // lo decimos explícitamente para no confundir con "no hay nada este día".
     // Esto solo aplica si estás viendo un turno específico — en "Todos" ya
@@ -5886,10 +5936,17 @@ function renderSolicitudesScreen(){
   // Solo lo del día que se está viendo en esta pantalla
   let delDia = delDiaTotal;
   if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=20);
+  const busquedaSolInput = document.getElementById('buscarClienteSolicitudes');
+  const textoBusquedaSol = busquedaSolInput ? busquedaSolInput.value : '';
+  const btnLimpiarSol = document.getElementById('btnLimpiarBuscarSolicitudes');
+  if(btnLimpiarSol) btnLimpiarSol.style.display = textoBusquedaSol ? 'block' : 'none';
+  if(textoBusquedaSol) delDia = delDia.filter(r => coincideBusquedaCliente(r, textoBusquedaSol));
 
   const el = document.getElementById('panelSolicitudes');
   if(delDia.length === 0){
-    el.innerHTML = `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+    el.innerHTML = textoBusquedaSol
+      ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en este día.</div>`
+      : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
     renderCalendarioSolInline();
     return;
   }
