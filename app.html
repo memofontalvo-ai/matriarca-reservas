@@ -1605,7 +1605,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.57</div>
+<div class="version-tag">v4.58</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4422,9 +4422,27 @@ function renderLista(){
   const textoBusqueda = busquedaInput ? busquedaInput.value : '';
   const btnLimpiarPorDia = document.getElementById('btnLimpiarBuscarPorDia');
   if(btnLimpiarPorDia) btnLimpiarPorDia.style.display = textoBusqueda ? 'block' : 'none';
-  const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
-  const rs = reservasDelTurno().filter(r=>coincideBusquedaCliente(r, textoBusqueda)).sort((a,b)=>a.hora.localeCompare(b.hora));
   const el = document.getElementById('panelLista');
+
+  // Modo búsqueda global: si hay texto escrito, se ignora por completo el
+  // día/turno que se esté mirando — se busca ese cliente en TODAS las
+  // fechas, porque su reserva puede estar en cualquier otro día, no
+  // necesariamente el que está abierto en pantalla ahora mismo.
+  if(textoBusqueda){
+    const resultados = reservas
+      .filter(r => coincideBusquedaCliente(r, textoBusqueda))
+      .sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+    if(resultados.length === 0){
+      el.innerHTML = `<div class="empty-state">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusqueda)}" en ninguna fecha.</div>`;
+      return;
+    }
+    el.innerHTML = `<div class="empty-state" style="padding:10px 4px; text-align:left; opacity:.8;">🔍 ${resultados.length} resultado${resultados.length===1?'':'s'} para "${escapeHtml(textoBusqueda)}" — en cualquier fecha:</div>`
+      + resultados.map(r => tarjetaReservaHTML(r, true)).join('');
+    return;
+  }
+
+  const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
+  const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
   // Aviso de bloqueo: recuerda al staff que este día/turno ya no acepta
   // solicitudes nuevas del cliente (solicitud.html lo respeta). No impide
   // que el staff mismo cree una reserva manual aquí si hace falta hacer
@@ -4446,10 +4464,6 @@ function renderLista(){
     avisoBloqueoHtml = `<div class="aviso-bloqueo-dia">${icono} Este día tiene: <b>${descripcion}</b>${dia.motivo?` — ${escapeHtml(dia.motivo)}`:''}.</div>`;
   }
   if(rs.length===0){
-    if(textoBusqueda){
-      el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + `<div class="empty-state">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusqueda)}" en este día/turno.</div>`;
-      return;
-    }
     // Aviso más útil: si este día SÍ tiene reservas pero en otro turno,
     // lo decimos explícitamente para no confundir con "no hay nada este día".
     // Esto solo aplica si estás viendo un turno específico — en "Todos" ya
@@ -4466,44 +4480,46 @@ function renderLista(){
     }
     return;
   }
-  const cardsHtml = rs.map(r=>{
-    const mesaTxt = r.mesa ? mesaLabelCorto(r.mesa) : '—';
-    const salonVipNombre = esSalonVipEspecial(r.mesa);
-    const isVip = mesaEsVip(r.mesa) || !!salonVipNombre;
-    const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-    return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
-      ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
-      <div class="res-top">
-        <div>
-          <div class="res-hora">${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
-          <div class="res-nombre">${escapeHtml(r.nombre)}</div>
-        </div>
-        <div class="res-top-right">
-          ${turnoActivo==='todos'?`<span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}
-          <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
-          <span class="edit-hint">✎ Editar / Eliminar</span>
-        </div>
+function tarjetaReservaHTML(r, mostrarFecha){
+  const mesaTxt = r.mesa ? mesaLabelCorto(r.mesa) : '—';
+  const salonVipNombre = esSalonVipEspecial(r.mesa);
+  const isVip = mesaEsVip(r.mesa) || !!salonVipNombre;
+  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+    ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
+    <div class="res-top">
+      <div>
+        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
+        <div class="res-nombre">${escapeHtml(r.nombre)}</div>
       </div>
-      <div class="res-meta">
-        <span>${r.pax} pax</span>
-        ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
-        ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
-        ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
-        ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
-        ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
-        ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
-        ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
+      <div class="res-top-right">
+        ${(mostrarFecha || turnoActivo==='todos')?`<span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}
+        <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
+        <span class="edit-hint">✎ Editar / Eliminar</span>
       </div>
-      ${(r.codigoReserva || r.ultimoEditorIniciales) ? `
-      <div class="res-firma">
-        ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
-        ${r.ultimoEditorIniciales?`<span title="Última vez editada por ${escapeHtml(r.ultimoEditorNombre||'')}">✎ ${escapeHtml(r.ultimoEditorIniciales)}</span>`:''}
-      </div>` : ''}
-      ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
-      ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
-      ${r.estado==='lista_espera'?`<div class="solicitud-hint">🕒 En lista de espera — avísale si se libera cupo${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
-    </div>`;
-  }).join('');
+    </div>
+    <div class="res-meta">
+      <span>${r.pax} pax</span>
+      ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
+      ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
+      ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
+      ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
+      ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
+      ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
+      ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
+    </div>
+    ${(r.codigoReserva || r.ultimoEditorIniciales) ? `
+    <div class="res-firma">
+      ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
+      ${r.ultimoEditorIniciales?`<span title="Última vez editada por ${escapeHtml(r.ultimoEditorNombre||'')}">✎ ${escapeHtml(r.ultimoEditorIniciales)}</span>`:''}
+    </div>` : ''}
+    ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
+    ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
+    ${r.estado==='lista_espera'?`<div class="solicitud-hint">🕒 En lista de espera — avísale si se libera cupo${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
+  </div>`;
+}
+
+  const cardsHtml = rs.map(r=>tarjetaReservaHTML(r, false)).join('');
 
   el.innerHTML = avisoBloqueoHtml + renderResumenTurnoHTML(rsTodas) + cardsHtml;
 }
@@ -5933,19 +5949,30 @@ function renderSolicitudesScreen(){
     }
   }
 
-  // Solo lo del día que se está viendo en esta pantalla
-  let delDia = delDiaTotal;
-  if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=20);
+  // Solo lo del día que se está viendo en esta pantalla — EXCEPTO si hay
+  // una búsqueda activa: ahí se ignora el día por completo y se busca ese
+  // cliente en TODO el historial de solicitudes, porque puede estar
+  // registrado en cualquier otra fecha, no necesariamente la que está
+  // abierta en pantalla ahora mismo.
   const busquedaSolInput = document.getElementById('buscarClienteSolicitudes');
   const textoBusquedaSol = busquedaSolInput ? busquedaSolInput.value : '';
   const btnLimpiarSol = document.getElementById('btnLimpiarBuscarSolicitudes');
   if(btnLimpiarSol) btnLimpiarSol.style.display = textoBusquedaSol ? 'block' : 'none';
-  if(textoBusquedaSol) delDia = delDia.filter(r => coincideBusquedaCliente(r, textoBusquedaSol));
+
+  let delDia;
+  if(textoBusquedaSol){
+    delDia = todas
+      .filter(r => coincideBusquedaCliente(r, textoBusquedaSol))
+      .sort((a,b) => (fechaSolicitudEfectiva(b)+(b.horaSolicitud||'')).localeCompare(fechaSolicitudEfectiva(a)+(a.horaSolicitud||'')));
+  } else {
+    delDia = delDiaTotal;
+    if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=20);
+  }
 
   const el = document.getElementById('panelSolicitudes');
   if(delDia.length === 0){
     el.innerHTML = textoBusquedaSol
-      ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en este día.</div>`
+      ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en ninguna fecha.</div>`
       : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
     renderCalendarioSolInline();
     return;
