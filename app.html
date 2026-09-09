@@ -1578,7 +1578,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.55</div>
+<div class="version-tag">v4.56</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6636,6 +6636,19 @@ function guardarReserva(){
   const horaSalidaNueva = document.getElementById('fHoraSalida').value; // opcional
   const mesaNueva = document.getElementById('fMesa').value;
   if(!mesaNueva && estadoSeleccionado !== 'cancelada'){ alert('Asigna una mesa en el plano antes de guardar — es indispensable para poder recibir al cliente ese día.'); return; }
+  // Ninguna reserva se puede cancelar sin dejar constancia del motivo —
+  // así siempre se puede dar seguimiento a por qué se cayó, sin importar
+  // desde dónde se esté cancelando (Solicitudes, Por día, etc.).
+  if(estadoSeleccionado === 'cancelada'){
+    const motivoTexto = document.getElementById('fMotivoCancelacion').value.trim();
+    if(!motivoTexto){
+      alert('Por favor ingresa el motivo de la cancelación antes de continuar — es obligatorio para poder darle seguimiento.');
+      const wrapMotivo = document.getElementById('motivoCancelacionWrap');
+      if(wrapMotivo) wrapMotivo.style.display = 'block';
+      document.getElementById('fMotivoCancelacion').focus();
+      return;
+    }
+  }
   // Si el bloque de "Fecha y turno de la reserva" está visible (solo pasa
   // al editar), usamos lo que el staff haya puesto ahí para mover la
   // reserva de día. Si no, se usa modalFecha/modalTurno tal cual (fijo en
