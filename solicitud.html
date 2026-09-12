@@ -155,6 +155,19 @@ button{cursor:pointer}
 .autorizacion-whatsapp__texto{font-size:12.5px; line-height:1.5; color:#dfe1e5}
 .autorizacion-whatsapp__nota{font-size:11px; color:#9aa0aa; margin-top:10px; line-height:1.4}
 .autorizacion-whatsapp__politica{display:inline-block; font-size:11.5px; color:var(--gold-bright); margin-top:8px; text-decoration:underline}
+.baja-datos-link{text-align:center; margin-top:16px; padding-bottom:6px;}
+.baja-datos-link a{font-size:10.5px; color:var(--text-dim); text-decoration:underline; line-height:1.5;}
+.overlay-baja-datos{position:fixed; inset:0; background:rgba(8,9,11,0.82); z-index:999; display:none; align-items:center; justify-content:center; padding:18px;}
+.overlay-baja-datos.open{display:flex;}
+.overlay-baja-datos .panel{background:#171a20; border:1px solid #343942; border-radius:16px; padding:22px; max-width:400px; width:100%;}
+.overlay-baja-datos h3{color:#f2c65d; font-size:16.5px; margin:0 0 10px;}
+.overlay-baja-datos p{font-size:12.5px; line-height:1.55; color:#d8dae0; margin-bottom:14px;}
+.overlay-baja-datos input{width:100%; padding:11px; border-radius:10px; border:1px solid #343942; background:#14171c; color:#f5f5f5; font-size:14px; margin-bottom:14px;}
+.overlay-baja-datos .btns{display:flex; gap:10px;}
+.overlay-baja-datos button{flex:1; padding:11px; border-radius:10px; border:none; font-weight:700; font-size:13px;}
+.overlay-baja-datos .btn-cancelar{background:#14171c; border:1px solid #343942; color:#e5e7eb;}
+.overlay-baja-datos .btn-confirmar{background:linear-gradient(180deg,#f2c65d,#e0ad3f); color:#111;}
+.overlay-baja-datos .ok{color:#7fd88f; font-size:13px; text-align:center;}
 
 .pax-control{
   display:grid;grid-template-columns:44px 1fr 44px;height:46px;
@@ -195,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.24</div>
+<div class="version-tag">v3.25</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -361,12 +374,28 @@ button{cursor:pointer}
 
     <div class="error-msg" id="errorMsg"></div>
     <div class="privacy">🔒 Tu información está protegida y solo se usará para tu reserva.</div>
+    <div class="baja-datos-link">
+      <a href="#" onclick="abrirBajaDatos();return false;">¿Deseas que dejemos de enviarte información sobre eventos, promociones y descuentos? Solicítalo aquí</a>
+    </div>
   </div>
 
   <div class="confirmacion" id="confirmacion">
     <div class="check">✓</div>
     <h2 id="confirmacionTitulo">¡Solicitud enviada!</h2>
     <p id="confirmacionTexto">Gracias, recibimos los detalles de tu reserva.<br>El equipo de La Matriarca te va a contactar pronto para confirmarla.</p>
+  </div>
+</div>
+
+<div class="overlay-baja-datos" id="overlayBajaDatos">
+  <div class="panel">
+    <h3>Dejar de recibir información</h3>
+    <p id="bajaDatosTexto">Escribe el número de celular con el que has hecho tus reservas. Dejaremos de enviarte información sobre eventos, programación musical, promociones, descuentos y novedades. Esto no afecta tu reserva ni los mensajes relacionados directamente con ella.</p>
+    <input type="tel" id="bajaDatosCelular" placeholder="Ej: 3001234567" maxlength="10">
+    <div class="btns" id="bajaDatosBtns">
+      <button type="button" class="btn-cancelar" onclick="cerrarBajaDatos()">Cancelar</button>
+      <button type="button" class="btn-confirmar" onclick="enviarBajaDatos()">Enviar solicitud</button>
+    </div>
+    <p class="ok" id="bajaDatosOk" style="display:none;">✓ Listo, recibimos tu solicitud. La atenderemos en los próximos días.</p>
   </div>
 </div>
 
@@ -458,11 +487,9 @@ const firebaseConfig = {
   // no duplicar ni perder el rastro desde el primer contacto.
   const idExistente = new URLSearchParams(location.search).get('id');
 
-  // URL oficial de la Política de Tratamiento de Datos Personales — TODAVÍA
-  // NO EXISTE. Cuando La Matriarca tenga la política publicada, se pone
-  // aquí y el link se activa solo (mientras tanto, el link queda oculto
-  // para no dejar una dirección rota).
-  const URL_POLITICA_DATOS_PERSONALES = '';
+  // URL de la Política de Tratamiento de Datos Personales — el PDF vive en
+  // la raíz del mismo repositorio, junto a los demás archivos del sistema.
+  const URL_POLITICA_DATOS_PERSONALES = 'politica-tratamiento-datos.pdf';
   (function prepararLinkPoliticaDatos(){
     const link = document.getElementById('linkPoliticaDatos');
     if(!link) return;
@@ -715,6 +742,50 @@ const firebaseConfig = {
     document.querySelectorAll('.turno-opt').forEach(b => b.classList.toggle('on', b.dataset.val === t));
     actualizarAvisoBloqueo();
     validarDuplicadoYDesbloquear();
+  }
+
+  // ---- Modal de "dejar de recibir información" (revocar autorización de
+  // WhatsApp/promociones). No borra la tarjeta del cliente ni sus reservas
+  // — solo registra la solicitud para que el staff la atienda desde
+  // app.html y ponga autorizacionWhatsApp en false para ese celular. ----
+  function abrirBajaDatos(){
+    document.getElementById('bajaDatosCelular').value = '';
+    document.getElementById('bajaDatosBtns').style.display = 'flex';
+    document.getElementById('bajaDatosOk').style.display = 'none';
+    document.getElementById('bajaDatosTexto').style.display = 'block';
+    document.getElementById('bajaDatosCelular').style.display = 'block';
+    document.getElementById('overlayBajaDatos').classList.add('open');
+  }
+  function cerrarBajaDatos(){
+    document.getElementById('overlayBajaDatos').classList.remove('open');
+  }
+  function enviarBajaDatos(){
+    const celInput = document.getElementById('bajaDatosCelular');
+    const celular = (celInput.value || '').replace(/\D/g,'');
+    if(celular.length < 7){
+      celInput.style.borderColor = '#e05c5c';
+      return;
+    }
+    celInput.style.borderColor = '';
+    const btns = document.getElementById('bajaDatosBtns');
+    btns.querySelector('.btn-confirmar').textContent = 'Enviando...';
+    btns.querySelector('.btn-confirmar').disabled = true;
+    db.collection('solicitudesEliminacion').add({
+      celular: celular,
+      estado: 'pendiente',
+      fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
+      origen: 'formulario_publico_reservas'
+    }).then(() => {
+      document.getElementById('bajaDatosTexto').style.display = 'none';
+      celInput.style.display = 'none';
+      btns.style.display = 'none';
+      document.getElementById('bajaDatosOk').style.display = 'block';
+    }).catch(err => {
+      console.error('Error registrando solicitud de baja de datos:', err);
+      btns.querySelector('.btn-confirmar').textContent = 'Enviar solicitud';
+      btns.querySelector('.btn-confirmar').disabled = false;
+      celInput.style.borderColor = '#e05c5c';
+    });
   }
 
   // ---- Modal de decisión para "sin disponibilidad" ----

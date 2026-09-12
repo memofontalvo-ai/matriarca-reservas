@@ -1583,6 +1583,20 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         </div>
       </div>
 
+      <!-- ===== GRUPO: SOLICITUDES DE BAJA DE DATOS ===== -->
+      <div class="config-grupo">
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoBajaDatos')">
+          <span>🔕 Solicitudes de baja de datos <span id="badgeBajaDatosPendientes" style="display:none; background:#e05c5c; color:#fff; border-radius:10px; padding:1px 7px; font-size:11px; margin-left:4px;">0</span></span>
+          <span class="config-grupo-chevron" id="chevron_grupoBajaDatos">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoBajaDatos" style="display:none;">
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-sub">Aquí llegan las solicitudes de clientes que piden dejar de recibir información sobre eventos, promociones y descuentos (link disponible al final del formulario público de reservas). Al atender una, se pone su autorización en "No autorizo" — sus datos y reservas no se borran, solo se deja de usar su número para enviarle promociones.</div>
+          <div id="listaBajaDatosPendientes" style="margin-top:10px;"></div>
+        </div>
+        </div>
+      </div>
+
       <!-- ===== GRUPO: ZONA DE PELIGRO ===== -->
       <div class="config-grupo">
         <button class="config-grupo-header config-grupo-header-peligro" onclick="toggleConfigGrupo('grupoPeligro')">
@@ -1605,7 +1619,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.58</div>
+<div class="version-tag">v4.59</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2574,6 +2588,7 @@ auth.onAuthStateChanged(user => {
       cargarUsuariosConfig();
       cargarCarruselConfig();
       cargarEventosConfig();
+      cargarBajaDatosConfig();
       iniciarPresencia();
     });
   } else {
@@ -2824,6 +2839,68 @@ function crearUsuario(){
     errEl.textContent = mensajes[err.code] || `No se pudo crear el usuario. Código de error: ${err.code || 'desconocido'}.`;
   }).finally(() => {
     btn.disabled = false; btn.textContent = 'Crear usuario';
+  });
+}
+
+// ===== SOLICITUDES DE BAJA DE DATOS (revocar autorización de WhatsApp) =====
+// El cliente pide desde el formulario público que dejemos de usar su
+// número para enviarle información promocional. Esto NO borra su tarjeta
+// en "clientes" ni sus reservas — solo pone autorizacionWhatsApp en false,
+// exactamente igual que si hubiera elegido "No autorizo" en el formulario.
+function cargarBajaDatosConfig(){
+  db.collection('solicitudesEliminacion').where('estado','==','pendiente')
+    .get().then(snap => {
+      const badge = document.getElementById('badgeBajaDatosPendientes');
+      const cont = document.getElementById('listaBajaDatosPendientes');
+      if(!cont) return;
+      if(snap.empty){
+        badge.style.display = 'none';
+        cont.innerHTML = '<div class="config-mensaje-sub">No hay solicitudes pendientes.</div>';
+        return;
+      }
+      badge.style.display = 'inline-block';
+      badge.textContent = snap.size;
+      const docs = snap.docs.slice().sort((a,b) => {
+        const fa = a.data().fechaSolicitud ? a.data().fechaSolicitud.toMillis() : 0;
+        const fb = b.data().fechaSolicitud ? b.data().fechaSolicitud.toMillis() : 0;
+        return fa - fb;
+      });
+      cont.innerHTML = docs.map(d => {
+        const s = d.data();
+        const fecha = s.fechaSolicitud ? s.fechaSolicitud.toDate().toLocaleDateString('es-CO', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+        return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:#171c25; border-radius:10px; margin-bottom:8px;">
+          <div>
+            <div style="font-weight:700; font-size:13.5px;">${s.celular}</div>
+            <div style="font-size:11px; color:var(--text-dim);">Solicitado el ${fecha}</div>
+          </div>
+          <button class="btn-config-guardar" onclick="atenderBajaDatos('${d.id}','${s.celular}', this)">Atender</button>
+        </div>`;
+      }).join('');
+    }).catch(err => console.error('Error cargando solicitudes de baja de datos:', err));
+}
+
+function atenderBajaDatos(idSolicitud, celular, btn){
+  btn.disabled = true;
+  btn.textContent = 'Procesando...';
+  const batch = db.batch();
+  const refCliente = db.collection('clientes').doc(celular);
+  batch.set(refCliente, {
+    autorizacionWhatsApp: false,
+    estadoAutorizacionWhatsApp: 'no_autorizado',
+    fechaAutorizacionWhatsApp: firebase.firestore.FieldValue.serverTimestamp(),
+    origenAutorizacionWhatsApp: 'solicitud_baja_datos'
+  }, {merge: true});
+  batch.update(db.collection('solicitudesEliminacion').doc(idSolicitud), {
+    estado: 'atendida',
+    fechaAtencion: firebase.firestore.FieldValue.serverTimestamp(),
+    atendidoPor: (usuarioActual && usuarioActual.nombre) || ''
+  });
+  batch.commit().then(() => {
+    cargarBajaDatosConfig();
+  }).catch(err => {
+    console.error('Error atendiendo solicitud de baja de datos:', err);
+    btn.disabled = false;
+    btn.textContent = 'Atender';
   });
 }
 
