@@ -208,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.25</div>
+<div class="version-tag">v3.26</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -366,7 +366,7 @@ button{cursor:pointer}
         <button type="button" class="vip-opt" data-val="no" onclick="elegirAutorizacionWhatsApp('no')">❌ No autorizo</button>
       </div>
       <div class="autorizacion-whatsapp__nota">Esta autorización es voluntaria y no es necesaria para solicitar una reserva. Los mensajes relacionados directamente con tu solicitud o reserva podrán ser enviados independientemente de esta autorización.</div>
-      <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" target="_blank" rel="noopener">Consultar Política de Tratamiento de Datos Personales</a>
+      <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" onclick="abrirPoliticaDatos();return false;">Consultar Política de Tratamiento de Datos Personales</a>
     </section>
 
     <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">✈ Enviar solicitud de reserva</button>
@@ -383,6 +383,16 @@ button{cursor:pointer}
     <div class="check">✓</div>
     <h2 id="confirmacionTitulo">¡Solicitud enviada!</h2>
     <p id="confirmacionTexto">Gracias, recibimos los detalles de tu reserva.<br>El equipo de La Matriarca te va a contactar pronto para confirmarla.</p>
+  </div>
+</div>
+
+<div class="overlay-baja-datos" id="overlayPoliticaDatos" style="z-index:1000;">
+  <div class="panel" style="max-width:600px; height:88vh; display:flex; flex-direction:column; padding:14px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <h3 style="margin:0; font-size:15px;">Política de Tratamiento de Datos Personales</h3>
+      <button type="button" onclick="cerrarPoliticaDatos()" style="background:#14171c; border:1px solid #343942; color:#e5e7eb; border-radius:8px; padding:6px 12px; font-weight:700; font-size:13px;">✕ Cerrar</button>
+    </div>
+    <iframe id="iframePoliticaDatos" style="flex:1; width:100%; border:none; border-radius:10px; background:#fff;"></iframe>
   </div>
 </div>
 
@@ -489,13 +499,23 @@ const firebaseConfig = {
 
   // URL de la Política de Tratamiento de Datos Personales — el PDF vive en
   // la raíz del mismo repositorio, junto a los demás archivos del sistema.
+  // Se muestra en una ventana propia (no en pestaña nueva) para que el
+  // cliente pueda leerla y volver a cerrarla sin perder lo que ya llevaba
+  // llenado en el formulario.
   const URL_POLITICA_DATOS_PERSONALES = 'politica-tratamiento-datos.pdf';
+  function abrirPoliticaDatos(){
+    if(!URL_POLITICA_DATOS_PERSONALES) return;
+    const iframe = document.getElementById('iframePoliticaDatos');
+    if(iframe && !iframe.src) iframe.src = URL_POLITICA_DATOS_PERSONALES;
+    document.getElementById('overlayPoliticaDatos').classList.add('open');
+  }
+  function cerrarPoliticaDatos(){
+    document.getElementById('overlayPoliticaDatos').classList.remove('open');
+  }
   (function prepararLinkPoliticaDatos(){
     const link = document.getElementById('linkPoliticaDatos');
     if(!link) return;
-    if(URL_POLITICA_DATOS_PERSONALES){
-      link.href = URL_POLITICA_DATOS_PERSONALES;
-    } else {
+    if(!URL_POLITICA_DATOS_PERSONALES){
       link.style.display = 'none';
     }
   })();
