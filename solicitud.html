@@ -208,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.26</div>
+<div class="version-tag">v3.27</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -506,7 +506,10 @@ const firebaseConfig = {
   function abrirPoliticaDatos(){
     if(!URL_POLITICA_DATOS_PERSONALES) return;
     const iframe = document.getElementById('iframePoliticaDatos');
-    if(iframe && !iframe.src) iframe.src = URL_POLITICA_DATOS_PERSONALES;
+    // El fragmento #view=FitH le pide al visor de PDF que ajuste la
+    // página al ancho de la pantalla, en vez de mostrarla a tamaño real
+    // (lo que obligaba a desplazarse hacia la derecha para leer completo).
+    if(iframe && !iframe.src) iframe.src = URL_POLITICA_DATOS_PERSONALES + '#view=FitH&toolbar=0';
     document.getElementById('overlayPoliticaDatos').classList.add('open');
   }
   function cerrarPoliticaDatos(){
