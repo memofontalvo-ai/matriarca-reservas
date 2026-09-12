@@ -326,6 +326,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .res-nombre{font-weight:600; font-size:13.5px; margin-top:3px;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; max-width:100%;}
 .res-meta span{overflow-wrap:anywhere; max-width:100%;}
+.tel-destacado{font-size:15px !important; font-weight:800; color:#ffffff !important; letter-spacing:.3px;}
 /* Fila fija de "identificación" (código, hora de solicitud, iniciales de
    quien la tomó): siempre abajo del todo y pegada a la derecha, separada
    de los demás datos — así la tarjeta se ve ordenada sin importar cuántos
@@ -1619,7 +1620,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.59</div>
+<div class="version-tag">v4.60</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4578,6 +4579,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     <div class="res-meta">
       <span>${r.pax} pax</span>
       ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
+      ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
       ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
@@ -6085,7 +6087,7 @@ function renderSolicitudesScreen(){
           <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
         </div>
         <div class="sc-meta">
-          ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
+          ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
         </div>
         ${(r.codigoReserva || formatearHoraSolicitud(r.horaSolicitud)) ? `
         <div class="sc-firma">
@@ -6109,7 +6111,7 @@ function renderSolicitudesScreen(){
       <div class="sc-meta">
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
-        ${r.celular?`<span>${escapeHtml(r.celular)}</span>`:''}
+        ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.listaEspera?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🕒 Lista de espera</span>`:''}
