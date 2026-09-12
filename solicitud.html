@@ -208,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.27</div>
+<div class="version-tag">v3.28</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -392,7 +392,7 @@ button{cursor:pointer}
       <h3 style="margin:0; font-size:15px;">Política de Tratamiento de Datos Personales</h3>
       <button type="button" onclick="cerrarPoliticaDatos()" style="background:#14171c; border:1px solid #343942; color:#e5e7eb; border-radius:8px; padding:6px 12px; font-weight:700; font-size:13px;">✕ Cerrar</button>
     </div>
-    <iframe id="iframePoliticaDatos" style="flex:1; width:100%; border:none; border-radius:10px; background:#fff;"></iframe>
+    <div id="contenidoPoliticaDatos" style="flex:1; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; border-radius:10px; background:#0e1015;"></div>
   </div>
 </div>
 
@@ -443,6 +443,7 @@ button{cursor:pointer}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script>
 const firebaseConfig = {
     apiKey: "AIzaSyDJCy93GCOhDySnC_OLo6pcV-wK_pC48_A",
@@ -499,18 +500,47 @@ const firebaseConfig = {
 
   // URL de la Política de Tratamiento de Datos Personales — el PDF vive en
   // la raíz del mismo repositorio, junto a los demás archivos del sistema.
-  // Se muestra en una ventana propia (no en pestaña nueva) para que el
-  // cliente pueda leerla y volver a cerrarla sin perder lo que ya llevaba
-  // llenado en el formulario.
+  // En vez de dejar que el navegador del celular decida cómo mostrarlo
+  // (algunos visores nativos no ajustan el ancho y obligan a desplazarse
+  // hacia los lados para leer), lo dibujamos nosotros mismos con PDF.js,
+  // ya escalado exactamente al ancho disponible en pantalla.
   const URL_POLITICA_DATOS_PERSONALES = 'politica-tratamiento-datos.pdf';
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+  }
+  let politicaDatosCargada = false;
   function abrirPoliticaDatos(){
     if(!URL_POLITICA_DATOS_PERSONALES) return;
-    const iframe = document.getElementById('iframePoliticaDatos');
-    // El fragmento #view=FitH le pide al visor de PDF que ajuste la
-    // página al ancho de la pantalla, en vez de mostrarla a tamaño real
-    // (lo que obligaba a desplazarse hacia la derecha para leer completo).
-    if(iframe && !iframe.src) iframe.src = URL_POLITICA_DATOS_PERSONALES + '#view=FitH&toolbar=0';
     document.getElementById('overlayPoliticaDatos').classList.add('open');
+    if(politicaDatosCargada) return;
+    politicaDatosCargada = true;
+    const cont = document.getElementById('contenidoPoliticaDatos');
+    cont.innerHTML = '<div style="text-align:center; padding:40px 16px; color:#8b93a3; font-size:13px;">Cargando documento...</div>';
+    pdfjsLib.getDocument(URL_POLITICA_DATOS_PERSONALES).promise.then(pdf => {
+      cont.innerHTML = '';
+      const anchoDisponible = cont.clientWidth - 4;
+      let cadena = Promise.resolve();
+      for(let i = 1; i <= pdf.numPages; i++){
+        cadena = cadena.then(() => pdf.getPage(i)).then(page => {
+          const viewportBase = page.getViewport({scale: 1});
+          const escala = anchoDisponible / viewportBase.width;
+          const viewport = page.getViewport({scale: escala});
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          canvas.style.display = 'block';
+          canvas.style.margin = '0 auto 10px';
+          canvas.style.borderRadius = '8px';
+          cont.appendChild(canvas);
+          return page.render({canvasContext: canvas.getContext('2d'), viewport: viewport}).promise;
+        });
+      }
+      return cadena;
+    }).catch(err => {
+      console.error('Error cargando el PDF de la política de datos:', err);
+      cont.innerHTML = '<div style="text-align:center; padding:40px 16px; color:#e07a7a; font-size:13px;">No se pudo cargar el documento. Intenta de nuevo más tarde.</div>';
+      politicaDatosCargada = false;
+    });
   }
   function cerrarPoliticaDatos(){
     document.getElementById('overlayPoliticaDatos').classList.remove('open');
