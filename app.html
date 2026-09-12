@@ -754,6 +754,9 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .modal h3{font-family:'Fraunces',serif; font-size:19px; margin-bottom:4px;}
 .modal .modal-sub{font-size:12px; color:var(--text-dim); margin-bottom:18px;}
 .field{margin-bottom:13px;}
+.field-check-cover{margin-bottom:13px;}
+.checkbox-label{display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--text); cursor:pointer;}
+.checkbox-label input[type="checkbox"]{width:18px; height:18px;}
 /* ===== NIVELES DE ACCESO (rol de usuario) ===== */
 .rol-opciones{display:flex; flex-direction:column; gap:8px; margin-top:4px;}
 .rol-opcion{
@@ -1620,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.60</div>
+<div class="version-tag">v4.61</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1849,6 +1852,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option>Menú 4</option><option>Menú 5</option>
             <option>Menú Típico</option><option>Carta abierta</option>
           </select>
+        </div>
+      </div>
+
+      <div class="field-check-cover">
+        <label class="checkbox-label"><input type="checkbox" id="fTieneCover" onchange="toggleCoverFields()"> Esta reserva tiene cover (entrada de evento especial)</label>
+      </div>
+      <div id="coverFieldsBlock" style="display:none;">
+        <div class="field"><label>Valor del cover ($)</label><input type="number" id="fCoverValor" placeholder="0"></div>
+        <div class="field">
+          <label>Comprobante de pago del cover</label>
+          <label class="btn-elegir-mesa phone-mesa-btn" id="fCoverComprobanteLabel" for="fCoverComprobanteInput" style="display:block; text-align:center; cursor:pointer;">📎 Subir comprobante del cover</label>
+          <input type="file" id="fCoverComprobanteInput" accept="image/*" style="display:none;" onchange="previsualizarComprobanteCover(this)">
+          <img id="fCoverComprobantePreview" style="display:none; max-width:100%; border-radius:8px; margin-top:8px;">
         </div>
       </div>
 
@@ -2968,6 +2984,45 @@ function elegirTurnoEvento(t){
 // Misma compresión que ya se usa para el carrusel: reduce la foto a un
 // ancho máximo de 1000px en JPEG de calidad media, para no pasarse del
 // límite de 1MB por documento en Firestore.
+let coverComprobanteBase64Temp = null;
+function toggleCoverFields(){
+  const marcado = document.getElementById('fTieneCover').checked;
+  document.getElementById('coverFieldsBlock').style.display = marcado ? 'block' : 'none';
+}
+function previsualizarComprobanteCover(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Mismo criterio de compresión que las imágenes de eventos — el
+      // comprobante suele ser una captura de pantalla de Nequi/Bancolombia,
+      // así que con 700px de ancho se lee perfecto y pesa poco.
+      const maxW = 700;
+      const escala = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      let calidad = 0.72;
+      let resultado = canvas.toDataURL('image/jpeg', calidad);
+      while(resultado.length > 700000 && calidad > 0.2){
+        calidad -= 0.12;
+        resultado = canvas.toDataURL('image/jpeg', calidad);
+      }
+      coverComprobanteBase64Temp = resultado;
+      const preview = document.getElementById('fCoverComprobantePreview');
+      preview.src = coverComprobanteBase64Temp;
+      preview.style.display = 'block';
+      document.getElementById('fCoverComprobanteLabel').textContent = '📎 Cambiar comprobante del cover';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function previsualizarImagenEvento(input){
   const file = input.files[0];
   if(!file) return;
@@ -3208,6 +3263,14 @@ function elegirEventoTelefono(id){
   document.getElementById('eventoSeleccionadoResumenTexto').textContent = `🎤 ${ev.nombre} — ${ev.fecha} · Hora de entrada: ${ev.horaEntrada}`;
   document.getElementById('eventoSeleccionadoResumen').style.display = 'block';
   document.getElementById('modalSub').textContent = `${ev.nombre} · ${ev.fecha}`;
+  // Si el evento tiene valor de entrada definido, se marca el cover de una
+  // vez y se prellena con ese valor — el staff lo puede ajustar a mano si
+  // el total cambia según cuántas personas paguen entrada.
+  if(ev.valorEntrada){
+    document.getElementById('fTieneCover').checked = true;
+    document.getElementById('fCoverValor').value = ev.valorEntrada;
+    toggleCoverFields();
+  }
 }
 
 // Por si el staff se equivocó de evento y quiere volver a ver la
@@ -4582,8 +4645,10 @@ function tarjetaReservaHTML(r, mostrarFecha){
       ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
+      ${r.coverValor>0?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}</span>`:''}
       ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
       ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
+      ${r.comprobanteCover?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)},"cover")'>🎫 Ver comprobante cover</button>`:''}
       ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
       ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
     </div>
@@ -4719,14 +4784,15 @@ function renderResumenTurnoHTML(rsTodas){
   `;
 }
 
-function verComprobante(id){
+function verComprobante(id, tipo){
   const r = reservas.find(x => x.id === id);
-  if(!r || !r.comprobanteAbono){ return; }
+  const imagen = tipo === 'cover' ? (r && r.comprobanteCover) : (r && r.comprobanteAbono);
+  if(!r || !imagen){ return; }
   // Se muestra DENTRO de la misma app, en una ventana flotante — abrir una
   // pestaña nueva con window.open() es poco confiable en Safari de iPhone
   // (a veces se queda en blanco o rompe la navegación y hay que cerrar todo
   // para volver). Así el usuario nunca sale del programa.
-  document.getElementById('comprobanteViewerImg').src = r.comprobanteAbono;
+  document.getElementById('comprobanteViewerImg').src = imagen;
   document.getElementById('comprobanteViewerOverlay').classList.add('open');
 }
 function cerrarComprobanteViewer(){
@@ -6116,6 +6182,8 @@ function renderSolicitudesScreen(){
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.listaEspera?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🕒 Lista de espera</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
+        ${r.coverValor>0?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}</span>`:''}
+        ${r.comprobanteCover?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)},"cover")'>🎫 Ver comprobante cover</button>`:''}
         ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
         ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
       </div>
@@ -6337,6 +6405,27 @@ function abrirModal(id, mesaId){
       comprobanteBlock.style.display = 'none';
       comprobanteBlock.innerHTML = '';
     }
+    // Cover de evento especial — mismo criterio: si la reserva ya tiene un
+    // valor de cover guardado, se marca el check y se muestra su
+    // comprobante (si lo hay). coverComprobanteBase64Temp se limpia acá
+    // porque, al abrir la reserva, todavía no se ha elegido ningún archivo
+    // nuevo — solo se sube uno nuevo si el staff lo hace en este momento.
+    coverComprobanteBase64Temp = null;
+    document.getElementById('fTieneCover').checked = Number(r.coverValor) > 0;
+    document.getElementById('fCoverValor').value = r.coverValor || '';
+    toggleCoverFields();
+    document.getElementById('fCoverComprobanteInput').value = '';
+    const coverPreview = document.getElementById('fCoverComprobantePreview');
+    const coverLabel = document.getElementById('fCoverComprobanteLabel');
+    if(r.comprobanteCover){
+      coverPreview.src = r.comprobanteCover;
+      coverPreview.style.display = 'block';
+      coverLabel.textContent = '📎 Cambiar comprobante del cover';
+    } else {
+      coverPreview.style.display = 'none';
+      coverPreview.src = '';
+      coverLabel.textContent = '📎 Subir comprobante del cover';
+    }
   } else {
     // La fecha de una reserva NUEVA siempre arranca en HOY, sin importar
     // qué día estés mirando en el calendario de "Por día" — ese calendario
@@ -6375,6 +6464,14 @@ function abrirModal(id, mesaId){
     actualizarBotonMesa();
     document.getElementById('fCanal').value = 'Teléfono';
     document.getElementById('fAbono').value = '';
+    coverComprobanteBase64Temp = null;
+    document.getElementById('fTieneCover').checked = false;
+    document.getElementById('fCoverValor').value = '';
+    document.getElementById('fCoverComprobanteInput').value = '';
+    document.getElementById('fCoverComprobantePreview').style.display = 'none';
+    document.getElementById('fCoverComprobantePreview').src = '';
+    document.getElementById('fCoverComprobanteLabel').textContent = '📎 Subir comprobante del cover';
+    toggleCoverFields();
     document.getElementById('fMenu').value = '';
     document.getElementById('fObs').value = '';
     document.getElementById('fWhatsTelefonoCod').value = '57';
@@ -6838,7 +6935,19 @@ function guardarReserva(){
     menu: document.getElementById('fMenu').value,
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
+    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
   };
+  if(coverComprobanteBase64Temp){
+    data.comprobanteCover = coverComprobanteBase64Temp;
+    data.comprobanteCoverSubidoEn = new Date().toISOString();
+  } else if(editandoId && !document.getElementById('fTieneCover').checked){
+    // Si se desmarca "tiene cover" en una reserva EXISTENTE que ya tenía
+    // comprobante guardado, se borra también — ya no aplica. (No se usa
+    // FieldValue.delete() al crear una reserva nueva porque ahí el
+    // documento todavía no existe — con set() sin merge eso da error.)
+    data.comprobanteCover = firebase.firestore.FieldValue.delete();
+    data.comprobanteCoverSubidoEn = firebase.firestore.FieldValue.delete();
+  }
   if(!editandoId && tipoReservaActual === 'evento' && eventoSeleccionadoParaReserva){
     data.eventoId = eventoSeleccionadoParaReserva.id;
     data.eventoNombre = eventoSeleccionadoParaReserva.nombre;
@@ -6980,7 +7089,15 @@ function enviarParaAprobacion(){
     estado: 'pendiente_aprobacion',
     aprobadaPorCliente: false,
     pasoPorSolicitud: true,
+    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
   };
+  if(coverComprobanteBase64Temp){
+    data.comprobanteCover = coverComprobanteBase64Temp;
+    data.comprobanteCoverSubidoEn = new Date().toISOString();
+  } else if(editandoId && !document.getElementById('fTieneCover').checked){
+    data.comprobanteCover = firebase.firestore.FieldValue.delete();
+    data.comprobanteCoverSubidoEn = firebase.firestore.FieldValue.delete();
+  }
   if(!editandoId && tipoReservaActual === 'evento' && eventoSeleccionadoParaReserva){
     data.eventoId = eventoSeleccionadoParaReserva.id;
     data.eventoNombre = eventoSeleccionadoParaReserva.nombre;
