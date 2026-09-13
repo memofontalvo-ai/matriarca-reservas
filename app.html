@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.72</div>
+<div class="version-tag">v4.73</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1886,6 +1886,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
       </div>
 
+      <div class="modal-actions modal-actions-wrap phone-actions" style="margin-top:8px;">
+        <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      </div>
+      </div>
+
       <div id="aprobacionExitoBlock" style="display:none; text-align:center; padding:10px 4px 4px;">
         <div style="font-size:38px;">✅</div>
         <div style="font-weight:700; font-size:17px; color:var(--gold); margin:10px 0 6px;">La reserva se guardó correctamente</div>
@@ -1894,13 +1899,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <a id="linkAbrirWhatsappAprobacion" href="#" onclick="return abrirWhatsappForzado(this.href, event)" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
         <button class="btn btn-ghost" style="width:100%;" onclick="cerrarModal()">Volver al menú principal</button>
       </div>
-
-      <div class="modal-actions modal-actions-wrap phone-actions" style="margin-top:8px;">
-        <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
-      </div>
     </div>
   </div>
-</div>
 
 <div class="phone-calendar-overlay" id="phoneCalendarOverlay" aria-hidden="true">
   <div class="phone-calendar-box">
