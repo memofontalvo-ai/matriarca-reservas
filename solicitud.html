@@ -208,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.30</div>
+<div class="version-tag">v3.31</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -476,23 +476,40 @@ const firebaseConfig = {
     return !!(dia && (dia.desayuno || dia.almuerzo || dia.cena));
   }
 
-  // ============ HORARIO REAL DE ATENCIÓN (por día de la semana) ============
-  // Mismo documento que edita el staff en Salones → "Horarios y capacidad
-  // por turno". Se usa para avisarle al cliente DE UNA VEZ si la hora que
-  // está pidiendo cae fuera del horario real de ese día — en vez de dejar
-  // que llegue una solicitud para un horario que ni siquiera existe.
+  // ============ HORARIO REAL DE ATENCIÓN (día por día, + festivos) ============
+  // Mismo documento que edita el staff en Config → "Horario de atención".
+  // Se usa para avisarle al cliente DE UNA VEZ si la hora que está
+  // pidiendo cae fuera del horario real de ese día — en vez de dejar que
+  // llegue una solicitud para un horario que ni siquiera existe.
   const HORARIOS_TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  const DIAS_SEMANA_ORDEN = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
   let HORARIOS_REALES = null;
   const horariosRealesPromesa = db.collection('configuracion').doc('horarios').get()
     .then(snap => { HORARIOS_REALES = snap.exists ? snap.data() : null; })
     .catch(err => console.error('Error cargando horarios reales:', err));
 
+  // Fechas festivas (YYYY-MM-DD) que el staff mantiene a mano en Config —
+  // los festivos colombianos cambian de fecha cada año. Si la fecha de la
+  // reserva es festiva, se usa el horario "festivo"; si es un domingo y el
+  // lunes siguiente es festivo, se usa "domingoAntesFestivo".
+  let FESTIVOS = [];
+  const festivosPromesa = db.collection('configuracion').doc('festivos').get()
+    .then(snap => { FESTIVOS = (snap.exists && Array.isArray(snap.data().fechas)) ? snap.data().fechas : []; })
+    .catch(err => console.error('Error cargando festivos:', err));
+
+  function fechaSiguienteIso(fechaIso){
+    const [y,m,d] = fechaIso.split('-').map(Number);
+    const dt = new Date(y, m-1, d, 12);
+    dt.setDate(dt.getDate()+1);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+
   function grupoDeFecha(fechaIso){
+    if(FESTIVOS.includes(fechaIso)) return 'festivo';
     const [y,m,d] = fechaIso.split('-').map(Number);
     const dow = new Date(y, m-1, d, 12).getDay(); // 0=domingo ... 6=sábado
-    if(dow === 0) return 'domingo';
-    if(dow === 5 || dow === 6) return 'viesab';
-    return 'lunjue';
+    if(dow === 0 && FESTIVOS.includes(fechaSiguienteIso(fechaIso))) return 'domingoAntesFestivo';
+    return DIAS_SEMANA_ORDEN[(dow+6)%7];
   }
 
   // Devuelve null si la hora pedida SÍ está dentro del horario real de ese

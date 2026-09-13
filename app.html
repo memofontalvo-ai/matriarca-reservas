@@ -1434,8 +1434,18 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <div class="config-grupo-contenido" id="grupoHorarios" style="display:none;">
         <div class="config-mensaje-bloque">
           <div class="capacidad-turnos-title">Horarios y capacidad por turno</div>
-          <div class="capacidad-turnos-sub">El horario real de atención de cada turno (y si está prendido o apagado ese día) — esto es lo que usa el formulario público para avisarle al cliente si está pidiendo una hora fuera de servicio. La capacidad es cuántas personas caben, para calcular el % de ocupación en "Por día" y "Resumen".</div>
+          <div class="capacidad-turnos-sub">El horario real de atención de cada turno (y si está prendido o apagado ese día) — esto es lo que usa el formulario público para avisarle al cliente si está pidiendo una hora fuera de servicio. La capacidad es cuántas personas caben, para calcular el % de ocupación en "Por día" y "Resumen".<br><br>"Festivo" se usa cualquier día que agregues abajo a la lista de festivos. "Domingo antes de festivo" se usa automáticamente cuando el domingo tiene el lunes siguiente marcado como festivo (por ejemplo, suele tener la cena habilitada, a diferencia de un domingo normal).</div>
           <div id="capacidadTurnosGrid"></div>
+        </div>
+
+        <div class="config-mensaje-bloque">
+          <div class="capacidad-turnos-title">Festivos</div>
+          <div class="capacidad-turnos-sub">Agrega aquí las fechas festivas del año (los festivos colombianos cambian de fecha cada año, así que se agregan a mano). Ese día se usa el horario "Festivo" de arriba, sin importar qué día de la semana sea.</div>
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <input type="date" id="fNuevoFestivo" style="flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px; padding:8px;">
+            <button class="btn-config-guardar" onclick="agregarFestivo(document.getElementById('fNuevoFestivo').value); document.getElementById('fNuevoFestivo').value='';">+ Agregar</button>
+          </div>
+          <div id="listaFestivos"></div>
         </div>
         </div>
       </div>
@@ -1644,7 +1654,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.77</div>
+<div class="version-tag">v4.78</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3626,12 +3636,28 @@ salonesRef.get().then(snap => {
   actualizarEstadoConexion(false);
 });
 
-// Config horarios por grupo de días — vive en Firestore para que se pueda
-// editar la capacidad de cada turno desde la pantalla de Salones.
+// Horario real de atención, día por día (no agrupado) — vive en Firestore
+// para poder editarse desde Config → "Horario de atención". Incluye dos
+// entradas especiales: "festivo" (cualquier día marcado como festivo en
+// la lista de abajo) y "domingoAntesFestivo" (un domingo cuyo lunes
+// siguiente es festivo — suele tener horario extendido de cena).
+const DIAS_SEMANA_ORDEN = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+const DIA_LABEL = {lunes:'Lunes', martes:'Martes', miercoles:'Miércoles', jueves:'Jueves', viernes:'Viernes', sabado:'Sábado', domingo:'Domingo', festivo:'Festivo', domingoAntesFestivo:'Domingo antes de festivo'};
+function clonarTurnos(t){ return JSON.parse(JSON.stringify(t)); }
+const TURNOS_LUNJUE_DEFAULT = {desayuno:{activo:true,inicio:'08:00',fin:'11:30',cap:300}, almuerzo:{activo:true,inicio:'12:00',fin:'17:30',cap:214}, cena:{activo:true,inicio:'18:00',fin:'22:00',cap:280}};
+const TURNOS_VIESAB_DEFAULT = {desayuno:{activo:true,inicio:'08:00',fin:'11:30',cap:300}, almuerzo:{activo:true,inicio:'12:00',fin:'17:30',cap:214}, cena:{activo:true,inicio:'18:00',fin:'23:30',cap:366}};
+const TURNOS_DOMINGO_DEFAULT = {desayuno:{activo:true,inicio:'08:00',fin:'12:00',cap:320}, almuerzo:{activo:true,inicio:'12:00',fin:'18:00',cap:250}, cena:{activo:false,inicio:'18:00',fin:'22:00',cap:200}};
+const TURNOS_DOMINGO_ANTES_FESTIVO_DEFAULT = {desayuno:{activo:true,inicio:'08:00',fin:'12:00',cap:320}, almuerzo:{activo:true,inicio:'12:00',fin:'18:00',cap:250}, cena:{activo:true,inicio:'18:00',fin:'22:00',cap:250}};
 const HORARIOS_SEED = {
-  'lunjue': {label:'Lunes a Jueves', desayuno:{activo:true,inicio:'08:00',fin:'11:30',cap:300}, almuerzo:{activo:true,inicio:'12:00',fin:'17:30',cap:214}, cena:{activo:true,inicio:'18:00',fin:'22:00',cap:280}},
-  'viesab': {label:'Viernes y Sábado', desayuno:{activo:true,inicio:'08:00',fin:'11:30',cap:300}, almuerzo:{activo:true,inicio:'12:00',fin:'17:30',cap:214}, cena:{activo:true,inicio:'18:00',fin:'23:30',cap:366}},
-  'domingo': {label:'Domingo', desayuno:{activo:true,inicio:'08:00',fin:'12:00',cap:320}, almuerzo:{activo:true,inicio:'12:00',fin:'18:00',cap:250}, cena:{activo:false,inicio:'18:00',fin:'22:00',cap:200}},
+  lunes: clonarTurnos(TURNOS_LUNJUE_DEFAULT),
+  martes: clonarTurnos(TURNOS_LUNJUE_DEFAULT),
+  miercoles: clonarTurnos(TURNOS_LUNJUE_DEFAULT),
+  jueves: clonarTurnos(TURNOS_LUNJUE_DEFAULT),
+  viernes: clonarTurnos(TURNOS_VIESAB_DEFAULT),
+  sabado: clonarTurnos(TURNOS_VIESAB_DEFAULT),
+  domingo: clonarTurnos(TURNOS_DOMINGO_DEFAULT),
+  festivo: clonarTurnos(TURNOS_DOMINGO_DEFAULT),
+  domingoAntesFestivo: clonarTurnos(TURNOS_DOMINGO_ANTES_FESTIVO_DEFAULT),
 };
 let HORARIOS = JSON.parse(JSON.stringify(HORARIOS_SEED));
 const horariosConfigRef = db.collection('configuracion').doc('horarios');
@@ -3640,22 +3666,108 @@ horariosConfigRef.get().then(snap => {
   if(!snap.exists){
     return horariosConfigRef.set(HORARIOS_SEED);
   }
+  const data = snap.data();
+  // Migración desde la versión anterior (agrupada en "lunjue" / "viesab" /
+  // "domingo") al horario individual por día — se hace UNA sola vez, para
+  // no perder lo que ya se había configurado a mano (capacidad, horas,
+  // activo/inactivo). De ahí en adelante cada día queda independiente.
+  if(data.lunjue && !data.lunes){
+    const migrado = {
+      lunes: data.lunjue, martes: data.lunjue, miercoles: data.lunjue, jueves: data.lunjue,
+      viernes: data.viesab || HORARIOS_SEED.viernes, sabado: data.viesab || HORARIOS_SEED.sabado,
+      domingo: data.domingo || HORARIOS_SEED.domingo,
+      festivo: HORARIOS_SEED.festivo,
+      domingoAntesFestivo: HORARIOS_SEED.domingoAntesFestivo,
+    };
+    return horariosConfigRef.set(migrado);
+  }
 }).then(() => {
   horariosConfigRef.onSnapshot(snap => {
     if(snap.exists){
       const data = snap.data();
-      // Combinamos con el seed por si falta algún grupo/turno (por ejemplo,
-      // si se agrega uno nuevo más adelante y documentos viejos no lo tienen).
-      HORARIOS = {
-        lunjue: {...HORARIOS_SEED.lunjue, ...(data.lunjue||{})},
-        viesab: {...HORARIOS_SEED.viesab, ...(data.viesab||{})},
-        domingo: {...HORARIOS_SEED.domingo, ...(data.domingo||{})},
-      };
+      // Combinamos con el seed por si falta algún día/turno (por ejemplo,
+      // festivo/domingoAntesFestivo en un documento migrado antes de que
+      // existieran).
+      HORARIOS = {};
+      Object.keys(HORARIOS_SEED).forEach(key => {
+        HORARIOS[key] = {...HORARIOS_SEED[key], ...(data[key]||{})};
+      });
       renderAll();
       renderCapacidadTurnos();
     }
   }, err => console.error('Error de conexión en configuración de horarios:', err));
 }).catch(err => console.error('Error conectando configuración de horarios:', err));
+
+// Lista de fechas festivas (YYYY-MM-DD) — la mantiene el staff a mano,
+// porque los festivos colombianos cambian de año en año y varios se
+// corren al lunes siguiente (Ley Emiliani). Cuando la fecha de una
+// reserva está en esta lista, se usa el horario "festivo" en vez del que
+// le tocaría por día de la semana; y si la fecha es un domingo y el lunes
+// siguiente está en la lista, se usa "domingoAntesFestivo".
+let FESTIVOS = [];
+const festivosConfigRef = db.collection('configuracion').doc('festivos');
+festivosConfigRef.onSnapshot(snap => {
+  FESTIVOS = (snap.exists && Array.isArray(snap.data().fechas)) ? snap.data().fechas.slice().sort() : [];
+  renderFestivos();
+}, err => console.error('Error de conexión en festivos:', err));
+
+function fechaEsFestivo(fechaIso){ return FESTIVOS.includes(fechaIso); }
+function fechaSiguiente(fechaIso){
+  const [y,m,d] = fechaIso.split('-').map(Number);
+  const dt = new Date(y, m-1, d, 12);
+  dt.setDate(dt.getDate()+1);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+// Dado un objeto Date o una fecha ISO, decide qué llave de HORARIOS usar:
+// festivo > domingo-antes-de-festivo > el día de la semana que le toque.
+function claveHorarioParaFecha(fechaIsoODate){
+  let fechaIso;
+  if(fechaIsoODate instanceof Date){
+    const dt = fechaIsoODate;
+    fechaIso = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  } else {
+    fechaIso = fechaIsoODate;
+  }
+  if(fechaEsFestivo(fechaIso)) return 'festivo';
+  const [y,m,d] = fechaIso.split('-').map(Number);
+  const dow = new Date(y, m-1, d, 12).getDay(); // 0=domingo
+  if(dow === 0 && fechaEsFestivo(fechaSiguiente(fechaIso))) return 'domingoAntesFestivo';
+  return DIAS_SEMANA_ORDEN[(dow+6)%7]; // getDay():0=domingo..6=sábado → índice en DIAS_SEMANA_ORDEN (lunes..domingo)
+}
+
+function agregarFestivo(fechaIso){
+  if(!fechaIso) return;
+  if(FESTIVOS.includes(fechaIso)) return;
+  const nuevos = [...FESTIVOS, fechaIso].sort();
+  festivosConfigRef.set({fechas: nuevos}, {merge:true}).catch(err => {
+    alert('No se pudo agregar el festivo. Revisa tu conexión e intenta de nuevo.');
+    console.error(err);
+  });
+}
+function quitarFestivo(fechaIso){
+  const nuevos = FESTIVOS.filter(f => f !== fechaIso);
+  festivosConfigRef.set({fechas: nuevos}, {merge:true}).catch(err => {
+    alert('No se pudo quitar el festivo. Revisa tu conexión e intenta de nuevo.');
+    console.error(err);
+  });
+}
+function renderFestivos(){
+  const el = document.getElementById('listaFestivos');
+  if(!el) return;
+  if(!FESTIVOS.length){
+    el.innerHTML = '<div class="config-mensaje-sub">Todavía no has agregado ningún festivo.</div>';
+    return;
+  }
+  el.innerHTML = FESTIVOS.map(f => {
+    const [y,m,d] = f.split('-').map(Number);
+    const fechaObj = new Date(y, m-1, d, 12);
+    const texto = `${DIAS[fechaObj.getDay()]} ${d} de ${MESES[m-1]} de ${y}`;
+    return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 12px; background:#171c25; border-radius:10px; margin-bottom:6px;">
+      <span style="font-size:12.5px;">${texto}</span>
+      <button class="btn-config-restaurar" onclick="quitarFestivo('${f}')">Quitar</button>
+    </div>`;
+  }).join('');
+}
 
 // Plano maestro (el mismo que se edita en salones.html): lo usamos en la
 // pestaña "Plano" de Por día para mostrar la ocupación real de cada
@@ -3708,7 +3820,7 @@ function actualizarHorarioTurno(grupoKey, turnoKey, campo, valor){
 function renderCapacidadTurnos(){
   const el = document.getElementById('capacidadTurnosGrid');
   if(!el) return;
-  const grupos = [['lunjue','Lunes a Jueves'],['viesab','Viernes y Sábado'],['domingo','Domingo']];
+  const grupos = [...DIAS_SEMANA_ORDEN, 'festivo', 'domingoAntesFestivo'].map(k => [k, DIA_LABEL[k]]);
   const turnos = [['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
   el.innerHTML = grupos.map(([gKey,gLabel])=>`
     <div class="capacidad-grupo">
@@ -4168,10 +4280,7 @@ function renderConfigMensajes(){
 }
 
 function grupoDeFecha(d){
-  const dia = d.getDay(); // 0=domingo
-  if(dia===0) return 'domingo';
-  if(dia===5||dia===6) return 'viesab';
-  return 'lunjue';
+  return claveHorarioParaFecha(d);
 }
 
 function turnoSegunHora(fechaObj, horaStr){
@@ -4442,7 +4551,7 @@ function fechaISO(d){
 function renderHeader(){
   const d = fechaActual;
   document.getElementById('dateLabel').innerHTML =
-    `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${HORARIOS[grupoDeFecha(d)].label}</span>`;
+    `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${DIA_LABEL[grupoDeFecha(d)]||''}</span>`;
 
   const grupo = HORARIOS[grupoDeFecha(d)];
   const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
