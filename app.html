@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.67</div>
+<div class="version-tag">v4.68</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1687,7 +1687,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div style="font-size:38px;">✅</div>
       <div style="font-weight:700; font-size:17px; color:var(--gold); margin:10px 0 6px;">La solicitud se guardó correctamente</div>
       <div style="color:var(--text-dim); font-size:13.5px; margin-bottom:20px;">Toca el botón para abrir WhatsApp y enviarle el mensaje al cliente.</div>
-      <a id="linkAbrirWhatsapp" href="#" target="_blank" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
+      <a id="linkAbrirWhatsapp" href="#" onclick="return abrirWhatsappForzado(this.href, event)" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
       <button class="btn btn-ghost" style="width:100%;" onclick="cerrarModal()">Volver al menú principal</button>
     </div>
 
@@ -1889,7 +1889,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <div style="font-size:38px;">✅</div>
         <div style="font-weight:700; font-size:17px; color:var(--gold); margin:10px 0 6px;">La reserva se guardó correctamente</div>
         <div style="color:var(--text-dim); font-size:13.5px; margin-bottom:20px;">Toca el botón para abrir WhatsApp y enviarle el link de aprobación al cliente.</div>
-        <a id="linkAbrirWhatsappAprobacion" href="#" target="_blank" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
+        <a id="linkAbrirWhatsappAprobacion" href="#" onclick="return abrirWhatsappForzado(this.href, event)" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
         <button class="btn btn-ghost" style="width:100%;" onclick="cerrarModal()">Volver al menú principal</button>
       </div>
 
@@ -2498,6 +2498,20 @@ function digitosWhatsapp(celularCompleto){
   const digitos = (celularCompleto||'').replace(/\D/g,'');
   if(digitos.length < 8 || digitos.length > 15) return null;
   return digitos;
+}
+
+// Al abrir un link de WhatsApp poco después de haber abierto otro (por
+// ejemplo, dos envíos seguidos a números distintos), el iPhone a veces
+// solo trae al frente la conversación que ya tenía abierta en vez de
+// abrir la del número nuevo — es una falla conocida de Safari/iOS con
+// links "wa.me" repetidos. Abrir cada vez con un nombre de ventana ÚNICO
+// obliga a que sea una navegación nueva de verdad, no una pestaña
+// reutilizada, así que siempre abre al número correcto.
+function abrirWhatsappForzado(url, ev){
+  if(ev) ev.preventDefault();
+  if(!url || url === '#') return false;
+  window.open(url, '_blank_wa_' + Date.now());
+  return false;
 }
 
 function emailInternoDesdeUsuario(usuario){
