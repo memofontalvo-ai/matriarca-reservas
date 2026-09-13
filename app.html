@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.68</div>
+<div class="version-tag">v4.69</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1686,7 +1686,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div id="whatsappExitoBlock" style="display:none; text-align:center; padding:10px 4px 4px;">
       <div style="font-size:38px;">✅</div>
       <div style="font-weight:700; font-size:17px; color:var(--gold); margin:10px 0 6px;">La solicitud se guardó correctamente</div>
-      <div style="color:var(--text-dim); font-size:13.5px; margin-bottom:20px;">Toca el botón para abrir WhatsApp y enviarle el mensaje al cliente.</div>
+      <div style="color:var(--text-dim); font-size:13.5px; margin-bottom:10px;">Toca el botón para abrir WhatsApp y enviarle el mensaje al cliente.</div>
+      <div id="destinoWhatsappTexto" style="background:#1a1f28; border:1px solid #3a4150; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:14px; color:#fff;"></div>
       <a id="linkAbrirWhatsapp" href="#" onclick="return abrirWhatsappForzado(this.href, event)" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
       <button class="btn btn-ghost" style="width:100%;" onclick="cerrarModal()">Volver al menú principal</button>
     </div>
@@ -1888,7 +1889,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div id="aprobacionExitoBlock" style="display:none; text-align:center; padding:10px 4px 4px;">
         <div style="font-size:38px;">✅</div>
         <div style="font-weight:700; font-size:17px; color:var(--gold); margin:10px 0 6px;">La reserva se guardó correctamente</div>
-        <div style="color:var(--text-dim); font-size:13.5px; margin-bottom:20px;">Toca el botón para abrir WhatsApp y enviarle el link de aprobación al cliente.</div>
+        <div style="color:var(--text-dim); font-size:13.5px; margin-bottom:10px;">Toca el botón para abrir WhatsApp y enviarle el link de aprobación al cliente.</div>
+        <div id="destinoWhatsappAprobacionTexto" style="background:#1a1f28; border:1px solid #3a4150; border-radius:10px; padding:10px 14px; margin-bottom:16px; font-size:14px; color:#fff;"></div>
         <a id="linkAbrirWhatsappAprobacion" href="#" onclick="return abrirWhatsappForzado(this.href, event)" rel="noopener" class="btn btn-primary" style="display:block; text-decoration:none; margin-bottom:12px;">💬 Abrir WhatsApp</a>
         <button class="btn btn-ghost" style="width:100%;" onclick="cerrarModal()">Volver al menú principal</button>
       </div>
@@ -4356,6 +4358,14 @@ fechaActual.setHours(12,0,0,0); // mediodía para evitar líos de huso horario a
 let turnoActivo = 'todos';
 let vistaActual = 'lista';
 let editandoId = null;
+// Se incrementa cada vez que se ABRE el modal (nueva reserva o editar una
+// existente). Un envío de WhatsApp que estaba en curso (esperando a que
+// Firestore confirme el guardado) captura este número al empezar; si para
+// cuando termina el staff ya abrió OTRA reserva distinta, ese envío atrasado
+// ya no debe mostrar su pantalla de éxito ni su link sobre la reserva que
+// está en pantalla ahora — evita mezclar el "Abrir WhatsApp" de una
+// reserva con los datos de otra.
+let modalToken = 0;
 let mesaPreseleccionada = null;
 let modalFecha = null;
 let modalTurno = null;
@@ -6358,11 +6368,14 @@ function cerrarDesgloseAtrasadas(){
 
 /* ============ MODAL ============ */
 function abrirModal(id, mesaId){
+  modalToken++;
   editandoId = id || null;
   mesaPreseleccionada = mesaId || null;
   guardandoReserva = false;
   const btnGuardar = document.getElementById('btnGuardarReserva');
   if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; }
+  const btnAprobReset = document.getElementById('btnEnviarParaAprobacion');
+  if(btnAprobReset){ btnAprobReset.disabled = false; btnAprobReset.textContent = '✉ Enviar para aprobación del cliente'; }
   const overlay = document.getElementById('overlay');
   const btnEliminar = document.getElementById('btnEliminar');
   const canalNuevoBlock = document.getElementById('canalNuevoBlock');
@@ -6668,6 +6681,7 @@ function reconocerClienteWhatsapp(){
 }
 
 function enviarSolicitudWhatsapp(){
+  const miTokenSolicitud = modalToken;
   const cod = document.getElementById('fWhatsTelefonoCod').value;
   const telefonoLocal = document.getElementById('fWhatsTelefono').value.trim();
   const contacto = document.getElementById('fWhatsContacto').value.trim();
@@ -6706,6 +6720,11 @@ function enviarSolicitudWhatsapp(){
     datoInicialSolicitud.codigoReserva = codigo;
     return reservasRef.add(datoInicialSolicitud);
   }).then(docRef => {
+    // Si mientras se guardaba esto el staff ya abrió otra reserva
+    // distinta, no se pisa lo que está viendo ahora en pantalla — el
+    // registro ya quedó guardado en Firestore de todas formas, solo se
+    // omite esta actualización de pantalla que ya no aplica.
+    if(miTokenSolicitud !== modalToken) return;
     const mensaje = armarMensaje(MENSAJES.solicitud, { nombre: contacto, link: urlFormularioSolicitud(docRef.id) });
     const url = `https://wa.me/${digitos}?text=${encodeURIComponent(mensaje)}`;
     // En vez de manejar una pestaña aparte (que en algunos casos se
@@ -6714,6 +6733,7 @@ function enviarSolicitudWhatsapp(){
     // abre WhatsApp es 100% directo del usuario, sin ninguna ventana
     // intermedia que pueda fallar.
     document.getElementById('linkAbrirWhatsapp').href = url;
+    document.getElementById('destinoWhatsappTexto').innerHTML = `Se enviará a:<br><b>${escapeHtml(contacto)}</b> — ${escapeHtml(telefono)}`;
     document.getElementById('whatsappBlock').style.display = 'none';
     document.getElementById('whatsappExitoBlock').style.display = 'block';
   }).catch(err => {
@@ -7105,6 +7125,7 @@ function urlAprobacion(id){
 }
 
 function enviarParaAprobacion(){
+  const miTokenAprobacion = modalToken;
   // Refuerzo de seguridad, igual que con eliminarReserva: aunque el botón
   // ya está oculto para una reserva de un día que ya pasó, esto bloquea el
   // envío real por si se llega a invocar de otra forma.
@@ -7191,6 +7212,11 @@ function enviarParaAprobacion(){
   });
 
   promesa.then(id => {
+    // Mismo resguardo: si para cuando termina de guardarse el staff ya
+    // había abierto otra reserva distinta, no se le muestra encima el
+    // "Abrir WhatsApp" de esta — la reserva ya quedó guardada igual, solo
+    // no se pisa la pantalla que está viendo ahora.
+    if(miTokenAprobacion !== modalToken) return;
     const mensaje = armarMensaje(MENSAJES.aprobacion, {
       nombre,
       link: urlAprobacion(id),
@@ -7203,6 +7229,7 @@ function enviarParaAprobacion(){
     });
     const waUrl = `https://wa.me/${digitosCliente}?text=${encodeURIComponent(mensaje)}`;
     document.getElementById('linkAbrirWhatsappAprobacion').href = waUrl;
+    document.getElementById('destinoWhatsappAprobacionTexto').innerHTML = `Se enviará a:<br><b>${escapeHtml(nombre)}</b> — ${escapeHtml(celular)}`;
     document.getElementById('formCompletoBlock').style.display = 'none';
     document.getElementById('aprobacionExitoBlock').style.display = 'block';
   }).catch(err => {
