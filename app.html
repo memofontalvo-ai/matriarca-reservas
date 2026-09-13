@@ -1414,7 +1414,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
         <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">✅ Mensaje de aprobación</div>
-          <div class="config-mensaje-sub">Se envía cuando ya armaste la reserva y le pides al cliente que la revise y apruebe. Además de <code>{nombre}</code> y <code>{link}</code>, aquí también puedes usar <code>{fecha}</code>, <code>{hora}</code>, <code>{pax}</code>, <code>{mesa}</code>, <code>{abono}</code> y <code>{menu}</code> — se llenan solos con los datos reales de cada reserva, para que le quede el detalle completo en el texto del WhatsApp aunque no vuelva a entrar a la app.</div>
+          <div class="config-mensaje-sub">Se envía cuando ya armaste la reserva y le pides al cliente que la revise y apruebe. Además de <code>{nombre}</code> y <code>{link}</code>, aquí también puedes usar <code>{fecha}</code>, <code>{hora}</code>, <code>{pax}</code>, <code>{mesa}</code>, <code>{abono}</code>, <code>{cover}</code> y <code>{menu}</code> — se llenan solos con los datos reales de cada reserva, para que le quede el detalle completo en el texto del WhatsApp aunque no vuelva a entrar a la app.</div>
           <textarea id="msgTexto_aprobacion" class="config-mensaje-textarea" rows="12"></textarea>
           <div class="config-mensaje-acciones">
             <button class="btn-config-restaurar" onclick="restaurarMensaje('aprobacion')">Restaurar original</button>
@@ -1654,7 +1654,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.81</div>
+<div class="version-tag">v4.82</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -1856,7 +1856,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div class="phone-section-title phone-client-title">▤ <span>Datos de la reserva</span></div>
 
       <div class="field-row phone-two-cols">
-        <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?"></div>
+        <div class="field field-pax-chico"><label>Personas</label><input type="number" id="fPax" min="1" placeholder="?" oninput="actualizarTotalCover()"></div>
         <div class="field">
           <label>Canal</label>
           <select id="fCanal">
@@ -1891,7 +1891,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <label class="checkbox-label"><input type="checkbox" id="fTieneCover" onchange="toggleCoverFields()"> Esta reserva tiene cover (entrada de evento especial)</label>
       </div>
       <div id="coverFieldsBlock" style="display:none;">
-        <div class="field"><label>Valor del cover ($)</label><input type="number" id="fCoverValor" placeholder="0"></div>
+        <div class="field">
+          <label>Valor del cover por persona ($)</label>
+          <input type="number" id="fCoverValor" placeholder="0" oninput="actualizarTotalCover()">
+          <div id="coverTotalDisplay" style="font-size:12.5px; color:var(--text-dim); margin-top:4px;"></div>
+        </div>
         <div class="field">
           <label>Comprobante de pago del cover</label>
           <label class="btn-elegir-mesa phone-mesa-btn" id="fCoverComprobanteLabel" for="fCoverComprobanteInput" style="display:block; text-align:center; cursor:pointer;">📎 Subir comprobante del cover</label>
@@ -3046,6 +3050,23 @@ let coverComprobanteBase64Temp = null;
 function toggleCoverFields(){
   const marcado = document.getElementById('fTieneCover').checked;
   document.getElementById('coverFieldsBlock').style.display = marcado ? 'block' : 'none';
+  if(marcado) actualizarTotalCover();
+}
+// El valor que escribe el staff en "Valor del cover" es POR PERSONA — el
+// total (lo que hay que cobrar/mostrarle al cliente) sale de
+// multiplicarlo por el número de personas de la reserva. Se recalcula
+// en vivo mientras se escribe cualquiera de los dos campos.
+function actualizarTotalCover(){
+  const el = document.getElementById('coverTotalDisplay');
+  if(!el) return;
+  const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+  const pax = Number(document.getElementById('fPax').value) || 0;
+  if(porPersona <= 0 || pax <= 0){
+    el.textContent = '';
+    return;
+  }
+  const total = porPersona * pax;
+  el.textContent = `Total: $${total.toLocaleString('es-CO')} (${pax} personas × $${porPersona.toLocaleString('es-CO')})`;
 }
 function previsualizarComprobanteCover(input){
   const file = input.files[0];
@@ -3945,6 +3966,7 @@ Tenemos disponibilidad para tu solicitud de reserva en La Matriarca Barranquilla
 👥 Personas: {pax}
 🪑 Mesa/Zona: {mesa}
 💰 Abono: {abono}
+🎫 Cover: {cover}
 🍽️ Menú: {menu}
 
 Ahora solo falta que revises los detalles y, si todo está correcto, apruebes tu reserva aquí:
@@ -6790,7 +6812,14 @@ function abrirModal(id, mesaId){
     // nuevo — solo se sube uno nuevo si el staff lo hace en este momento.
     coverComprobanteBase64Temp = null;
     document.getElementById('fTieneCover').checked = Number(r.coverValor) > 0;
-    document.getElementById('fCoverValor').value = r.coverValor || '';
+    // coverValorPersona es el campo nuevo (lo que escribe el staff, por
+    // persona). Reservas viejas solo tienen coverValor (el total plano de
+    // antes) — para esas, se calcula el valor por persona dividiendo entre
+    // el pax guardado, como mejor estimado, y el staff lo puede corregir.
+    const coverPersonaGuardado = r.coverValorPersona != null
+      ? r.coverValorPersona
+      : (Number(r.coverValor) > 0 && Number(r.pax) > 0 ? Math.round(Number(r.coverValor) / Number(r.pax)) : '');
+    document.getElementById('fCoverValor').value = coverPersonaGuardado || '';
     toggleCoverFields();
     document.getElementById('fCoverComprobanteInput').value = '';
     const coverPreview = document.getElementById('fCoverComprobantePreview');
@@ -7331,7 +7360,11 @@ function guardarReserva(){
     menu: document.getElementById('fMenu').value,
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
-    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
+    coverValorPersona: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
+    // coverValor se guarda como TOTAL (por persona × pax) — así el badge
+    // de la tarjeta y el mensaje de WhatsApp pueden seguir mostrando el
+    // total sin tener que recalcularlo cada vez.
+    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) * (Number(document.getElementById('fPax').value)||1) : 0,
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
@@ -7495,7 +7528,11 @@ function enviarParaAprobacion(){
     estado: 'pendiente_aprobacion',
     aprobadaPorCliente: false,
     pasoPorSolicitud: true,
-    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
+    coverValorPersona: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
+    // coverValor se guarda como TOTAL (por persona × pax) — así el badge
+    // de la tarjeta y el mensaje de WhatsApp pueden seguir mostrando el
+    // total sin tener que recalcularlo cada vez.
+    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) * (Number(document.getElementById('fPax').value)||1) : 0,
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
@@ -7553,6 +7590,9 @@ function enviarParaAprobacion(){
       mesa: data.mesa ? mesaLabel(data.mesa) : 'Por confirmar',
       abono: data.abono > 0 ? ('$' + Number(data.abono).toLocaleString('es-CO')) : 'Sin abono',
       menu: data.menu || 'Por definir',
+      cover: data.coverValor > 0
+        ? `$${Number(data.coverValorPersona).toLocaleString('es-CO')} por persona — Total $${Number(data.coverValor).toLocaleString('es-CO')} (${data.pax} personas)`
+        : 'Sin cover',
     });
     const waUrl = `https://wa.me/${digitosCliente}?text=${encodeURIComponent(mensaje)}`;
     document.getElementById('linkAbrirWhatsappAprobacion').href = waUrl;
