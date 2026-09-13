@@ -1654,7 +1654,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.78</div>
+<div class="version-tag">v4.79</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3661,6 +3661,7 @@ const HORARIOS_SEED = {
 };
 let HORARIOS = JSON.parse(JSON.stringify(HORARIOS_SEED));
 const horariosConfigRef = db.collection('configuracion').doc('horarios');
+let suprimirRenderHorarios = false;
 
 horariosConfigRef.get().then(snap => {
   if(!snap.exists){
@@ -3693,7 +3694,17 @@ horariosConfigRef.get().then(snap => {
         HORARIOS[key] = {...HORARIOS_SEED[key], ...(data[key]||{})};
       });
       renderAll();
-      renderCapacidadTurnos();
+      // Si este cambio lo acabamos de guardar nosotros mismos (tocando un
+      // campo de hora/activo/capacidad), NO reconstruimos la grilla: eso
+      // borraba y recreaba los inputs mientras el selector nativo de hora
+      // seguía abierto, y por eso se cerraba solo a mitad de camino. Los
+      // valores en pantalla ya son los correctos porque el usuario los
+      // acaba de escribir — solo re-renderizamos cuando el cambio viene
+      // de otro lado (otro empleado, u otra pestaña del mismo usuario).
+      if(!suprimirRenderHorarios){
+        renderCapacidadTurnos();
+      }
+      suprimirRenderHorarios = false;
     }
   }, err => console.error('Error de conexión en configuración de horarios:', err));
 }).catch(err => console.error('Error conectando configuración de horarios:', err));
@@ -3786,7 +3797,9 @@ db.collection('configuracion').doc('planoMesas').onSnapshot(snap => {
 function actualizarCapacidad(grupoKey, turnoKey, valor){
   const cap = Math.max(0, Math.round(Number(valor)) || 0);
   const grupoActualizado = { ...HORARIOS[grupoKey], [turnoKey]: { ...HORARIOS[grupoKey][turnoKey], cap } };
+  suprimirRenderHorarios = true;
   horariosConfigRef.set({ [grupoKey]: grupoActualizado }, { merge: true }).catch(err => {
+    suprimirRenderHorarios = false;
     alert('No se pudo guardar la capacidad. Revisa tu conexión e intenta de nuevo.');
     console.error(err);
   });
@@ -3799,7 +3812,9 @@ function actualizarCapacidad(grupoKey, turnoKey, valor){
 // no existe.
 function actualizarActivoTurno(grupoKey, turnoKey, activo){
   const grupoActualizado = { ...HORARIOS[grupoKey], [turnoKey]: { ...HORARIOS[grupoKey][turnoKey], activo } };
+  suprimirRenderHorarios = true;
   horariosConfigRef.set({ [grupoKey]: grupoActualizado }, { merge: true }).catch(err => {
+    suprimirRenderHorarios = false;
     alert('No se pudo guardar el cambio. Revisa tu conexión e intenta de nuevo.');
     console.error(err);
   });
@@ -3808,10 +3823,18 @@ function actualizarActivoTurno(grupoKey, turnoKey, activo){
 // Hora de inicio/fin real de cada turno — esto es lo que usa
 // solicitud.html para saber si la hora que el cliente está pidiendo cae
 // dentro del horario de atención real del restaurante ese día.
+//
+// IMPORTANTE: no se reconstruye la grilla completa después de guardar
+// (ver la bandera suprimirRenderHorarios más arriba) — si se reconstruye
+// mientras el selector nativo de hora del celular sigue abierto, el
+// selector se cierra solo a mitad de camino, antes de que la persona
+// termine de mover la hora o los minutos.
 function actualizarHorarioTurno(grupoKey, turnoKey, campo, valor){
   if(!valor) return;
   const grupoActualizado = { ...HORARIOS[grupoKey], [turnoKey]: { ...HORARIOS[grupoKey][turnoKey], [campo]: valor } };
+  suprimirRenderHorarios = true;
   horariosConfigRef.set({ [grupoKey]: grupoActualizado }, { merge: true }).catch(err => {
+    suprimirRenderHorarios = false;
     alert('No se pudo guardar el horario. Revisa tu conexión e intenta de nuevo.');
     console.error(err);
   });
@@ -6165,7 +6188,7 @@ function toggleConfigGrupo(id){
   const contenido = document.getElementById(id);
   const chevron = document.getElementById('chevron_' + id);
   const yaAbierto = contenido.style.display !== 'none';
-  ['grupoMensajes', 'grupoCarrusel', 'grupoEventos', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoPeligro'].forEach(otroId => {
+  ['grupoMensajes', 'grupoHorarios', 'grupoCarrusel', 'grupoEventos', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoPeligro'].forEach(otroId => {
     const otroContenido = document.getElementById(otroId);
     const otroChevron = document.getElementById('chevron_' + otroId);
     if(otroContenido) otroContenido.style.display = 'none';
