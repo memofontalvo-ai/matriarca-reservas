@@ -1669,7 +1669,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.84</div>
+<div class="version-tag">v4.85</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5315,8 +5315,17 @@ function descargarInformeDia(){
       .filter(r => r.fecha===iso && r.turno===turno && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='cancelada' && r.estado!=='lista_espera')
       .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
+    const totalAbonoTurno = rs.reduce((s,r) => s + (Number(r.abono)||0), 0);
+    const reservasConCoverTurno = rs.filter(r => Number(r.coverValor) > 0);
+    const totalCoverTurno = reservasConCoverTurno.reduce((s,r) => s + (Number(r.coverValor)||0), 0);
+    const paxConCoverTurno = reservasConCoverTurno.reduce((s,r) => s + (Number(r.pax)||0), 0);
 
-    const filasHtml = rs.length ? rs.map(r => `
+    const filasHtml = rs.length ? rs.map(r => {
+      const coverPersona = Number(r.coverValorPersona) || (Number(r.coverValor)>0 && Number(r.pax)>0 ? Math.round(Number(r.coverValor)/Number(r.pax)) : 0);
+      const coverTexto = Number(r.coverValor) > 0
+        ? `$${Number(r.coverValor).toLocaleString('es-CO')} (${r.pax} × $${coverPersona.toLocaleString('es-CO')})`
+        : '—';
+      return `
       <tr>
         <td>${escapeHtml(r.hora)}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
         <td>${escapeHtml(r.nombre)}</td>
@@ -5324,10 +5333,12 @@ function descargarInformeDia(){
         <td>${escapeHtml(r.celular||'—')}</td>
         <td>${r.mesa?escapeHtml(r.mesa.split('+').join(' + ')):'—'}</td>
         <td>${r.abono>0?'$'+Number(r.abono).toLocaleString('es-CO'):'—'}</td>
+        <td>${coverTexto}</td>
         <td>${escapeHtml(r.ultimoEditorIniciales||r.creadoPorIniciales||'—')}</td>
         <td>${estadoLabel(r.estado)}</td>
         <td>${escapeHtml(r.obs||'')}</td>
-      </tr>`).join('') : `<tr><td colspan="9" style="text-align:center; color:#888; padding:14px;">Sin reservas en este turno.</td></tr>`;
+      </tr>`;
+    }).join('') : `<tr><td colspan="10" style="text-align:center; color:#888; padding:14px;">Sin reservas en este turno.</td></tr>`;
 
     const porMesaRef = {};
     rs.forEach(r => { if(r.mesa) r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; }); });
@@ -5343,10 +5354,14 @@ function descargarInformeDia(){
         <h2>${turnoLabels[turno]} — ${rs.length} reserva${rs.length===1?'':'s'}, ${totalPax} pax</h2>
         <table>
           <thead><tr>
-            <th>Hora</th><th>Cliente</th><th>Pax</th><th>Celular</th><th>Mesa</th><th>Abono</th><th>Gestionó</th><th>Estado</th><th>Obs.</th>
+            <th>Hora</th><th>Cliente</th><th>Pax</th><th>Celular</th><th>Mesa</th><th>Abono</th><th>Cover</th><th>Gestionó</th><th>Estado</th><th>Obs.</th>
           </tr></thead>
           <tbody>${filasHtml}</tbody>
         </table>
+        <div style="display:flex; gap:16px; margin-top:10px; font-size:13px; font-weight:700;">
+          <span>💰 Total abonos: $${totalAbonoTurno.toLocaleString('es-CO')}</span>
+          <span>🎫 Total cover: $${totalCoverTurno.toLocaleString('es-CO')} (${reservasConCoverTurno.length} reserva${reservasConCoverTurno.length===1?'':'s'}, ${paxConCoverTurno} personas)</span>
+        </div>
         ${planoHtml}
       </div>`;
   }).join('');
