@@ -1654,7 +1654,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.79</div>
+<div class="version-tag">v4.80</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3746,6 +3746,34 @@ function claveHorarioParaFecha(fechaIsoODate){
   return DIAS_SEMANA_ORDEN[(dow+6)%7]; // getDay():0=domingo..6=sábado → índice en DIAS_SEMANA_ORDEN (lunes..domingo)
 }
 
+// Mismas funciones que usa solicitud.html del lado del cliente — para
+// avisarle al STAFF de una vez si la hora que está por confirmar (al
+// tomar una reserva por teléfono) cae fuera del horario real de
+// atención ese día. A diferencia del cliente, aquí es solo un aviso: el
+// staff puede confirmar de todas formas si tiene una buena razón.
+const HORARIOS_TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+function textoHorariosDelDia(fechaIso){
+  const grupo = HORARIOS[claveHorarioParaFecha(fechaIso)];
+  if(!grupo) return '';
+  const partes = ['desayuno','almuerzo','cena']
+    .filter(t => grupo[t] && grupo[t].activo !== false)
+    .map(t => `${HORARIOS_TURNO_LABEL[t]}: ${grupo[t].inicio} a ${grupo[t].fin}`);
+  if(!partes.length) return 'Ese día no tenemos servicio.';
+  return 'Nuestro horario ese día es — ' + partes.join(' · ');
+}
+function validarHorarioReal(fechaIso, turno, horaHHMM){
+  const grupo = HORARIOS[claveHorarioParaFecha(fechaIso)];
+  if(!grupo) return null;
+  const t = grupo[turno];
+  if(!t || t.activo === false){
+    return `Este turno está fuera del horario real de atención. ${textoHorariosDelDia(fechaIso)}`;
+  }
+  if(horaHHMM && t.inicio && t.fin && (horaHHMM < t.inicio || horaHHMM > t.fin)){
+    return `Esta hora está fuera del horario real de atención. ${textoHorariosDelDia(fechaIso)}`;
+  }
+  return null;
+}
+
 function agregarFestivo(fechaIso){
   if(!fechaIso) return;
   if(FESTIVOS.includes(fechaIso)) return;
@@ -4072,6 +4100,16 @@ function confirmarHoraSeleccionadaTelefono(){
   }
   const fecha = document.getElementById('fFechaReservaEdit').value;
   const turno = document.getElementById('fTurnoReservaEdit').value;
+  const horaHHMM = document.getElementById('fHora').value;
+  // Primero: ¿esta hora cae dentro del horario real de atención ese día?
+  // (festivos y domingo-antes-de-festivo incluidos). El staff SÍ puede
+  // seguir adelante — solo se le avisa antes, por si fue un error de dedo
+  // al tomar la reserva por teléfono.
+  const errorHorario = validarHorarioReal(fecha, turno, horaHHMM);
+  if(errorHorario){
+    abrirModalAvisoBloqueoTelefono(fecha, turno, {tipo:'fuera_horario', motivo: errorHorario});
+    return;
+  }
   const info = infoBloqueoTurno(fecha, turno);
   if(!info){
     validarDuplicadoYDesbloquearTelefono();
@@ -4107,7 +4145,11 @@ function abrirModalAvisoBloqueoTelefono(fecha, turno, info){
   const titulo = document.getElementById('avisoBloqueoTelTitulo');
   const texto = document.getElementById('avisoBloqueoTelTexto');
   const img = document.getElementById('avisoBloqueoTelImg');
-  if(tipo === 'evento_privado'){
+  if(tipo === 'fuera_horario'){
+    titulo.textContent = '⏰ Fuera del horario real de atención';
+    texto.textContent = `${info.motivo} ¿Confirmas que quieres crear esta reserva de todas formas?`;
+    img.style.display = 'none';
+  } else if(tipo === 'evento_privado'){
     titulo.textContent = '🔒 Evento privado en este turno';
     texto.textContent = `Este turno está bloqueado por un evento privado — el restaurante queda reservado completo.${dia.motivo?' '+dia.motivo:''} ¿Confirmas que quieres crear esta reserva de todas formas?`;
     img.style.display = 'none';
