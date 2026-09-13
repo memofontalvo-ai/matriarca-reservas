@@ -1386,11 +1386,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
   <div id="pantallaSalones" style="display:none;">
     <div class="salones-panel" id="panelSalones">
-      <div class="capacidad-turnos-panel">
-        <div class="capacidad-turnos-title">Horarios y capacidad por turno</div>
-        <div class="capacidad-turnos-sub">El horario real de atención de cada turno (y si está prendido o apagado ese día) — esto es lo que usa el formulario público para avisarle al cliente si está pidiendo una hora fuera de servicio. La capacidad es cuántas personas caben, para calcular el % de ocupación en "Por día" y "Resumen".</div>
-        <div id="capacidadTurnosGrid"></div>
-      </div>
       <button class="new-btn btn-nuevo-salon" onclick="abrirModalSalon()">+ Nuevo salón</button>
       <div id="listaSalones"></div>
     </div>
@@ -1426,6 +1421,21 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button class="btn-config-guardar" onclick="guardarMensaje('aprobacion', document.getElementById('msgTexto_aprobacion').value)">Guardar</button>
             <span class="config-mensaje-ok" id="msgGuardado_aprobacion" style="display:none;">✓ Guardado</span>
           </div>
+        </div>
+        </div>
+      </div>
+
+      <!-- ===== GRUPO: HORARIO DE ATENCIÓN ===== -->
+      <div class="config-grupo">
+        <button class="config-grupo-header" onclick="toggleConfigGrupo('grupoHorarios')">
+          <span>🕒 Horario de atención</span>
+          <span class="config-grupo-chevron" id="chevron_grupoHorarios">›</span>
+        </button>
+        <div class="config-grupo-contenido" id="grupoHorarios" style="display:none;">
+        <div class="config-mensaje-bloque">
+          <div class="capacidad-turnos-title">Horarios y capacidad por turno</div>
+          <div class="capacidad-turnos-sub">El horario real de atención de cada turno (y si está prendido o apagado ese día) — esto es lo que usa el formulario público para avisarle al cliente si está pidiendo una hora fuera de servicio. La capacidad es cuántas personas caben, para calcular el % de ocupación en "Por día" y "Resumen".</div>
+          <div id="capacidadTurnosGrid"></div>
         </div>
         </div>
       </div>
@@ -1634,7 +1644,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.76</div>
+<div class="version-tag">v4.77</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
