@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.62</div>
+<div class="version-tag">v4.63</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3479,10 +3479,6 @@ function sellarUsuarioEnReserva(data, esNueva){
   if(!usuarioActual) return;
   data.ultimoEditorIniciales = usuarioActual.iniciales;
   data.ultimoEditorNombre = usuarioActual.nombre;
-  // Marca de tiempo de la última vez que el staff tocó esta reserva
-  // (crearla, confirmarla, editarla) — se usa para ordenar "Por día" con
-  // las gestionadas más recientemente arriba, en vez de por hora de mesa.
-  data.ultimaEdicionEn = new Date().toISOString();
   if(esNueva){
     data.creadoPorIniciales = usuarioActual.iniciales;
     data.creadoPorNombre = usuarioActual.nombre;
@@ -4587,11 +4583,12 @@ function renderLista(){
   }
 
   const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
-  // Orden pedido por Memo: las reservas gestionadas/aprobadas más
-  // recientemente van arriba, las más viejas abajo — ya no se ordena por
-  // la hora de la mesa. Las que todavía no tienen "ultimaEdicionEn"
-  // (registros de antes de este cambio, o aprobadas por el cliente sin
-  // pasar por el staff) quedan al final, ordenadas entre ellas por hora.
+  // Orden pedido por Memo: las reservas APROBADAS más recientemente van
+  // arriba, las más viejas abajo — ya no se ordena por la hora de la
+  // mesa. "ultimaEdicionEn" se guarda solo en el momento exacto en que la
+  // reserva pasa a Confirmada (no en cada edición). Las que todavía no
+  // tienen ese dato (de antes de este cambio, o que nunca se confirmaron
+  // por este medio) quedan al final, ordenadas entre ellas por hora.
   const rs = reservasDelTurno().sort((a,b) => {
     const claveA = a.ultimaEdicionEn || '';
     const claveB = b.ultimaEdicionEn || '';
@@ -7016,6 +7013,13 @@ function guardarReserva(){
     return;
   }
   sellarUsuarioEnReserva(data, !editandoId);
+  // Marca de fecha/hora de APROBACIÓN — se guarda únicamente en el momento
+  // exacto en que la reserva pasa a "Confirmada" (no cada vez que se edita
+  // algo, ni si ya venía confirmada de antes). Esto es lo que usa "Por
+  // día" para ordenar con las últimas aprobadas arriba.
+  if(estadoSeleccionado === 'confirmada' && (!reservaAnterior || reservaAnterior.estado !== 'confirmada')){
+    data.ultimaEdicionEn = new Date().toISOString();
+  }
   // Si esta edición está cancelando una reserva que antes NO estaba
   // cancelada, se libera su candado de duplicados para que ese celular
   // pueda volver a reservar en esa fecha y turno más adelante.
