@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.71</div>
+<div class="version-tag">v4.72</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5949,7 +5949,19 @@ document.getElementById('calOverlay').addEventListener('click', e=>{
   if(e.target.id==='calOverlay') cerrarCalendario();
 });
 
+// Si llega una actualización en tiempo real (por ejemplo, otro empleado
+// gestionando OTRA reserva) mientras el modal de editar/nueva reserva
+// está abierto, NO se refresca la pantalla en ese momento — se guarda la
+// bandera y se actualiza recién cuando se cierra el modal. Esto evita que
+// dos personas usando el sistema al mismo tiempo se interfieran una a la
+// otra justo en medio de procesar una reserva.
+let rerenderPendienteTrasModal = false;
 function renderAll(){
+  const overlayAbierto = document.getElementById('overlay').classList.contains('open');
+  if(overlayAbierto){
+    rerenderPendienteTrasModal = true;
+    return;
+  }
   renderHeader();
   renderStats();
   renderLista();
@@ -6796,6 +6808,10 @@ document.getElementById('fTurnoReservaEdit').addEventListener('change', actualiz
 
 function cerrarModal(){
   document.getElementById('overlay').classList.remove('open');
+  if(rerenderPendienteTrasModal){
+    rerenderPendienteTrasModal = false;
+    renderAll();
+  }
 }
 
 /* ============ PANTALLA DE SALONES Y MESAS ============ */
