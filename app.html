@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.61</div>
+<div class="version-tag">v4.62</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3479,6 +3479,10 @@ function sellarUsuarioEnReserva(data, esNueva){
   if(!usuarioActual) return;
   data.ultimoEditorIniciales = usuarioActual.iniciales;
   data.ultimoEditorNombre = usuarioActual.nombre;
+  // Marca de tiempo de la última vez que el staff tocó esta reserva
+  // (crearla, confirmarla, editarla) — se usa para ordenar "Por día" con
+  // las gestionadas más recientemente arriba, en vez de por hora de mesa.
+  data.ultimaEdicionEn = new Date().toISOString();
   if(esNueva){
     data.creadoPorIniciales = usuarioActual.iniciales;
     data.creadoPorNombre = usuarioActual.nombre;
@@ -4583,7 +4587,17 @@ function renderLista(){
   }
 
   const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
-  const rs = reservasDelTurno().sort((a,b)=>a.hora.localeCompare(b.hora));
+  // Orden pedido por Memo: las reservas gestionadas/aprobadas más
+  // recientemente van arriba, las más viejas abajo — ya no se ordena por
+  // la hora de la mesa. Las que todavía no tienen "ultimaEdicionEn"
+  // (registros de antes de este cambio, o aprobadas por el cliente sin
+  // pasar por el staff) quedan al final, ordenadas entre ellas por hora.
+  const rs = reservasDelTurno().sort((a,b) => {
+    const claveA = a.ultimaEdicionEn || '';
+    const claveB = b.ultimaEdicionEn || '';
+    if(claveA || claveB) return claveB.localeCompare(claveA);
+    return a.hora.localeCompare(b.hora);
+  });
   // Aviso de bloqueo: recuerda al staff que este día/turno ya no acepta
   // solicitudes nuevas del cliente (solicitud.html lo respeta). No impide
   // que el staff mismo cree una reserva manual aquí si hace falta hacer
