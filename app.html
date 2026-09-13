@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.70</div>
+<div class="version-tag">v4.71</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6376,6 +6376,17 @@ function abrirModal(id, mesaId){
   if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; }
   const btnAprobReset = document.getElementById('btnEnviarParaAprobacion');
   if(btnAprobReset){ btnAprobReset.disabled = false; btnAprobReset.textContent = '✉ Enviar para aprobación del cliente'; }
+  // Por si el modal anterior había quedado abierto en alguna de las dos
+  // pantallas de "se guardó / abrir WhatsApp" (por ejemplo, si el staff
+  // pasó directo a otra reserva sin volver antes al menú principal), se
+  // restauran SIEMPRE aquí — antes esto solo pasaba al crear una reserva
+  // nueva, así que al EDITAR una ya existente esa pantalla vieja se podía
+  // quedar tapando el formulario, mostrando el modal como si estuviera
+  // vacío.
+  const whatsappExitoReset = document.getElementById('whatsappExitoBlock');
+  if(whatsappExitoReset) whatsappExitoReset.style.display = 'none';
+  const aprobacionExitoReset = document.getElementById('aprobacionExitoBlock');
+  if(aprobacionExitoReset) aprobacionExitoReset.style.display = 'none';
   const overlay = document.getElementById('overlay');
   const btnEliminar = document.getElementById('btnEliminar');
   const canalNuevoBlock = document.getElementById('canalNuevoBlock');
@@ -6383,6 +6394,7 @@ function abrirModal(id, mesaId){
   const formCompletoBlock = document.getElementById('formCompletoBlock');
 
   if(id){
+   try{
     const r = reservas.find(x=>x.id===id);
     modalFecha = r.fecha;
     modalTurno = r.turno;
@@ -6488,6 +6500,14 @@ function abrirModal(id, mesaId){
       coverPreview.src = '';
       coverLabel.textContent = '📎 Subir comprobante del cover';
     }
+   } catch(errAbrirModal){
+    // Si algo falla llenando el formulario, que se vea CLARO en pantalla
+    // en vez de dejar el modal a medio llenar sin explicación — así, la
+    // próxima vez que pase, con solo una foto de esta alerta se sabe
+    // exactamente qué línea falló, sin tener que adivinar.
+    console.error('Error abriendo la reserva para editar:', errAbrirModal);
+    alert('Hubo un error abriendo esta reserva:\n\n' + (errAbrirModal && errAbrirModal.message ? errAbrirModal.message : errAbrirModal) + '\n\nToma una foto de este mensaje y compártela para poder corregirlo.');
+   }
   } else {
     // La fecha de una reserva NUEVA siempre arranca en HOY, sin importar
     // qué día estés mirando en el calendario de "Por día" — ese calendario
@@ -6541,12 +6561,9 @@ function abrirModal(id, mesaId){
     document.getElementById('fWhatsContacto').value = '';
     const avisoWhatsReset = document.getElementById('clienteWhatsReconocidoAviso');
     if(avisoWhatsReset) avisoWhatsReset.style.display = 'none';
-    // Por si el modal anterior había quedado en la pantalla de éxito
-    // (después de enviar un link), se restauran los bloques normales.
-    const whatsappExitoReset = document.getElementById('whatsappExitoBlock');
-    if(whatsappExitoReset) whatsappExitoReset.style.display = 'none';
-    const aprobacionExitoReset = document.getElementById('aprobacionExitoBlock');
-    if(aprobacionExitoReset) aprobacionExitoReset.style.display = 'none';
+    // (El reseteo de las pantallas de éxito ahora se hace arriba, al
+    // principio de la función, para que también aplique al editar una
+    // reserva ya existente — no solo al crear una nueva.)
     // Por defecto queda "pendiente" — la persona que toma la llamada no
     // siempre puede confirmar de una vez (puede depender de disponibilidad,
     // de que el cliente confirme algo, etc.). Si ya está confirmada de
