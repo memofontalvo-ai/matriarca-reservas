@@ -977,7 +977,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .capacidad-grupo{margin-bottom:12px;}
 .capacidad-grupo:last-child{margin-bottom:0;}
 .capacidad-grupo-label{font-size:12px; font-weight:700; color:var(--text); margin-bottom:6px;}
-.capacidad-grupo-turnos{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.capacidad-grupo-turnos{display:grid; grid-template-columns:1fr; gap:8px;}
 .capacidad-turno-item{
   display:flex; flex-direction:column; gap:4px; background:var(--panel-raised);
   border-radius:8px; padding:8px;
@@ -988,6 +988,17 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   color:var(--text); font-size:15px; font-weight:700; padding:6px 8px; width:100%;
 }
 .capacidad-turno-item input:focus{border-color:var(--gold); outline:none;}
+.capacidad-turno-item.turno-inactivo{opacity:.55;}
+.capacidad-turno-activo-row{display:flex; align-items:center; justify-content:space-between; gap:6px;}
+.capacidad-turno-activo-row .switch-mini{position:relative; width:32px; height:18px; flex-shrink:0;}
+.capacidad-turno-activo-row .switch-mini input{position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer;}
+.capacidad-turno-activo-row .switch-mini .track{position:absolute; inset:0; background:var(--border); border-radius:20px; transition:background .15s;}
+.capacidad-turno-activo-row .switch-mini .track::after{content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; background:#fff; border-radius:50%; transition:transform .15s;}
+.capacidad-turno-activo-row .switch-mini input:checked + .track{background:var(--confirmed);}
+.capacidad-turno-activo-row .switch-mini input:checked + .track::after{transform:translateX(14px);}
+.capacidad-turno-horas-row{display:flex; align-items:center; gap:4px;}
+.capacidad-turno-horas-row input[type="time"]{font-size:11.5px; font-weight:600; padding:5px 4px;}
+.capacidad-turno-horas-row span{font-size:10px; color:var(--text-dim);}
 .salon-card-admin{
   background:var(--panel-alt); border:1px solid var(--border-soft); border-radius:var(--radius);
   padding:14px; margin-bottom:12px;
@@ -1376,8 +1387,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   <div id="pantallaSalones" style="display:none;">
     <div class="salones-panel" id="panelSalones">
       <div class="capacidad-turnos-panel">
-        <div class="capacidad-turnos-title">Capacidad por turno</div>
-        <div class="capacidad-turnos-sub">Cuántas personas caben en cada turno según el día de la semana. Se usa para calcular el % de ocupación en "Por día" y "Resumen".</div>
+        <div class="capacidad-turnos-title">Horarios y capacidad por turno</div>
+        <div class="capacidad-turnos-sub">El horario real de atención de cada turno (y si está prendido o apagado ese día) — esto es lo que usa el formulario público para avisarle al cliente si está pidiendo una hora fuera de servicio. La capacidad es cuántas personas caben, para calcular el % de ocupación en "Por día" y "Resumen".</div>
         <div id="capacidadTurnosGrid"></div>
       </div>
       <button class="new-btn btn-nuevo-salon" onclick="abrirModalSalon()">+ Nuevo salón</button>
@@ -1623,7 +1634,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.75</div>
+<div class="version-tag">v4.76</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -3659,6 +3670,31 @@ function actualizarCapacidad(grupoKey, turnoKey, valor){
   });
 }
 
+// Prender/apagar un turno completo (por ejemplo, "Domingo → Cena" apagado
+// porque ese día no hay servicio de cena). Cuando está apagado, el cliente
+// ya no puede elegir ese turno al reservar desde solicitud.html — se lo
+// avisa de una vez, sin dejarlo completar una reserva para un horario que
+// no existe.
+function actualizarActivoTurno(grupoKey, turnoKey, activo){
+  const grupoActualizado = { ...HORARIOS[grupoKey], [turnoKey]: { ...HORARIOS[grupoKey][turnoKey], activo } };
+  horariosConfigRef.set({ [grupoKey]: grupoActualizado }, { merge: true }).catch(err => {
+    alert('No se pudo guardar el cambio. Revisa tu conexión e intenta de nuevo.');
+    console.error(err);
+  });
+}
+
+// Hora de inicio/fin real de cada turno — esto es lo que usa
+// solicitud.html para saber si la hora que el cliente está pidiendo cae
+// dentro del horario de atención real del restaurante ese día.
+function actualizarHorarioTurno(grupoKey, turnoKey, campo, valor){
+  if(!valor) return;
+  const grupoActualizado = { ...HORARIOS[grupoKey], [turnoKey]: { ...HORARIOS[grupoKey][turnoKey], [campo]: valor } };
+  horariosConfigRef.set({ [grupoKey]: grupoActualizado }, { merge: true }).catch(err => {
+    alert('No se pudo guardar el horario. Revisa tu conexión e intenta de nuevo.');
+    console.error(err);
+  });
+}
+
 function renderCapacidadTurnos(){
   const el = document.getElementById('capacidadTurnosGrid');
   if(!el) return;
@@ -3668,13 +3704,27 @@ function renderCapacidadTurnos(){
     <div class="capacidad-grupo">
       <div class="capacidad-grupo-label">${gLabel}</div>
       <div class="capacidad-grupo-turnos">
-        ${turnos.map(([tKey,tLabel])=>`
-          <label class="capacidad-turno-item">
-            <span class="capacidad-turno-label">${tLabel}</span>
+        ${turnos.map(([tKey,tLabel])=>{
+          const t = HORARIOS[gKey][tKey];
+          return `
+          <label class="capacidad-turno-item ${t.activo===false?'turno-inactivo':''}">
+            <div class="capacidad-turno-activo-row">
+              <span class="capacidad-turno-label">${tLabel}</span>
+              <span class="switch-mini">
+                <input type="checkbox" ${t.activo!==false?'checked':''} onchange="actualizarActivoTurno('${gKey}','${tKey}', this.checked)">
+                <span class="track"></span>
+              </span>
+            </div>
+            <div class="capacidad-turno-horas-row">
+              <input type="time" value="${t.inicio||''}" onchange="actualizarHorarioTurno('${gKey}','${tKey}','inicio', this.value)">
+              <span>a</span>
+              <input type="time" value="${t.fin||''}" onchange="actualizarHorarioTurno('${gKey}','${tKey}','fin', this.value)">
+            </div>
             <input type="number" min="0" step="1" inputmode="numeric"
-              value="${HORARIOS[gKey][tKey].cap}"
+              value="${t.cap}" placeholder="Capacidad"
               onchange="actualizarCapacidad('${gKey}','${tKey}', this.value)">
-          </label>`).join('')}
+          </label>`;
+        }).join('')}
       </div>
     </div>`).join('');
 }

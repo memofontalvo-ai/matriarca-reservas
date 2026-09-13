@@ -208,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.29</div>
+<div class="version-tag">v3.30</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -474,6 +474,53 @@ const firebaseConfig = {
   function diaTieneAlgunBloqueo(fechaIso){
     const dia = FECHAS_BLOQUEADAS[fechaIso];
     return !!(dia && (dia.desayuno || dia.almuerzo || dia.cena));
+  }
+
+  // ============ HORARIO REAL DE ATENCIÓN (por día de la semana) ============
+  // Mismo documento que edita el staff en Salones → "Horarios y capacidad
+  // por turno". Se usa para avisarle al cliente DE UNA VEZ si la hora que
+  // está pidiendo cae fuera del horario real de ese día — en vez de dejar
+  // que llegue una solicitud para un horario que ni siquiera existe.
+  const HORARIOS_TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  let HORARIOS_REALES = null;
+  const horariosRealesPromesa = db.collection('configuracion').doc('horarios').get()
+    .then(snap => { HORARIOS_REALES = snap.exists ? snap.data() : null; })
+    .catch(err => console.error('Error cargando horarios reales:', err));
+
+  function grupoDeFecha(fechaIso){
+    const [y,m,d] = fechaIso.split('-').map(Number);
+    const dow = new Date(y, m-1, d, 12).getDay(); // 0=domingo ... 6=sábado
+    if(dow === 0) return 'domingo';
+    if(dow === 5 || dow === 6) return 'viesab';
+    return 'lunjue';
+  }
+
+  // Devuelve null si la hora pedida SÍ está dentro del horario real de ese
+  // turno ese día. Si no, devuelve un texto explicando qué turnos SÍ hay
+  // disponibles ese día, para mostrárselo de una vez al cliente.
+  function textoHorariosDelDia(fechaIso){
+    if(!HORARIOS_REALES) return '';
+    const grupo = HORARIOS_REALES[grupoDeFecha(fechaIso)];
+    if(!grupo) return '';
+    const partes = ['desayuno','almuerzo','cena']
+      .filter(t => grupo[t] && grupo[t].activo !== false)
+      .map(t => `${HORARIOS_TURNO_LABEL[t]}: ${grupo[t].inicio} a ${grupo[t].fin}`);
+    if(!partes.length) return 'Ese día no tenemos servicio.';
+    return 'Nuestro horario ese día es — ' + partes.join(' · ');
+  }
+
+  function validarHorarioReal(fechaIso, turno, horaHHMM){
+    if(!HORARIOS_REALES) return null; // si no cargó a tiempo, no se bloquea de más
+    const grupo = HORARIOS_REALES[grupoDeFecha(fechaIso)];
+    if(!grupo) return null;
+    const t = grupo[turno];
+    if(!t || t.activo === false){
+      return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
+    }
+    if(horaHHMM && t.inicio && t.fin && (horaHHMM < t.inicio || horaHHMM > t.fin)){
+      return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
+    }
+    return null;
   }
 
   // Mismo generador de código consecutivo que usa el panel de staff — para
@@ -776,6 +823,17 @@ const firebaseConfig = {
   function elegirTurno(t){
     document.getElementById('errorMsg').style.display = 'none';
     const fecha = document.getElementById('fFecha').value;
+    // Primero: ¿este turno siquiera existe ese día de la semana? (por
+    // ejemplo, "Cena" un domingo si ese día no hay servicio de cena).
+    // Esto aplica sin importar si el turno se eligió tocando el botón
+    // directamente o llegó automáticamente desde la rueda de hora.
+    const errorHorario = validarHorarioReal(fecha, t, null);
+    if(errorHorario){
+      const avisoBloqueo = document.getElementById('avisoFechaBloqueada');
+      avisoBloqueo.style.display = 'block';
+      avisoBloqueo.innerHTML = `<strong>Fuera de horario</strong><br>${errorHorario}`;
+      return;
+    }
     const info = infoBloqueoTurno(fecha, t);
     if(info && (info.tipo === 'evento' || info.tipo === 'evento_privado')){
       // Bloqueo total: ni se selecciona ni hay opción de lista de espera.
@@ -1572,6 +1630,23 @@ const firebaseConfig = {
       if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
       else if(minutosDelDia >= 660 && minutosDelDia < 1080) turnoAuto = 'almuerzo';
       else turnoAuto = 'cena';
+
+      // Antes de seguir, se valida contra el horario REAL configurado por
+      // el staff para ese día de la semana — si la hora pedida cae fuera
+      // de servicio (por ejemplo, domingo a las 7pm y ese día no hay
+      // cena), se avisa de una vez con los horarios correctos, sin dejar
+      // que la solicitud continúe.
+      const fechaActual = document.getElementById('fFecha').value;
+      const horaHHMM = `${String(h24).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+      const errorHorario = validarHorarioReal(fechaActual, turnoAuto, horaHHMM);
+      if(errorHorario){
+        const aviso = document.getElementById('avisoHoraSinConfirmar');
+        if(aviso){
+          aviso.textContent = `⏰ ${errorHorario}`;
+          aviso.style.display = 'block';
+        }
+        return;
+      }
     }
     ultimoTurnoAutoPreguntado = turnoAuto;
     elegirTurno(turnoAuto);
