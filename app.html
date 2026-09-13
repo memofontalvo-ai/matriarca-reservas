@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.64</div>
+<div class="version-tag">v4.66</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4668,9 +4668,10 @@ function tarjetaReservaHTML(r, mostrarFecha){
       ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
       ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
     </div>
-    ${(r.codigoReserva || r.ultimoEditorIniciales) ? `
+    ${(r.codigoReserva || r.ultimoEditorIniciales || r.ultimaEdicionEn) ? `
     <div class="res-firma">
       ${r.codigoReserva?`<span class="codigo-reserva-tag">${escapeHtml(r.codigoReserva)}</span>`:''}
+      ${r.ultimaEdicionEn?`<span title="Fecha y hora en que se aprobó esta reserva">✓ Aprobada: ${formatearFechaHoraAprobacion(r.ultimaEdicionEn)}</span>`:''}
       ${r.ultimoEditorIniciales?`<span title="Última vez editada por ${escapeHtml(r.ultimoEditorNombre||'')}">✎ ${escapeHtml(r.ultimoEditorIniciales)}</span>`:''}
     </div>` : ''}
     ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
@@ -6008,6 +6009,24 @@ function formatearHoraSolicitud(iso){
   const ampm = h >= 12 ? 'pm' : 'am';
   h = h % 12; if(h === 0) h = 12;
   return `${h}:${min} ${ampm}`;
+}
+
+// Igual que formatearHoraSolicitud, pero con fecha y hora juntas — para
+// mostrar EXACTAMENTE cuándo se aprobó una reserva (campo
+// "ultimaEdicionEn", que solo se llena en el momento de la aprobación).
+// Si el registro no lo tiene (de antes de este cambio, o nunca se marcó
+// Confirmada por este medio), devuelve vacío en vez de inventar una fecha.
+function formatearFechaHoraAprobacion(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const dia = String(d.getDate()).padStart(2,'0');
+  const mes = MESES[d.getMonth()].slice(0,3);
+  let h = d.getHours();
+  const min = String(d.getMinutes()).padStart(2,'0');
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12; if(h === 0) h = 12;
+  return `${dia} ${mes} · ${h}:${min} ${ampm}`;
 }
 
 function requiereGestion(r){
