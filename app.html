@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.69</div>
+<div class="version-tag">v4.70</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4682,7 +4682,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     <div class="res-meta">
       <span>${r.pax} pax</span>
       ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
-      ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
+      ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
       ${r.coverValor>0?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}</span>`:''}
@@ -6212,7 +6212,7 @@ function renderSolicitudesScreen(){
           <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
         </div>
         <div class="sc-meta">
-          ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
+          ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
         </div>
         ${(r.codigoReserva || formatearHoraSolicitud(r.horaSolicitud)) ? `
         <div class="sc-firma">
@@ -6236,7 +6236,7 @@ function renderSolicitudesScreen(){
       <div class="sc-meta">
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
-        ${r.celular?`<span class="tel-destacado">📞 ${escapeHtml(r.celular)}</span>`:''}
+        ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
         ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.listaEspera?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🕒 Lista de espera</span>`:''}
