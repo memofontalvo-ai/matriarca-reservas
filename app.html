@@ -1623,7 +1623,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.73</div>
+<div class="version-tag">v4.74</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -6763,6 +6763,8 @@ function enviarSolicitudWhatsapp(){
     // intermedia que pueda fallar.
     document.getElementById('linkAbrirWhatsapp').href = url;
     document.getElementById('destinoWhatsappTexto').innerHTML = `Se enviará a:<br><b>${escapeHtml(contacto)}</b> — ${escapeHtml(telefono)}`;
+    document.getElementById('modalTitle').textContent = 'Enviar solicitud';
+    document.getElementById('modalSub').textContent = 'Guardada — falta que el cliente complete el formulario';
     document.getElementById('whatsappBlock').style.display = 'none';
     document.getElementById('whatsappExitoBlock').style.display = 'block';
   }).catch(err => {
@@ -7263,6 +7265,8 @@ function enviarParaAprobacion(){
     const waUrl = `https://wa.me/${digitosCliente}?text=${encodeURIComponent(mensaje)}`;
     document.getElementById('linkAbrirWhatsappAprobacion').href = waUrl;
     document.getElementById('destinoWhatsappAprobacionTexto').innerHTML = `Se enviará a:<br><b>${escapeHtml(nombre)}</b> — ${escapeHtml(celular)}`;
+    document.getElementById('modalTitle').textContent = 'Enviar para aprobación';
+    document.getElementById('modalSub').textContent = 'Reserva guardada — falta que el cliente confirme';
     document.getElementById('formCompletoBlock').style.display = 'none';
     document.getElementById('aprobacionExitoBlock').style.display = 'block';
   }).catch(err => {
