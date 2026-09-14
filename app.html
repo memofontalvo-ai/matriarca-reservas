@@ -1640,7 +1640,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <header>
       <div class="date-nav">
         <button onclick="cambiarDia(-1)">‹</button>
-        <div class="date-label" id="dateLabel" onclick="toggleCalendarioPorDia()"></div>
+        <div class="date-label" id="dateLabel" onclick="verResumenMes()" title="Toca para ver el resumen de todo el mes"></div>
         <button onclick="cambiarDia(1)">›</button>
       </div>
       <div class="dia-acciones-row">
@@ -1980,7 +1980,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.04</div>
+<div class="version-tag">v5.05</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
