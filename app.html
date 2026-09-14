@@ -1920,7 +1920,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.96</div>
+<div class="version-tag">v4.97</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5441,6 +5441,43 @@ async function generarInformeEjecutivoMensual(anoParam, mesParam){
   }
 }
 
+// Dibuja la dona de participación por turno en un <canvas> de verdad
+// (con ctx.arc, no CSS) y la devuelve como una imagen (data URL) lista
+// para meter en un <img>. Todos los números que entran aquí ya vienen
+// validados (pax >= 0, turno filtrado a los que tienen pax > 0), así que
+// no hay riesgo de pasarle un valor no numérico al canvas.
+function dibujarDonaComoImagen(porServicio, totalPax){
+  const size = 260; // se muestra a 130px en pantalla, el doble para que se vea nítida
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size/2, cy = size/2, radio = size/2 - 20, grosor = 22;
+  ctx.lineWidth = grosor;
+  ctx.lineCap = 'butt';
+
+  // Fondo del anillo completo
+  ctx.beginPath();
+  ctx.arc(cx, cy, radio, 0, Math.PI*2);
+  ctx.strokeStyle = '#242b35';
+  ctx.stroke();
+
+  const total = Number(totalPax) || 0;
+  if(total > 0){
+    let anguloActual = -Math.PI/2; // arranca arriba, como las 12 en punto
+    porServicio.filter(s => Number(s.pax) > 0).forEach(s => {
+      const fraccion = Number(s.pax) / total;
+      if(!isFinite(fraccion) || fraccion <= 0) return;
+      const anguloFinal = anguloActual + fraccion * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radio, anguloActual, anguloFinal);
+      ctx.strokeStyle = IE_TURNO_COLOR[s.turno] || '#c9a15a';
+      ctx.stroke();
+      anguloActual = anguloFinal;
+    });
+  }
+  return canvas.toDataURL('image/png');
+}
+
 function renderExecutiveReport(d){
   const poster = document.getElementById('iePoster');
   const mesNombre = MESES[d.mes].toUpperCase();
@@ -5449,21 +5486,14 @@ function renderExecutiveReport(d){
   const corte = `${String(ahora.getDate()).padStart(2,'0')}/${String(ahora.getMonth()+1).padStart(2,'0')}/${ahora.getFullYear()} ${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
 
   // ---- Dona de participación por turno ----
-  // SVG con stroke-dasharray en vez de conic-gradient: la herramienta que
-  // convierte esto a imagen (html2canvas) no entiende conic-gradient y
-  // fallaba justo en este punto — un SVG normal sí es 100% compatible.
-  let acumPct = 0;
-  const segmentosDona = d.porServicio.filter(s=>s.pax>0).map(s=>{
-    const pct = (s.pax/(d.metrics.totalPax||1))*100;
-    const offset = 25 - acumPct;
-    const circulo = `<circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="${IE_TURNO_COLOR[s.turno]}" stroke-width="4.5" stroke-dasharray="${pct.toFixed(3)} ${(100-pct).toFixed(3)}" stroke-dashoffset="${offset.toFixed(3)}"></circle>`;
-    acumPct += pct;
-    return circulo;
-  }).join('');
-  const donaSvg = `<svg viewBox="0 0 36 36" style="position:absolute; inset:0; width:100%; height:100%;">
-    <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#242b35" stroke-width="4.5"></circle>
-    ${segmentosDona}
-  </svg>`;
+  // Dibujada en un <canvas> normal y convertida a imagen — ni SVG ni
+  // conic-gradient, que son justo los dos trucos con los que la
+  // herramienta que genera la imagen final (html2canvas) ha venido
+  // fallando dentro del navegador de WhatsApp. Un <canvas> convertido a
+  // <img> es lo más compatible que existe: html2canvas simplemente copia
+  // la imagen tal cual, sin tener que reinterpretar nada.
+  const donaImgSrc = dibujarDonaComoImagen(d.porServicio, d.metrics.totalPax);
+  const donaHtml = `<img src="${donaImgSrc}" style="position:absolute; inset:0; width:100%; height:100%;" alt="">`;
 
   const servicioHtml = d.porServicio.map(s => `
     <div class="ie-servicio-fila">
@@ -5514,7 +5544,7 @@ function renderExecutiveReport(d){
       <div class="ie-panel ie-panel-servicio">
         <div class="ie-panel-titulo">PARTICIPACIÓN POR TIEMPO DE SERVICIO</div>
         <div class="ie-dona-row">
-          <div class="ie-dona">${donaSvg}<div class="ie-dona-hueco"><b>${numCO(d.metrics.totalPax)}</b><span>PAX TOTALES</span></div></div>
+          <div class="ie-dona">${donaHtml}<div class="ie-dona-hueco"><b>${numCO(d.metrics.totalPax)}</b><span>PAX TOTALES</span></div></div>
           <div class="ie-servicio-lista">${servicioHtml}</div>
         </div>
         <div class="ie-badges-row">
