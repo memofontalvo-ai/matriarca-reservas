@@ -11,17 +11,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
 
 :root{
-  --bg: #12151a;
-  --panel: #191d25;
-  --panel-alt: #1f242e;
-  --panel-raised: #262c38;
+  --bg: #0b111a;
+  --panel: #101a26;
+  --panel-alt: #131f2b;
+  --panel-raised: #18232f;
   --border: #2b313d;
-  --border-soft: #232833;
-  --text: #edeef1;
-  --text-muted: #8b93a3;
-  --text-dim: #5c6472;
-  --gold: #c9a15a;
-  --gold-bright: #e0bb78;
+  --border-soft: rgba(255,255,255,0.10);
+  --text: #f5f7fa;
+  --text-muted: #aab3c2;
+  --text-dim: #6b7484;
+  --gold: #d6aa55;
+  --gold-bright: #e8c675;
+  --terracota: #e96b50;
   --confirmed: #47b881;
   --confirmed-bg: rgba(71,184,129,0.14);
   --pending: #4fb0c9;
@@ -50,7 +51,10 @@
    recortado ese elemento puntual, en vez de mover la pantalla completa. */
 html, body{overflow-x:hidden; max-width:100%; overscroll-behavior-x:none;}
 body{
-  background:var(--bg);
+  background:
+    radial-gradient(ellipse 900px 500px at 15% -8%, rgba(41,58,82,0.35) 0%, rgba(41,58,82,0) 60%),
+    linear-gradient(180deg, #0d141f 0%, var(--bg) 45%, #0a0f17 100%);
+  background-attachment:fixed;
   color:var(--text);
   font-family:'Inter',sans-serif;
   min-height:100vh;
@@ -102,38 +106,58 @@ header{
 }
 .btn-nueva-reserva-header .fab-icon{
   width:38px; height:38px; border-radius:50%;
-  background:var(--gold); color:#1a1408;
+  background:linear-gradient(150deg, var(--gold-bright) 0%, var(--gold) 55%, #a97f3f 100%);
+  color:#1a1408;
   display:flex; align-items:center; justify-content:center;
   font-size:22px; font-weight:400; line-height:1;
-  box-shadow:0 3px 10px rgba(0,0,0,0.4);
+  box-shadow:0 3px 10px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .btn-nueva-reserva-header:active .fab-icon{background:var(--gold-bright); transform:scale(0.94);}
 .btn-nueva-reserva-header span:last-child{
   font-size:9px; font-weight:700; color:var(--gold-bright); letter-spacing:0.2px;
   white-space:nowrap;
 }
-/* El botón de cerrar sesión usa el mismo estilo del de "Nueva reserva" pero
-   NO puede compartir su posición (top:10px; left:12px) o quedarían los dos
-   encimados en la misma esquina — por eso este va aparte, en la esquina
-   opuesta (arriba a la derecha), sin el círculo dorado grande. */
+/* Control superior derecho: versión + usuario dentro de UNA misma cápsula,
+   apiladas en dos líneas (versión arriba, "GF · Salir" abajo), en vez de
+   dos elementos posicionados por separado — así nunca pueden quedar
+   montados uno sobre el otro, sin importar la resolución. El número de
+   versión visible aquí se sincroniza por JS desde .version-tag (ver
+   sincronizarVersionHeader más abajo), que sigue siendo la única fuente
+   del texto de versión a actualizar en cada release. */
+.header-userbox{
+  position:absolute; top:10px; right:12px; z-index:60;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  background:rgba(0,0,0,0.28); border:1px solid rgba(214,170,85,0.35);
+  border-radius:16px; padding:8px 14px;
+}
+.header-userbox .header-version-line{
+  font-size:10px; font-weight:600; color:var(--text-dim);
+  font-family:'JetBrains Mono',monospace; letter-spacing:0.3px; white-space:nowrap;
+}
 .btn-cerrar-sesion-header{
-  left:auto; right:12px; flex-direction:row; gap:4px;
-  background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:20px;
-  padding:6px 12px !important;
+  position:static; flex-direction:row; gap:4px;
+  background:none; border:none; padding:0 !important;
 }
 .btn-cerrar-sesion-header span{font-size:11px !important; color:var(--text-dim) !important;}
 .btn-cerrar-sesion-header span:first-child{color:var(--gold-bright) !important; font-weight:700;}
 .date-nav{display:flex; align-items:center; gap:6px;}
 .date-nav-solicitudes{
-  justify-content:center; padding:12px 16px; background:var(--panel);
-  border-bottom:1px solid var(--border); flex-shrink:0;
+  justify-content:space-between; gap:10px; margin:12px 16px 0; padding:10px 12px;
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:14px;
+  flex-shrink:0;
 }
+.date-nav-solicitudes .date-label{flex:1;}
 .alerta-atrasadas{
-  background:rgba(232,163,61,0.12); border-bottom:1px solid #e8a33d;
-  color:#e8a33d; font-size:12.5px; font-weight:600; padding:11px 16px;
+  display:flex; align-items:flex-start; gap:10px;
+  background:rgba(233,107,80,0.14); border-bottom:1px solid var(--terracota);
+  color:#f0a998; font-size:12.5px; font-weight:600; padding:11px 16px;
   cursor:pointer; line-height:1.4; flex-shrink:0;
 }
-.alerta-atrasadas:hover{background:rgba(232,163,61,0.2);}
+.alerta-atrasadas:hover{background:rgba(233,107,80,0.22);}
+.alerta-atrasadas svg{flex-shrink:0;}
+.alerta-atrasadas .alerta-atrasadas-icono{color:var(--terracota); margin-top:1px;}
+.alerta-atrasadas .alerta-atrasadas-texto{flex:1;}
+.alerta-atrasadas .alerta-atrasadas-chevron{color:var(--terracota); margin-top:3px;}
 .date-nav button{
   width:30px; height:30px; border-radius:8px; background:var(--panel-alt);
   border:1px solid var(--border); color:var(--text-muted); font-size:14px;
@@ -183,6 +207,8 @@ header{
 }
 .especial-btn:hover{background:rgba(201,161,90,0.12);}
 .especial-btn.activo{background:var(--gold); color:#1a1408;}
+.especial-btn svg{width:15px; height:15px; flex-shrink:0;}
+.especial-btn .especial-chevron{margin-left:auto; width:14px; height:14px; flex-shrink:0;}
 .filtro-especiales-row{
   display:flex; justify-content:center; padding:10px 16px 0;
   background:var(--panel); flex-shrink:0;
@@ -194,7 +220,8 @@ header{
   background:var(--panel-alt); border:1px solid var(--border); border-radius:12px;
   padding:9px 12px; flex-shrink:0;
 }
-.buscador-cliente-icono{font-size:14px; opacity:.7;}
+.buscador-cliente-icono{display:flex; align-items:center; opacity:.7;}
+.buscador-cliente-icono svg{width:15px; height:15px;}
 .buscador-cliente-input{
   flex:1; background:none; border:none; outline:none; color:var(--text);
   font-size:14px; font-family:inherit;
@@ -211,13 +238,16 @@ header{
   padding:12px 16px 0; background:var(--panel);
 }
 .resumen-sol-card{
-  background:var(--panel-alt); border:1px solid var(--border); border-radius:10px;
-  padding:10px 6px; text-align:center;
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:14px;
+  padding:12px 6px; text-align:center;
 }
 .resumen-sol-card.total{background:rgba(230,180,90,0.14); border-color:var(--gold);}
+.resumen-sol-icon{display:flex; align-items:center; justify-content:center; margin-bottom:4px; color:var(--text-dim);}
+.resumen-sol-icon svg{width:16px; height:16px;}
+.resumen-sol-card.total .resumen-sol-icon{color:var(--gold-bright);}
 .resumen-sol-num{font-size:20px; font-weight:800; color:var(--text);}
 .resumen-sol-card.total .resumen-sol-num{color:var(--gold-bright);}
-.resumen-sol-label{font-size:10px; color:var(--text-dim); text-transform:uppercase; font-weight:700; margin-top:2px;}
+.resumen-sol-label{font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700; margin-top:2px;}
 
 /* ===== TABS + STATS BAR ===== */
 .subbar{
@@ -374,11 +404,22 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .empty-state{color:var(--text-dim); font-size:12.5px; text-align:center; padding:40px 10px;}
 
-/* ===== ESTADO DE CONEXIÓN ===== */
+/* ===== FILA DE ESTADO (conexión + presencia) ===== */
+/* Antes "Conectado a la base de datos" y "En línea ahora" eran dos franjas
+   completas apiladas, cada una ocupando el ancho entero — se veían como dos
+   componentes sueltos y desperdiciaban alto. Ahora van en la misma fila,
+   cada una dentro de su propia cápsula compacta; en pantallas angostas se
+   envuelven a la línea siguiente pero conservan la forma de cápsula. */
+.estado-row{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
 .estado-conexion{
-  display:flex; align-items:center; justify-content:center; gap:8px;
-  padding:7px 10px; font-size:11.5px; font-weight:600; color:var(--text-muted);
-  background:var(--panel-raised); border-bottom:1px solid var(--border); flex-shrink:0;
+  display:inline-flex; align-items:center; gap:7px;
+  padding:6px 12px; font-size:11.5px; font-weight:600; color:var(--text-muted);
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:999px;
+  flex-shrink:0;
 }
 .estado-conexion-dot{
   width:8px; height:8px; border-radius:50%; background:#e8a33d; flex-shrink:0;
@@ -391,11 +432,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 /* ===== USUARIOS EN LÍNEA (solo visible para Administrador) ===== */
 .usuarios-en-linea{
-  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-  padding:8px 12px; font-size:11px; background:var(--panel-alt);
-  border-bottom:1px solid var(--border); flex-shrink:0;
+  display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:6px 12px; font-size:11px;
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:999px;
+  flex-shrink:0;
 }
-.usuarios-en-linea-label{color:var(--text-dim); font-weight:600; white-space:nowrap;}
+.usuarios-en-linea-label{color:var(--text-muted); font-weight:600; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;}
 .usuarios-en-linea-lista{display:flex; gap:6px; flex-wrap:wrap;}
 .usuario-en-linea-chip{
   display:inline-flex; align-items:center; gap:5px;
@@ -415,10 +457,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .app-toggle-btn{
   flex:1; padding:11px 6px; background:transparent; color:var(--text-muted);
   font-size:12px; font-weight:700; border-bottom:2.5px solid transparent;
+  border-right:1px solid var(--border-soft);
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
   text-align:center;
 }
-.app-toggle-icon{font-size:17px; line-height:1;}
+.app-toggle-btn:last-child{border-right:none;}
+.app-toggle-icon{font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center;}
+.app-toggle-icon svg{width:18px; height:18px; display:block; stroke:currentColor;}
 .app-toggle-label{display:flex; align-items:center; gap:5px; white-space:nowrap;}
 .app-toggle-btn.active{color:var(--gold-bright); border-bottom-color:var(--gold);}
 .badge-count{
@@ -871,7 +916,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 /* ===== CALENDAR PICKER ===== */
 .cal-modal{max-width:320px; padding:18px;}
 .cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
-.cal-head .cal-title{font-family:'Fraunces',serif; font-size:16px; font-weight:600; text-transform:capitalize;}
+.cal-head .cal-title{font-family:'Inter',sans-serif; font-size:16px; font-weight:700; text-transform:capitalize;}
 .cal-nav-btn{
   width:30px; height:30px; border-radius:8px; background:var(--panel-alt);
   border:1px solid var(--border); color:var(--text-muted); font-size:14px;
@@ -891,10 +936,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .cal-day.today{border-color:var(--gold); color:var(--gold-bright);}
 .cal-day.selected{background:var(--gold); color:#1a1408; font-weight:700;}
 
-/* ===== CALENDARIO EMBEBIDO EN "POR DÍA" ===== */
+/* ===== CALENDARIO EMBEBIDO EN "POR DÍA" / SOLICITUDES ===== */
 .calendario-inline-wrap{
-  background:var(--panel); border-bottom:1px solid var(--border);
-  padding:14px 16px; flex-shrink:0;
+  margin:12px 16px; background:var(--panel-alt); border:1px solid var(--border);
+  border-radius:16px; padding:16px; flex-shrink:0;
 }
 .cal-days-inline .cal-day{
   aspect-ratio:auto; height:44px; flex-direction:column; gap:1px; position:relative;
@@ -921,7 +966,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .cal-day-count.pendiente{background:#e8a33d; color:#1a1408;}
 .cal-day.selected .cal-day-count{background:#1a1408; color:var(--gold-bright);}
 .cal-inline-leyenda{
-  display:flex; justify-content:center; gap:16px; margin-top:10px;
+  display:flex; justify-content:center; gap:16px; margin-top:12px; padding-top:12px;
+  border-top:1px solid var(--border-soft);
   font-size:10.5px; color:var(--text-dim);
 }
 .cal-inline-leyenda span{display:flex; align-items:center; gap:5px;}
@@ -1285,7 +1331,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 /* ===== RESPONSIVE ===== */
 .version-tag{
-  position:fixed; top:6px; right:8px; font-size:10px; color:var(--text-dim);
+  position:fixed; top:8px; right:12px; font-size:10px; color:var(--text-dim);
   font-family:'JetBrains Mono',monospace; z-index:1001; pointer-events:none; opacity:.85;
   background:rgba(0,0,0,0.35); padding:2px 7px; border-radius:6px;
 }
@@ -1508,33 +1554,38 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <button class="btn-nueva-reserva-header" id="btnNuevaReservaHeader" onclick="abrirModal()" title="Nueva reserva">
       <span class="fab-icon">+</span><span>Nueva reserva</span>
     </button>
-    <button class="btn-nueva-reserva-header btn-cerrar-sesion-header" onclick="cerrarSesion()" title="Cerrar sesión">
-      <span id="miIniciales" style="font-weight:700;"></span><span>Salir</span>
-    </button>
+    <div class="header-userbox">
+      <span class="header-version-line" id="headerVersionLine"></span>
+      <button class="btn-nueva-reserva-header btn-cerrar-sesion-header" onclick="cerrarSesion()" title="Cerrar sesión">
+        <span id="miIniciales" style="font-weight:700;"></span><span>Salir</span>
+      </button>
+    </div>
   </div>
-  <div class="estado-conexion" id="estadoConexion">
-    <span class="estado-conexion-dot"></span>
-    <span id="estadoConexionTexto">Conectando con la base de datos...</span>
-  </div>
-  <div class="usuarios-en-linea" id="usuariosEnLineaBox" style="display:none;">
-    <span class="usuarios-en-linea-label">🟢 En línea ahora:</span>
-    <div class="usuarios-en-linea-lista" id="usuariosEnLineaLista"></div>
+  <div class="estado-row">
+    <div class="estado-conexion" id="estadoConexion">
+      <span class="estado-conexion-dot"></span>
+      <span id="estadoConexionTexto">Conectando con la base de datos...</span>
+    </div>
+    <div class="usuarios-en-linea" id="usuariosEnLineaBox" style="display:none;">
+      <span class="usuarios-en-linea-label"><span class="estado-conexion-dot" style="background:var(--confirmed); box-shadow:0 0 0 3px rgba(71,184,129,0.2);"></span>En línea ahora:</span>
+      <div class="usuarios-en-linea-lista" id="usuariosEnLineaLista"></div>
+    </div>
   </div>
   <div class="app-toggle">
-    <button id="toggleSolicitudes" class="app-toggle-btn" onclick="cambiarVistaApp('solicitudes')">
-      <span class="app-toggle-icon">🔔</span>
+    <button id="toggleSolicitudes" class="app-toggle-btn" onclick="cambiarVistaApp('solicitudes')" aria-current="page">
+      <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
       <span class="app-toggle-label">Solicitudes <span class="badge-count" id="solicitudesBadge">0</span></span>
     </button>
     <button id="togglePorDia" class="app-toggle-btn" onclick="cambiarVistaApp('porDia')">
-      <span class="app-toggle-icon">📅</span>
+      <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
       <span class="app-toggle-label">Por día</span>
     </button>
     <button id="toggleSalones" class="app-toggle-btn" onclick="irASalones()">
-      <span class="app-toggle-icon">🏛️</span>
+      <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6"/></svg></span>
       <span class="app-toggle-label">Salones</span>
     </button>
     <button id="toggleConfig" class="app-toggle-btn" onclick="cambiarVistaApp('config')">
-      <span class="app-toggle-icon">⚙️</span>
+      <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
       <span class="app-toggle-label">Config</span>
     </button>
   </div>
@@ -1566,10 +1617,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     <div class="resumen-sol-dia" id="resumenSolicitudesDia" style="display:none;"></div>
 
     <div class="filtro-especiales-row">
-      <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()">⭐ Reservas especiales (20+ personas)</button>
+      <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> Reservas especiales (20+ personas) <svg class="especial-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div class="buscador-cliente-wrap">
-      <span class="buscador-cliente-icono">🔍</span>
+      <span class="buscador-cliente-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
       <input type="text" id="buscarClienteSolicitudes" class="buscador-cliente-input" placeholder="Buscar por nombre o celular..." oninput="renderSolicitudesScreen()">
       <button type="button" class="buscador-cliente-limpiar" id="btnLimpiarBuscarSolicitudes" style="display:none;" onclick="document.getElementById('buscarClienteSolicitudes').value=''; renderSolicitudesScreen();">✕</button>
     </div>
@@ -1585,7 +1636,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <button onclick="cambiarDia(1)">›</button>
       </div>
       <div class="turnos" id="turnosBar"></div>
-      <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()">⭐ <span>Especiales (20+)</span></button>
+      <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (20+)</span></button>
       <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
       <button class="clear-btn" onclick="confirmarVaciarTurno()" title="Eliminar todas las reservas de este turno">🗑 <span>Vaciar turno</span></button>
     </header>
@@ -1617,7 +1668,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
     </div>
 
     <div class="buscador-cliente-wrap">
-      <span class="buscador-cliente-icono">🔍</span>
+      <span class="buscador-cliente-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
       <input type="text" id="buscarClientePorDia" class="buscador-cliente-input" placeholder="Buscar por nombre o celular..." oninput="renderLista()">
       <button type="button" class="buscador-cliente-limpiar" id="btnLimpiarBuscarPorDia" style="display:none;" onclick="document.getElementById('buscarClientePorDia').value=''; renderLista();">✕</button>
     </div>
@@ -1920,7 +1971,18 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.01</div>
+<div class="version-tag">v5.03</div>
+<script>
+  // Copia el número de versión de arriba (.version-tag, única fuente del
+  // texto — sigue siendo lo único que hay que editar al subir versión)
+  // dentro de la cápsula del encabezado ya logueado, para que se vea como
+  // primera línea junto a "GF · Salir" sin duplicar el texto a mano.
+  (function(){
+    var origen = document.querySelector('.version-tag');
+    var destino = document.getElementById('headerVersionLine');
+    if(origen && destino) destino.textContent = origen.textContent;
+  })();
+</script>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2951,6 +3013,11 @@ auth.onAuthStateChanged(user => {
       };
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('appRoot').style.display = 'flex';
+      // La versión ya se ve dentro de la cápsula del encabezado (arriba,
+      // junto a "GF · Salir") una vez adentro de la app — se oculta la
+      // etiqueta flotante de la esquina para que no se monte encima.
+      const vTagLogin = document.querySelector('.version-tag');
+      if(vTagLogin) vTagLogin.style.display = 'none';
       const miIniciales = document.getElementById('miIniciales');
       if(miIniciales) miIniciales.textContent = usuarioActual.iniciales + ' · ';
       document.getElementById('loginUsuario').value = '';
@@ -2968,6 +3035,8 @@ auth.onAuthStateChanged(user => {
     detenerPresencia();
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appRoot').style.display = 'none';
+    const vTagLogout = document.querySelector('.version-tag');
+    if(vTagLogout) vTagLogout.style.display = '';
     revisarBootstrapPrimerUsuario();
   }
 });
@@ -7280,6 +7349,15 @@ function cambiarVistaApp(v){
   document.getElementById('togglePorDia').classList.toggle('active', v==='porDia');
   document.getElementById('toggleSalones').classList.toggle('active', v==='salones');
   document.getElementById('toggleConfig').classList.toggle('active', v==='config');
+  ['toggleSolicitudes','togglePorDia','toggleSalones','toggleConfig'].forEach(id=>{
+    const btn = document.getElementById(id);
+    if(v==='solicitudes' && id==='toggleSolicitudes' || v==='porDia' && id==='togglePorDia' ||
+       v==='salones' && id==='toggleSalones' || v==='config' && id==='toggleConfig'){
+      btn.setAttribute('aria-current','page');
+    } else {
+      btn.removeAttribute('aria-current');
+    }
+  });
   document.getElementById('pantallaSolicitudes').style.display = v==='solicitudes' ? 'flex' : 'none';
   document.getElementById('pantallaPorDia').style.display = v==='porDia' ? 'flex' : 'none';
   document.getElementById('pantallaSalones').style.display = v==='salones' ? 'flex' : 'none';
@@ -7383,7 +7461,9 @@ function renderSolicitudesScreen(){
     });
     window._atrasadasPorDia = porDia;
     alertaEl.innerHTML = `<div class="alerta-atrasadas" onclick="abrirDesgloseAtrasadas()">
-      ⚠ Tienes <b>${atrasadas.length}</b> solicitud${atrasadas.length===1?'':'es'} atrasada${atrasadas.length===1?'':'s'} de días anteriores sin gestionar o sin aprobar — toca para ver en qué días están
+      <span class="alerta-atrasadas-icono"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      <span class="alerta-atrasadas-texto">Tienes <b>${atrasadas.length}</b> solicitud${atrasadas.length===1?'':'es'} atrasada${atrasadas.length===1?'':'s'} de días anteriores sin gestionar o sin aprobar — toca para ver en qué días están</span>
+      <span class="alerta-atrasadas-chevron"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
     </div>`;
   } else {
     alertaEl.innerHTML = '';
@@ -7419,9 +7499,9 @@ function renderSolicitudesScreen(){
     } else {
       resumenEl.style.display = 'grid';
       resumenEl.innerHTML = `
-        <div class="resumen-sol-card"><div class="resumen-sol-num">${delDiaTotal.length}</div><div class="resumen-sol-label">Recibidas</div></div>
-        <div class="resumen-sol-card"><div class="resumen-sol-num">${respondidas}</div><div class="resumen-sol-label">Respondidas</div></div>
-        <div class="resumen-sol-card total"><div class="resumen-sol-num">${aprobadasHoy}</div><div class="resumen-sol-label">Aprobadas</div></div>
+        <div class="resumen-sol-card"><div class="resumen-sol-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></div><div class="resumen-sol-num">${delDiaTotal.length}</div><div class="resumen-sol-label">Recibidas</div></div>
+        <div class="resumen-sol-card"><div class="resumen-sol-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div><div class="resumen-sol-num">${respondidas}</div><div class="resumen-sol-label">Respondidas</div></div>
+        <div class="resumen-sol-card total"><div class="resumen-sol-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div class="resumen-sol-num">${aprobadasHoy}</div><div class="resumen-sol-label">Aprobadas</div></div>
       `;
     }
   }
