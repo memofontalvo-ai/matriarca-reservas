@@ -1920,7 +1920,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.94</div>
+<div class="version-tag">v4.95</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5448,15 +5448,22 @@ function renderExecutiveReport(d){
   const ahora = new Date();
   const corte = `${String(ahora.getDate()).padStart(2,'0')}/${String(ahora.getMonth()+1).padStart(2,'0')}/${ahora.getFullYear()} ${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
 
-  // ---- Dona de participación por turno (conic-gradient, sin Chart.js) ----
-  let acumGrados = 0;
-  const conicPartes = d.porServicio.filter(s=>s.pax>0).map(s=>{
-    const grados = (s.pax/(d.metrics.totalPax||1))*360;
-    const parte = `${IE_TURNO_COLOR[s.turno]} ${acumGrados}deg ${acumGrados+grados}deg`;
-    acumGrados += grados;
-    return parte;
-  });
-  const donaCss = conicPartes.length ? `conic-gradient(${conicPartes.join(', ')})` : '#3a3f4a';
+  // ---- Dona de participación por turno ----
+  // SVG con stroke-dasharray en vez de conic-gradient: la herramienta que
+  // convierte esto a imagen (html2canvas) no entiende conic-gradient y
+  // fallaba justo en este punto — un SVG normal sí es 100% compatible.
+  let acumPct = 0;
+  const segmentosDona = d.porServicio.filter(s=>s.pax>0).map(s=>{
+    const pct = (s.pax/(d.metrics.totalPax||1))*100;
+    const offset = 25 - acumPct;
+    const circulo = `<circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="${IE_TURNO_COLOR[s.turno]}" stroke-width="4.5" stroke-dasharray="${pct.toFixed(3)} ${(100-pct).toFixed(3)}" stroke-dashoffset="${offset.toFixed(3)}"></circle>`;
+    acumPct += pct;
+    return circulo;
+  }).join('');
+  const donaSvg = `<svg viewBox="0 0 36 36" style="position:absolute; inset:0; width:100%; height:100%;">
+    <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#242b35" stroke-width="4.5"></circle>
+    ${segmentosDona}
+  </svg>`;
 
   const servicioHtml = d.porServicio.map(s => `
     <div class="ie-servicio-fila">
@@ -5507,7 +5514,7 @@ function renderExecutiveReport(d){
       <div class="ie-panel ie-panel-servicio">
         <div class="ie-panel-titulo">PARTICIPACIÓN POR TIEMPO DE SERVICIO</div>
         <div class="ie-dona-row">
-          <div class="ie-dona" style="background:${donaCss};"><div class="ie-dona-hueco"><b>${numCO(d.metrics.totalPax)}</b><span>PAX TOTALES</span></div></div>
+          <div class="ie-dona">${donaSvg}<div class="ie-dona-hueco"><b>${numCO(d.metrics.totalPax)}</b><span>PAX TOTALES</span></div></div>
           <div class="ie-servicio-lista">${servicioHtml}</div>
         </div>
         <div class="ie-badges-row">
