@@ -648,6 +648,128 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   .rdd-total{ flex-wrap:wrap; row-gap:8px; }
 }
 
+/* ===== INFORME EJECUTIVO MENSUAL (cartelera descargable) ===== */
+.btn-informe-ejecutivo{
+  width:100%; margin-top:10px; padding:13px; border-radius:12px;
+  background:linear-gradient(135deg, var(--gold-bright), var(--gold));
+  color:#241a05; border:none; font-size:14px; font-weight:800; cursor:pointer;
+}
+.btn-informe-ejecutivo:active{ opacity:.85; }
+
+.ie-overlay-scroll{
+  position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:500;
+  display:none; flex-direction:column; align-items:center;
+  padding:16px 10px; overflow:auto;
+}
+.ie-overlay-scroll.open{ display:flex; }
+.ie-toolbar{
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+  margin-bottom:14px; position:sticky; top:0; z-index:2; padding:6px 0;
+}
+.ie-toolbar button{
+  padding:11px 16px; border-radius:10px; font-size:13px; font-weight:700; border:none; cursor:pointer;
+}
+.ie-btn-descargar{ background:var(--gold-bright); color:#241a05; }
+.ie-btn-pdf{ background:var(--panel-raised); color:var(--text); border:1px solid var(--border) !important; }
+.ie-btn-cerrar{ background:transparent; color:var(--text-muted); border:1px solid var(--border) !important; }
+.ie-loading{ color:var(--gold-bright); font-size:14px; font-weight:700; padding:60px 20px; text-align:center; }
+.ie-vacio{ color:var(--text-muted); font-size:14px; padding:60px 20px; text-align:center; max-width:400px; }
+
+.ie-scale-wrap{ overflow-x:auto; max-width:100%; -webkit-overflow-scrolling:touch; }
+
+/* La cartelera en sí — tamaño fijo (la mitad de 3300x2100, para que
+   html2canvas la capture a escala 2 y salga exacta a 3300x2100). No usa
+   ninguna variable CSS del resto de la app: es un documento visual aparte,
+   pensado para verse igual sin importar el tema del navegador. */
+.ie-poster{
+  width:1650px; height:1050px; flex-shrink:0;
+  background:linear-gradient(160deg, #0d1420, #10151d 55%, #0b1118);
+  color:#f4efe5; font-family:'Inter',sans-serif; position:relative;
+  padding:34px 44px; box-sizing:border-box;
+  display:flex; flex-direction:column; gap:14px;
+}
+.ie-header{ display:flex; justify-content:space-between; align-items:flex-start; }
+.ie-header-marca{ font-size:13px; letter-spacing:3px; color:#c9a15a; font-weight:700; }
+.ie-header-tag{ font-size:10.5px; letter-spacing:2px; color:#7d8896; text-align:right; line-height:1.6; }
+.ie-titulo-wrap{ text-align:center; }
+.ie-marca-central{
+  font-family:'Fraunces',serif; font-size:26px; letter-spacing:6px; color:#f4efe5;
+  border-top:1px solid #3a3120; border-bottom:1px solid #3a3120; display:inline-block; padding:2px 22px;
+}
+.ie-titulo{ font-size:38px; font-weight:800; letter-spacing:1px; color:#f4efe5; margin-top:10px; }
+.ie-subtitulo{ font-size:15px; color:#b7ab8f; margin-top:4px; }
+
+.ie-kpis{ display:flex; gap:14px; }
+.ie-kpi{
+  flex:1; border:1px solid #3a3120; border-radius:10px; padding:14px 16px;
+  display:flex; align-items:center; gap:14px; background:rgba(201,161,90,0.04);
+}
+.ie-kpi-icon{ font-size:26px; color:#c9a15a; flex-shrink:0; }
+.ie-kpi-num{ font-size:30px; font-weight:800; color:#f4efe5; line-height:1; }
+.ie-kpi-label{ font-size:11px; letter-spacing:1px; color:#9c8a68; margin-top:4px; font-weight:700; }
+.ie-kpi-quote{
+  width:230px; flex-shrink:0; font-family:'Fraunces',serif; font-style:italic; font-size:14.5px;
+  color:#c9a15a; text-align:center; display:flex; align-items:center; justify-content:center; line-height:1.4;
+  border-left:1px solid #3a3120; padding-left:16px;
+}
+
+.ie-main-row{ display:flex; gap:14px; flex:1; min-height:0; }
+.ie-panel{ border:1px solid #3a3120; border-radius:10px; padding:16px 18px; background:rgba(255,255,255,0.015); }
+.ie-panel-titulo{ font-size:13.5px; font-weight:800; letter-spacing:1.5px; color:#f4efe5; margin-bottom:12px; }
+
+.ie-panel-servicio{ width:520px; flex-shrink:0; display:flex; flex-direction:column; }
+.ie-dona-row{ display:flex; align-items:center; gap:18px; margin-bottom:10px; }
+.ie-dona{ width:130px; height:130px; border-radius:50%; flex-shrink:0; position:relative; display:flex; align-items:center; justify-content:center; }
+.ie-dona-hueco{ position:absolute; width:78px; height:78px; border-radius:50%; background:#10151d; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.ie-dona-hueco b{ font-size:19px; color:#f4efe5; }
+.ie-dona-hueco span{ font-size:8px; color:#9c8a68; letter-spacing:1px; }
+.ie-servicio-lista{ flex:1; display:flex; flex-direction:column; gap:10px; }
+.ie-servicio-fila{ display:flex; align-items:center; gap:10px; }
+.ie-servicio-icon{ font-size:17px; width:22px; text-align:center; flex-shrink:0; }
+.ie-servicio-info{ flex:1; }
+.ie-servicio-nombre{ font-size:12px; font-weight:800; letter-spacing:0.5px; color:#f4efe5; }
+.ie-servicio-barra-bg{ height:8px; border-radius:5px; background:#20242c; margin-top:5px; overflow:hidden; }
+.ie-servicio-barra{ height:100%; border-radius:5px; }
+.ie-servicio-cifras{ font-size:11.5px; color:#b7ab8f; margin-top:3px; }
+.ie-badges-row{ display:flex; gap:10px; margin-top:12px; }
+.ie-badge{ flex:1; border-radius:8px; padding:9px 11px; font-size:11.5px; font-weight:800; text-align:center; }
+.ie-badge-mayor{ background:rgba(201,161,90,0.18); color:#e8c987; border:1px solid #6b5a2f; }
+.ie-badge-menor{ background:rgba(195,92,68,0.18); color:#d99a86; border:1px solid #6b3c2f; }
+.ie-nota-desayuno{
+  margin-top:12px; font-size:10.5px; line-height:1.5; color:#a89878;
+  background:rgba(201,161,90,0.06); border-left:3px solid #6b5a2f; padding:9px 11px; border-radius:6px;
+}
+
+.ie-panel-diario{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.ie-chart-leyenda{ font-size:10.5px; color:#9c8a68; margin-bottom:8px; }
+.ie-barras{ flex:1; display:flex; align-items:flex-end; gap:3px; min-height:0; }
+.ie-barra-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; min-width:0; }
+.ie-barra-num{ font-size:8.5px; color:#e8c987; font-weight:700; margin-bottom:2px; white-space:nowrap; }
+.ie-barra{ width:100%; border-radius:3px 3px 0 0; background:#3a3f4a; }
+.ie-barra.pico{ background:linear-gradient(180deg, #e8c987, #b8893f); }
+.ie-barra-dia{ font-size:8px; color:#7d8896; margin-top:4px; }
+
+.ie-footer-row{ display:flex; gap:14px; }
+.ie-panel-lectura{ flex:1.4; }
+.ie-lectura-item{ display:flex; gap:10px; margin-bottom:9px; align-items:flex-start; }
+.ie-lectura-num{
+  width:20px; height:20px; border-radius:50%; background:#c9a15a; color:#1a1408;
+  font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px;
+}
+.ie-lectura-texto{ font-size:11.5px; line-height:1.45; color:#e2dcc8; }
+.ie-panel-oportunidad{
+  flex:1; background:linear-gradient(160deg, #7a4a34, #5c3527);
+  border:1px solid #8a5a40; display:flex; flex-direction:column; justify-content:center;
+}
+.ie-panel-oportunidad .ie-panel-titulo{ color:#f4e3d3; }
+.ie-panel-oportunidad-texto{ font-size:12.5px; line-height:1.5; color:#f4e3d3; }
+
+.ie-footer{ display:flex; justify-content:space-between; align-items:center; font-size:9.5px; letter-spacing:1.5px; color:#7d8896; border-top:1px solid #2a2418; padding-top:10px; }
+
+@media (max-width:900px){
+  .ie-scale-wrap{ display:flex; justify-content:flex-start; }
+}
+
 /* ===== FLOOR PLAN ===== */
 .salon-group{margin-bottom:26px;}
 .salon-head{
@@ -1235,6 +1357,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<!-- Solo para el Informe Ejecutivo mensual (captura de la cartelera como
+     imagen/PDF) — no se usan para nada más de la app. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyDJCy93GCOhDySnC_OLo6pcV-wK_pC48_A",
@@ -1468,6 +1594,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <span><span class="cal-star-leyenda">⭐</span> Incluye reserva especial (20+)</span>
       </div>
       <div class="cal-aviso-navegando" id="calAvisoNavegando" style="display:none;"></div>
+      <button class="btn-informe-ejecutivo" onclick="generarInformeEjecutivoMensual()">📊 Generar informe ejecutivo</button>
     </div>
 
     <div class="subbar">
@@ -1770,7 +1897,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.89</div>
+<div class="version-tag">v4.90</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2222,7 +2349,20 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   </div>
 </div>
 
+<div class="ie-overlay-scroll" id="ieOverlay">
+  <div class="ie-toolbar" id="ieToolbar" style="display:none;">
+    <button class="ie-btn-descargar" onclick="descargarInformeEjecutivoPNG()">⬇ Descargar imagen</button>
+    <button class="ie-btn-pdf" onclick="descargarInformeEjecutivoPDF()">📄 Descargar PDF</button>
+    <button class="ie-btn-cerrar" onclick="cerrarInformeEjecutivo()">Cerrar</button>
+  </div>
+  <div id="ieEstadoCarga" class="ie-loading">Generando informe ejecutivo…</div>
+  <div class="ie-scale-wrap">
+    <div class="ie-poster" id="iePoster" style="display:none;"></div>
+  </div>
+</div>
+
 <div class="overlay" id="overlayInforme">
+
   <div class="modal informe-modal">
     <div class="informe-toolbar">
       <button class="btn btn-ghost" onclick="cerrarInforme()">✕ Cerrar</button>
@@ -5046,6 +5186,347 @@ function verResumenMes(){
 }
 function cerrarResumenMes(){
   document.getElementById('overlayResumenMes').classList.remove('open');
+}
+
+/* ================= INFORME EJECUTIVO MENSUAL ================= */
+// Todo esto es de SOLO LECTURA sobre el array `reservas` que ya mantiene
+// la app sincronizado con Firestore — no se hace ninguna consulta nueva
+// ni ninguna escritura. El mes que se usa es el que esté abierto en el
+// calendario de "Por día" (calInlineMes/calInlineAno).
+
+const IE_TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+const IE_TURNO_ICONO = {desayuno:'☕', almuerzo:'☀', cena:'🌙'};
+const IE_TURNO_COLOR = {desayuno:'#8fb3c9', almuerzo:'#c9a15a', cena:'#e8c987'};
+const IE_DIAS_SEMANA_LABEL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
+// 1) Reservas del mes que cuentan para el reporte — misma regla que ya
+// usa el resumen de "Por día" y el informe diario imprimible (no se
+// inventa una regla nueva): fuera cancelada, solicitud, pendiente de
+// aprobación y lista de espera.
+function getMonthlyReservationData(ano, mes){
+  return reservas.filter(r => {
+    if(!r.fecha) return false;
+    const [y,m] = r.fecha.split('-').map(Number);
+    return y===ano && (m-1)===mes;
+  });
+}
+function filterValidReservations(rs){
+  return rs.filter(r => r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
+}
+// El turno ya viene guardado en cada reserva (r.turno) — no se infiere
+// por hora. Si alguna reserva vieja no lo trae, cae en "sin_clasificar"
+// en vez de adivinar a cuál turno pertenece.
+function classifyServicePeriod(r){
+  return IE_TURNO_LABEL[r.turno] ? r.turno : 'sin_clasificar';
+}
+
+function numCO(n, decimales){
+  return Number(n).toLocaleString('es-CO', {minimumFractionDigits:decimales||0, maximumFractionDigits:decimales||0});
+}
+
+function calculateMonthlyMetrics(rsMes){
+  const totalPax = rsMes.reduce((a,r)=>a+Number(r.pax||0),0);
+  const totalReservas = rsMes.length;
+  const diasConReservas = new Set(rsMes.map(r=>r.fecha)).size;
+  const paxPromedio = totalReservas ? totalPax/totalReservas : 0;
+  return { totalPax, totalReservas, diasConReservas, paxPromedio };
+}
+
+function groupPaxByDate(rsMes, ano, mes){
+  const diasEnMes = new Date(ano, mes+1, 0).getDate();
+  const porDia = [];
+  for(let d=1; d<=diasEnMes; d++){
+    const iso = `${ano}-${String(mes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const rsDia = rsMes.filter(r=>r.fecha===iso);
+    porDia.push({
+      dia: d, iso,
+      pax: rsDia.reduce((a,r)=>a+Number(r.pax||0),0),
+      reservas: rsDia.length,
+      tieneEspecial: rsDia.some(r=>Number(r.pax)>=20),
+    });
+  }
+  return porDia;
+}
+
+function groupPaxByWeekday(rsMes){
+  const acumulado = IE_DIAS_SEMANA_LABEL.map((label,i)=>({dow:i, label, pax:0, fechas:new Set()}));
+  const totalPax = rsMes.reduce((a,r)=>a+Number(r.pax||0),0);
+  rsMes.forEach(r=>{
+    const [y,m,d] = r.fecha.split('-').map(Number);
+    const dow = new Date(y, m-1, d, 12).getDay();
+    acumulado[dow].pax += Number(r.pax||0);
+    acumulado[dow].fechas.add(r.fecha);
+  });
+  return acumulado.map(a => ({
+    label: a.label,
+    pax: a.pax,
+    fechasOperadas: a.fechas.size,
+    promedio: a.fechas.size ? a.pax/a.fechas.size : 0,
+    pct: totalPax ? (a.pax/totalPax*100) : 0,
+  }));
+}
+
+// Picos: entre los 5 días de más pax del mes, o cualquier día con una
+// reserva especial (20+ pax) — no hay un "umbral de alta demanda"
+// configurado aparte en la app, así que se usa exactamente este criterio
+// de respaldo que pide el documento.
+function identifyDemandPeaks(porDia){
+  const conActividad = porDia.filter(d=>d.pax>0).slice().sort((a,b)=>b.pax-a.pax);
+  const top5 = new Set(conActividad.slice(0,5).map(d=>d.iso));
+  porDia.forEach(d => { d.esPico = top5.has(d.iso) || d.tieneEspecial; });
+  return porDia.filter(d=>d.esPico);
+}
+
+function generateExecutiveInsights(porServicioOrdenado, porDiaSemana, metrics){
+  const insights = [];
+  if(porServicioOrdenado.length && metrics.totalPax>0){
+    const principal = porServicioOrdenado[0];
+    insights.push(`${principal.turno==='almuerzo'?'El almuerzo':principal.turno==='cena'?'La cena':'El desayuno'} concentra el ${numCO(principal.pct,1)}% de los pax y es el principal motor de reservas.`);
+  } else {
+    insights.push('Todavía no hay suficientes datos este mes para identificar un tiempo de servicio principal.');
+  }
+  const diasOrdenados = porDiaSemana.filter(d=>d.pax>0).slice().sort((a,b)=>b.pax-a.pax);
+  if(diasOrdenados.length){
+    const top = diasOrdenados.slice(0, Math.min(3, diasOrdenados.length)).map(d=>d.label);
+    insights.push(`Los mayores picos de demanda se concentran principalmente en ${top.join(', ')}.`);
+  } else {
+    insights.push('Todavía no hay suficientes datos este mes para identificar los días de mayor demanda.');
+  }
+  insights.push('La operación debe priorizar personal, inventario y montaje durante las jornadas de mayor demanda.');
+  return insights;
+}
+
+function calcularOportunidad(porServicio, porDiaSemana, metrics){
+  const cena = porServicio.find(s=>s.turno==='cena');
+  const almuerzo = porServicio.find(s=>s.turno==='almuerzo');
+  const desayuno = porServicio.find(s=>s.turno==='desayuno');
+  const viesabPct = ['Viernes','Sábado'].reduce((a,l)=>{
+    const d = porDiaSemana.find(x=>x.label===l); return a + (d?d.pax:0);
+  },0) / (metrics.totalPax||1) * 100;
+  const diasActivos = porDiaSemana.filter(d=>d.pax>0);
+  const concentradoEnPocos = diasActivos.length>0 && diasActivos.length<=3;
+
+  if(cena && cena.pct > 65){
+    return 'Fortalecer almuerzos corporativos y explorar estrategias para los horarios de menor demanda — la cena concentra la mayoría de los pax del mes.';
+  }
+  if(almuerzo && almuerzo.pct < 15 && metrics.totalPax>0){
+    return 'Impulsar el almuerzo con convenios empresariales, grupos turísticos o menús corporativos — es el turno con menor participación relativa.';
+  }
+  if(desayuno && desayuno.pct < 10 && metrics.totalPax>0){
+    return 'Recordar que el desayuno debe medirse por fin de semana operativo, no contra los 30 días del mes — entre semana solo aplica a reservas especiales o corporativas.';
+  }
+  if(viesabPct > 55){
+    return 'Explorar estrategias para aumentar reservas de domingo a jueves — viernes y sábado concentran más de la mitad de los pax del mes.';
+  }
+  if(concentradoEnPocos){
+    return 'Equilibrar la demanda mediante campañas en las fechas de menor ocupación — la mayoría de los pax del mes se concentran en muy pocos días.';
+  }
+  return 'La demanda del mes está razonablemente distribuida — mantener el nivel de servicio actual en todos los turnos.';
+}
+
+let ieMesActual = null; // {ano, mes} del último informe generado, para el nombre del archivo
+
+async function generarInformeEjecutivoMensual(){
+  const overlay = document.getElementById('ieOverlay');
+  const toolbar = document.getElementById('ieToolbar');
+  const carga = document.getElementById('ieEstadoCarga');
+  const poster = document.getElementById('iePoster');
+  toolbar.style.display = 'none';
+  poster.style.display = 'none';
+  carga.style.display = 'block';
+  carga.textContent = 'Generando informe ejecutivo…';
+  overlay.classList.add('open');
+
+  // Pequeño respiro para que se pinte el "Generando..." antes de trabajar
+  // (el cálculo es local y rápido, pero así no se siente congelado).
+  await new Promise(r => setTimeout(r, 30));
+
+  try{
+    const ano = calInlineAno, mes = calInlineMes;
+    const rsMesTodas = getMonthlyReservationData(ano, mes);
+    const rsMes = filterValidReservations(rsMesTodas);
+
+    if(rsMes.length === 0){
+      carga.textContent = 'No existen reservas válidas para generar el informe del periodo seleccionado.';
+      toolbar.style.display = 'none';
+      return;
+    }
+
+    const metrics = calculateMonthlyMetrics(rsMes);
+    const porDia = groupPaxByDate(rsMes, ano, mes);
+    identifyDemandPeaks(porDia);
+    const porDiaSemana = groupPaxByWeekday(rsMes);
+
+    const sinClasificar = rsMes.filter(r=>classifyServicePeriod(r)==='sin_clasificar');
+    const porServicio = ['desayuno','almuerzo','cena'].map(t=>{
+      const rs = rsMes.filter(r=>classifyServicePeriod(r)===t);
+      const pax = rs.reduce((a,r)=>a+Number(r.pax||0),0);
+      return { turno:t, label:IE_TURNO_LABEL[t], pax, reservas:rs.length, pct: metrics.totalPax ? pax/metrics.totalPax*100 : 0 };
+    });
+    const porServicioOrdenado = porServicio.slice().sort((a,b)=>b.pax-a.pax);
+    const mayorDemanda = porServicioOrdenado[0];
+    const menorParticipacion = porServicioOrdenado[porServicioOrdenado.length-1];
+
+    const insights = generateExecutiveInsights(porServicioOrdenado, porDiaSemana, metrics);
+    const oportunidad = calcularOportunidad(porServicio, porDiaSemana, metrics);
+
+    ieMesActual = {ano, mes};
+    renderExecutiveReport({ano, mes, metrics, porDia, porDiaSemana, porServicio, mayorDemanda, menorParticipacion, insights, oportunidad, sinClasificar});
+
+    carga.style.display = 'none';
+    poster.style.display = 'flex';
+    toolbar.style.display = 'flex';
+  } catch(err){
+    console.error('Error generando informe ejecutivo:', err);
+    carga.textContent = 'No fue posible generar el informe. Verifique los datos e inténtelo nuevamente.';
+    toolbar.style.display = 'none';
+  }
+}
+
+function renderExecutiveReport(d){
+  const poster = document.getElementById('iePoster');
+  const mesNombre = MESES[d.mes].toUpperCase();
+  const mesNombreCap = MESES[d.mes].charAt(0).toUpperCase()+MESES[d.mes].slice(1);
+  const ahora = new Date();
+  const corte = `${String(ahora.getDate()).padStart(2,'0')}/${String(ahora.getMonth()+1).padStart(2,'0')}/${ahora.getFullYear()} ${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
+
+  // ---- Dona de participación por turno (conic-gradient, sin Chart.js) ----
+  let acumGrados = 0;
+  const conicPartes = d.porServicio.filter(s=>s.pax>0).map(s=>{
+    const grados = (s.pax/(d.metrics.totalPax||1))*360;
+    const parte = `${IE_TURNO_COLOR[s.turno]} ${acumGrados}deg ${acumGrados+grados}deg`;
+    acumGrados += grados;
+    return parte;
+  });
+  const donaCss = conicPartes.length ? `conic-gradient(${conicPartes.join(', ')})` : '#3a3f4a';
+
+  const servicioHtml = d.porServicio.map(s => `
+    <div class="ie-servicio-fila">
+      <div class="ie-servicio-icon">${IE_TURNO_ICONO[s.turno]}</div>
+      <div class="ie-servicio-info">
+        <div class="ie-servicio-nombre">${s.label.toUpperCase()}</div>
+        <div class="ie-servicio-barra-bg"><div class="ie-servicio-barra" style="width:${Math.max(s.pct,0)}%; background:${IE_TURNO_COLOR[s.turno]};"></div></div>
+        <div class="ie-servicio-cifras">${numCO(s.pax)} pax &nbsp;·&nbsp; ${numCO(s.pct,1)}% &nbsp;·&nbsp; ${s.reservas} reserva${s.reservas===1?'':'s'}</div>
+      </div>
+    </div>`).join('');
+
+  const maxPaxDia = Math.max(1, ...d.porDia.map(x=>x.pax));
+  const barrasHtml = d.porDia.map(x => `
+    <div class="ie-barra-col">
+      ${x.pax>0?`<div class="ie-barra-num">${numCO(x.pax)}</div>`:''}
+      <div class="ie-barra ${x.esPico?'pico':''}" style="height:${x.pax>0 ? Math.max(4,(x.pax/maxPaxDia*100)) : 0}%;"></div>
+      <div class="ie-barra-dia">${String(x.dia).padStart(2,'0')}</div>
+    </div>`).join('');
+
+  const incluyeDesayuno = d.porServicio.some(s=>s.turno==='desayuno' && s.pax>0);
+
+  const lecturaHtml = d.insights.map((texto,i) => `
+    <div class="ie-lectura-item">
+      <div class="ie-lectura-num">${i+1}</div>
+      <div class="ie-lectura-texto">${escapeHtml(texto)}</div>
+    </div>`).join('');
+
+  poster.innerHTML = `
+    <div class="ie-header">
+      <div class="ie-header-marca">BUENA MESA<br>GRANDES<br>HISTORIAS</div>
+      <div class="ie-titulo-wrap">
+        <div class="ie-marca-central">LA MATRIARCA</div>
+        <div class="ie-titulo">COMPORTAMIENTO DE RESERVAS · ${mesNombre} ${d.ano}</div>
+        <div class="ie-subtitulo">Corte al ${corte} · Reservas registradas para todo el mes${d.sinClasificar.length?` · ${d.sinClasificar.length} sin clasificar`:''}</div>
+      </div>
+      <div class="ie-header-tag">TRADICIÓN QUE<br>SIEMPRE RESERVA<br>UN LUGAR</div>
+    </div>
+
+    <div class="ie-kpis">
+      <div class="ie-kpi"><div class="ie-kpi-icon">👥</div><div><div class="ie-kpi-num">${numCO(d.metrics.totalPax)}</div><div class="ie-kpi-label">PAX TOTALES</div></div></div>
+      <div class="ie-kpi"><div class="ie-kpi-icon">📋</div><div><div class="ie-kpi-num">${numCO(d.metrics.totalReservas)}</div><div class="ie-kpi-label">RESERVAS</div></div></div>
+      <div class="ie-kpi"><div class="ie-kpi-icon">📅</div><div><div class="ie-kpi-num">${numCO(d.metrics.diasConReservas)}</div><div class="ie-kpi-label">DÍAS CON RESERVAS</div></div></div>
+      <div class="ie-kpi"><div class="ie-kpi-icon">⚖</div><div><div class="ie-kpi-num">${numCO(d.metrics.paxPromedio,1).replace('.',',')}</div><div class="ie-kpi-label">PAX PROMEDIO POR RESERVA</div></div></div>
+      <div class="ie-kpi-quote">"Más que reservas, personas que vuelven."</div>
+    </div>
+
+    <div class="ie-main-row">
+      <div class="ie-panel ie-panel-servicio">
+        <div class="ie-panel-titulo">PARTICIPACIÓN POR TIEMPO DE SERVICIO</div>
+        <div class="ie-dona-row">
+          <div class="ie-dona" style="background:${donaCss};"><div class="ie-dona-hueco"><b>${numCO(d.metrics.totalPax)}</b><span>PAX TOTALES</span></div></div>
+          <div class="ie-servicio-lista">${servicioHtml}</div>
+        </div>
+        <div class="ie-badges-row">
+          <div class="ie-badge ie-badge-mayor">🏆 Mayor demanda: ${d.mayorDemanda?d.mayorDemanda.label.toUpperCase():'—'}</div>
+          <div class="ie-badge ie-badge-menor">↓ Menor participación: ${d.menorParticipacion?d.menorParticipacion.label.toUpperCase():'—'}</div>
+        </div>
+        ${incluyeDesayuno ? `<div class="ie-nota-desayuno">ℹ IMPORTANTE: El desayuno opera regularmente solo sábados y domingos. Entre semana únicamente aplica para reservas especiales o corporativas; por tanto, su menor participación no debe interpretarse como bajo desempeño en igualdad de días operados.</div>` : ''}
+      </div>
+      <div class="ie-panel ie-panel-diario">
+        <div class="ie-panel-titulo">COMPORTAMIENTO DIARIO · PAX RESERVADOS</div>
+        <div class="ie-chart-leyenda">● Pax reservados por fecha</div>
+        <div class="ie-barras">${barrasHtml}</div>
+      </div>
+    </div>
+
+    <div class="ie-footer-row">
+      <div class="ie-panel ie-panel-lectura">
+        <div class="ie-panel-titulo">LECTURA EJECUTIVA</div>
+        ${lecturaHtml}
+      </div>
+      <div class="ie-panel ie-panel-oportunidad">
+        <div class="ie-panel-titulo">🎯 OPORTUNIDAD</div>
+        <div class="ie-panel-oportunidad-texto">${escapeHtml(d.oportunidad)}</div>
+      </div>
+    </div>
+
+    <div class="ie-footer">
+      <span>LA MATRIARCA</span>
+      <span>COCINA · ENCUENTROS · TRADICIÓN</span>
+      <span>EST. 2018</span>
+    </div>
+  `;
+}
+
+function cerrarInformeEjecutivo(){
+  document.getElementById('ieOverlay').classList.remove('open');
+}
+
+async function descargarInformeEjecutivoPNG(){
+  const poster = document.getElementById('iePoster');
+  const toolbar = document.getElementById('ieToolbar');
+  toolbar.style.display = 'none'; // que no salga la barra de botones en la captura
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await html2canvas(poster, {scale:2, backgroundColor:null, useCORS:true});
+    const link = document.createElement('a');
+    const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
+    link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } catch(err){
+    console.error('Error descargando informe (PNG):', err);
+    alert('No fue posible generar la imagen. Intenta de nuevo.');
+  } finally {
+    toolbar.style.display = 'flex';
+  }
+}
+
+async function descargarInformeEjecutivoPDF(){
+  const poster = document.getElementById('iePoster');
+  const toolbar = document.getElementById('ieToolbar');
+  toolbar.style.display = 'none';
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await html2canvas(poster, {scale:2, backgroundColor:null, useCORS:true});
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({orientation:'landscape', unit:'px', format:[canvas.width, canvas.height]});
+    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
+    pdf.save(`Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.pdf`);
+  } catch(err){
+    console.error('Error descargando informe (PDF):', err);
+    alert('No fue posible generar el PDF. Intenta de nuevo.');
+  } finally {
+    toolbar.style.display = 'flex';
+  }
 }
 
 function renderCalendarioInline(){
