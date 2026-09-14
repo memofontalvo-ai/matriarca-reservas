@@ -717,7 +717,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .ie-panel{ border:1px solid #3a3120; border-radius:10px; padding:16px 18px; background:rgba(255,255,255,0.015); }
 .ie-panel-titulo{ font-size:13.5px; font-weight:800; letter-spacing:1.5px; color:#f4efe5; margin-bottom:12px; }
 
-.ie-panel-servicio{ width:520px; flex-shrink:0; display:flex; flex-direction:column; }
+.ie-panel-servicio{ width:520px; flex-shrink:0; display:flex; flex-direction:column; justify-content:center; }
 .ie-dona-row{ display:flex; align-items:center; gap:18px; margin-bottom:10px; }
 .ie-dona{ width:130px; height:130px; border-radius:50%; flex-shrink:0; position:relative; display:flex; align-items:center; justify-content:center; }
 .ie-dona-hueco{ position:absolute; width:78px; height:78px; border-radius:50%; background:#10151d; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -1358,9 +1358,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <!-- Solo para el Informe Ejecutivo mensual (captura de la cartelera como
-     imagen/PDF) — no se usan para nada más de la app. -->
+     imagen) — no se usa para nada más de la app. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyDJCy93GCOhDySnC_OLo6pcV-wK_pC48_A",
@@ -1897,7 +1896,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.90</div>
+<div class="version-tag">v4.91</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2352,7 +2351,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <div class="ie-overlay-scroll" id="ieOverlay">
   <div class="ie-toolbar" id="ieToolbar" style="display:none;">
     <button class="ie-btn-descargar" onclick="descargarInformeEjecutivoPNG()">⬇ Descargar imagen</button>
-    <button class="ie-btn-pdf" onclick="descargarInformeEjecutivoPDF()">📄 Descargar PDF</button>
+    <button class="ie-btn-pdf" onclick="descargarInformeEjecutivoLiviana()">📱 Descargar liviana (WhatsApp)</button>
     <button class="ie-btn-cerrar" onclick="cerrarInformeEjecutivo()">Cerrar</button>
   </div>
   <div id="ieEstadoCarga" class="ie-loading">Generando informe ejecutivo…</div>
@@ -5195,8 +5194,12 @@ function cerrarResumenMes(){
 // calendario de "Por día" (calInlineMes/calInlineAno).
 
 const IE_TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-const IE_TURNO_ICONO = {desayuno:'☕', almuerzo:'☀', cena:'🌙'};
-const IE_TURNO_COLOR = {desayuno:'#8fb3c9', almuerzo:'#c9a15a', cena:'#e8c987'};
+const IE_TURNO_ICONO = {desayuno:'☕', almuerzo:'🍴', cena:'🍽'};
+const IE_TURNO_COLOR = {desayuno:'#ede6d6', almuerzo:'#c1603f', cena:'#d9a84e'};
+// Orden de despliegue en la lista y en la dona — Cena primero (suele ser
+// el turno con más peso), luego Almuerzo, luego Desayuno. Igual al orden
+// de la cartelera de referencia.
+const IE_TURNO_ORDEN = ['cena','almuerzo','desayuno'];
 const IE_DIAS_SEMANA_LABEL = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 
 // 1) Reservas del mes que cuentan para el reporte — misma regla que ya
@@ -5358,7 +5361,7 @@ async function generarInformeEjecutivoMensual(){
     const porDiaSemana = groupPaxByWeekday(rsMes);
 
     const sinClasificar = rsMes.filter(r=>classifyServicePeriod(r)==='sin_clasificar');
-    const porServicio = ['desayuno','almuerzo','cena'].map(t=>{
+    const porServicio = IE_TURNO_ORDEN.map(t=>{
       const rs = rsMes.filter(r=>classifyServicePeriod(r)===t);
       const pax = rs.reduce((a,r)=>a+Number(r.pax||0),0);
       return { turno:t, label:IE_TURNO_LABEL[t], pax, reservas:rs.length, pct: metrics.totalPax ? pax/metrics.totalPax*100 : 0 };
@@ -5508,22 +5511,26 @@ async function descargarInformeEjecutivoPNG(){
   }
 }
 
-async function descargarInformeEjecutivoPDF(){
+// Versión liviana en JPG comprimido — pensada para mandar por WhatsApp sin
+// que pese varios megas. El PDF que había antes incrustaba la imagen en
+// PNG sin comprimir y quedaba pesadísimo; un JPG a buena calidad se ve
+// prácticamente igual para este tipo de cartelera (colores sólidos y
+// texto) y pesa una fracción de eso.
+async function descargarInformeEjecutivoLiviana(){
   const poster = document.getElementById('iePoster');
   const toolbar = document.getElementById('ieToolbar');
   toolbar.style.display = 'none';
   try{
     if(document.fonts && document.fonts.ready) await document.fonts.ready;
-    const canvas = await html2canvas(poster, {scale:2, backgroundColor:null, useCORS:true});
-    const imgData = canvas.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({orientation:'landscape', unit:'px', format:[canvas.width, canvas.height]});
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+    const canvas = await html2canvas(poster, {scale:1.4, backgroundColor:'#0d1420', useCORS:true});
+    const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
-    pdf.save(`Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.pdf`);
+    link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}_liviano.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.8);
+    link.click();
   } catch(err){
-    console.error('Error descargando informe (PDF):', err);
-    alert('No fue posible generar el PDF. Intenta de nuevo.');
+    console.error('Error descargando informe (liviano):', err);
+    alert('No fue posible generar la imagen liviana. Intenta de nuevo.');
   } finally {
     toolbar.style.display = 'flex';
   }
