@@ -1920,7 +1920,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.99</div>
+<div class="version-tag">v5.00</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5620,8 +5620,8 @@ async function mostrarImagenParaGuardar(){
   const img = document.getElementById('ieImagenGuardar');
   toolbar.style.display = 'none';
   try{
-    const canvas = await ieCapturarCanvas(poster, 1.5);
-    img.src = canvas.toDataURL('image/jpeg', 0.85);
+    const canvas = await ieCapturarCanvas(poster, 2.2);
+    img.src = canvas.toDataURL('image/jpeg', 0.92);
     poster.parentElement.style.display = 'none';
     wrap.style.display = 'block';
   } catch(err){
@@ -5637,7 +5637,7 @@ async function descargarInformeEjecutivoPNG(){
   const toolbar = document.getElementById('ieToolbar');
   toolbar.style.display = 'none'; // que no salga la barra de botones en la captura
   try{
-    const canvas = await ieCapturarCanvas(poster, 2);
+    const canvas = await ieCapturarCanvas(poster, 2.5);
     const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
     link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.png`;
@@ -5661,11 +5661,11 @@ async function descargarInformeEjecutivoLiviana(){
   const toolbar = document.getElementById('ieToolbar');
   toolbar.style.display = 'none';
   try{
-    const canvas = await ieCapturarCanvas(poster, 1.4);
+    const canvas = await ieCapturarCanvas(poster, 1.8);
     const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
     link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}_liviano.jpg`;
-    link.href = canvas.toDataURL('image/jpeg', 0.8);
+    link.href = canvas.toDataURL('image/jpeg', 0.85);
     link.click();
   } catch(err){
     console.error('Error descargando informe (liviano):', err);
