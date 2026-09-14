@@ -682,10 +682,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    ninguna variable CSS del resto de la app: es un documento visual aparte,
    pensado para verse igual sin importar el tema del navegador. */
 .ie-poster{
-  width:1650px; height:1050px; flex-shrink:0;
+  width:1650px; height:800px; flex-shrink:0;
   background:linear-gradient(160deg, #0d1420, #10151d 55%, #0b1118);
   color:#f4efe5; font-family:'Inter',sans-serif; position:relative;
-  padding:34px 44px; box-sizing:border-box;
+  padding:30px 44px; box-sizing:border-box;
   display:flex; flex-direction:column; gap:14px;
 }
 .ie-header{ display:flex; justify-content:space-between; align-items:flex-start; }
@@ -765,6 +765,16 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .ie-panel-oportunidad-texto{ font-size:12.5px; line-height:1.5; color:#f4e3d3; }
 
 .ie-footer{ display:flex; justify-content:space-between; align-items:center; font-size:9.5px; letter-spacing:1.5px; color:#7d8896; border-top:1px solid #2a2418; padding-top:10px; }
+
+.ie-especiales-row{
+  border:1px solid #3a3120; border-radius:10px; padding:12px 20px;
+  display:flex; align-items:center; gap:22px; background:rgba(201,161,90,0.05);
+}
+.ie-especiales-titulo{ font-size:12.5px; font-weight:800; letter-spacing:1.5px; color:#e8c987; white-space:nowrap; }
+.ie-especiales-cards{ flex:1; display:flex; gap:22px; }
+.ie-especiales-card{ flex:1; text-align:center; }
+.ie-especiales-num{ font-size:26px; font-weight:800; color:#f4efe5; line-height:1; }
+.ie-especiales-label{ font-size:9.5px; letter-spacing:1px; color:#9c8a68; font-weight:700; margin-top:4px; }
 
 @media (max-width:900px){
   .ie-scale-wrap{ display:flex; justify-content:flex-start; }
@@ -1908,7 +1918,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.92</div>
+<div class="version-tag">v4.93</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5400,8 +5410,17 @@ async function generarInformeEjecutivoMensual(anoParam, mesParam){
     const insights = generateExecutiveInsights(porServicioOrdenado, porDiaSemana, metrics);
     const oportunidad = calcularOportunidad(porServicio, porDiaSemana, metrics);
 
+    // Reservas especiales (20+ personas) del mes — mismo umbral que ya usa
+    // el resto de la app (⭐ en el calendario, filtro "Especiales (20+)").
+    const rsEspeciales = rsMes.filter(r=>Number(r.pax)>=20);
+    const especiales = {
+      count: rsEspeciales.length,
+      pax: rsEspeciales.reduce((a,r)=>a+Number(r.pax||0),0),
+      pctReservas: metrics.totalReservas ? (rsEspeciales.length/metrics.totalReservas*100) : 0,
+    };
+
     ieMesActual = {ano, mes};
-    renderExecutiveReport({ano, mes, metrics, porDia, porDiaSemana, porServicio, mayorDemanda, menorParticipacion, insights, oportunidad, sinClasificar});
+    renderExecutiveReport({ano, mes, metrics, porDia, porDiaSemana, porServicio, mayorDemanda, menorParticipacion, insights, oportunidad, sinClasificar, especiales});
 
     carga.style.display = 'none';
     poster.style.display = 'flex';
@@ -5495,21 +5514,22 @@ function renderExecutiveReport(d){
       </div>
     </div>
 
-    <div class="ie-footer-row">
-      <div class="ie-panel ie-panel-lectura">
-        <div class="ie-panel-titulo">LECTURA EJECUTIVA</div>
-        ${lecturaHtml}
+    <div class="ie-especiales-row">
+      <div class="ie-especiales-titulo">⭐ RESERVAS ESPECIALES (20+ PERSONAS)</div>
+      <div class="ie-especiales-cards">
+        <div class="ie-especiales-card">
+          <div class="ie-especiales-num">${numCO(d.especiales.count)}</div>
+          <div class="ie-especiales-label">RESERVAS ESPECIALES</div>
+        </div>
+        <div class="ie-especiales-card">
+          <div class="ie-especiales-num">${numCO(d.especiales.pax)}</div>
+          <div class="ie-especiales-label">PAX EN RESERVAS ESPECIALES</div>
+        </div>
+        <div class="ie-especiales-card">
+          <div class="ie-especiales-num">${numCO(d.especiales.pctReservas,1).replace('.',',')}%</div>
+          <div class="ie-especiales-label">DEL TOTAL DE RESERVAS DEL MES</div>
+        </div>
       </div>
-      <div class="ie-panel ie-panel-oportunidad">
-        <div class="ie-panel-titulo">🎯 OPORTUNIDAD</div>
-        <div class="ie-panel-oportunidad-texto">${escapeHtml(d.oportunidad)}</div>
-      </div>
-    </div>
-
-    <div class="ie-footer">
-      <span>LA MATRIARCA</span>
-      <span>COCINA · ENCUENTROS · TRADICIÓN</span>
-      <span>EST. 2018</span>
     </div>
   `;
 }
