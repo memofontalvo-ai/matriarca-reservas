@@ -1920,7 +1920,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.98</div>
+<div class="version-tag">v4.99</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5425,7 +5425,7 @@ async function generarInformeEjecutivoMensual(anoParam, mesParam){
     const especiales = {
       count: rsEspeciales.length,
       pax: rsEspeciales.reduce((a,r)=>a+Number(r.pax||0),0),
-      pctReservas: metrics.totalReservas ? (rsEspeciales.length/metrics.totalReservas*100) : 0,
+      pctPax: metrics.totalPax ? (rsEspeciales.reduce((a,r)=>a+Number(r.pax||0),0)/metrics.totalPax*100) : 0,
     };
 
     ieMesActual = {ano, mes};
@@ -5572,8 +5572,8 @@ function renderExecutiveReport(d){
           <div class="ie-especiales-label">PAX EN RESERVAS ESPECIALES</div>
         </div>
         <div class="ie-especiales-card">
-          <div class="ie-especiales-num">${numCO(d.especiales.pctReservas,1).replace('.',',')}%</div>
-          <div class="ie-especiales-label">DEL TOTAL DE RESERVAS DEL MES</div>
+          <div class="ie-especiales-num">${numCO(d.especiales.pctPax,1).replace('.',',')}%</div>
+          <div class="ie-especiales-label">DEL TOTAL DE PAX DEL MES</div>
         </div>
       </div>
     </div>
