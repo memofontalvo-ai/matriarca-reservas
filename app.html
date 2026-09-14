@@ -172,6 +172,14 @@ header{
 .date-label .grupo{display:block; font-size:10.5px; font-weight:500; color:var(--text-dim); text-transform:none;}
 
 .turnos{display:flex; gap:6px;}
+/* Fila de acciones del día (Especiales / Bloquear día): va SIEMPRE en su
+   propia línea, centrada, debajo del selector de fecha — antes estos
+   botones quedaban sueltos a la derecha de las flechas de fecha, pegados
+   sin relación visual clara con nada. width:100% obliga al contenedor
+   flex-wrap del <header> a bajarla de línea siempre, en cualquier ancho. */
+.dia-acciones-row{
+  width:100%; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;
+}
 .turno-pill{
   background:var(--panel-alt); border:1px solid var(--border); color:var(--text-muted);
   padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:600;
@@ -1635,10 +1643,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <div class="date-label" id="dateLabel" onclick="toggleCalendarioPorDia()"></div>
         <button onclick="cambiarDia(1)">›</button>
       </div>
+      <div class="dia-acciones-row">
+        <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (20+)</span></button>
+        <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
+      </div>
       <div class="turnos" id="turnosBar"></div>
-      <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (20+)</span></button>
-      <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
-      <button class="clear-btn" onclick="confirmarVaciarTurno()" title="Eliminar todas las reservas de este turno">🗑 <span>Vaciar turno</span></button>
     </header>
 
     <div class="calendario-inline-wrap" id="calendarioInlineWrap">
@@ -1971,7 +1980,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.03</div>
+<div class="version-tag">v5.04</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -8856,23 +8865,7 @@ function resetearTodasLasReservas(){
   });
 }
 
-function confirmarVaciarTurno(){
-  const rs = reservasDelTurno();
-  if(rs.length === 0){
-    alert('Este turno ya está vacío, no hay reservas que eliminar.');
-    return;
-  }
-  const turnoLabel = turnoActivo.charAt(0).toUpperCase() + turnoActivo.slice(1);
-  const fechaLabel = fechaISO(fechaActual);
-  const ok = confirm(`Vas a eliminar TODAS las ${rs.length} reservas de ${turnoLabel} del ${fechaLabel}.\n\nEsta acción no se puede deshacer. ¿Continuar?`);
-  if(!ok) return;
-  const batch = db.batch();
-  rs.forEach(r => batch.delete(reservasRef.doc(r.id)));
-  batch.commit().catch(err => {
-    console.error('Error vaciando el turno:', err);
-    alert('No se pudo vaciar el turno. Revisa tu conexión e intenta de nuevo.');
-  });
-}
+
 
 document.getElementById('overlay').addEventListener('click', e=>{
   if(e.target.id==='overlay') cerrarModal();
