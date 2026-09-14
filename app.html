@@ -671,6 +671,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .ie-btn-descargar{ background:var(--gold-bright); color:#241a05; }
 .ie-btn-pdf{ background:var(--panel-raised); color:var(--text); border:1px solid var(--border) !important; }
+.ie-btn-guardar-toque{ background:#2d4a3e; color:#c9f2dd; border:1px solid #3f6b57 !important; }
+.ie-hint-guardar{ color:var(--gold-bright); font-size:13px; font-weight:600; max-width:600px; margin:0 auto 12px; line-height:1.5; padding:0 10px; }
 .ie-btn-cerrar{ background:transparent; color:var(--text-muted); border:1px solid var(--border) !important; }
 .ie-loading{ color:var(--gold-bright); font-size:14px; font-weight:700; padding:60px 20px; text-align:center; }
 .ie-vacio{ color:var(--text-muted); font-size:14px; padding:60px 20px; text-align:center; max-width:400px; }
@@ -1918,7 +1920,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.93</div>
+<div class="version-tag">v4.94</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -2372,6 +2374,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 <div class="ie-overlay-scroll" id="ieOverlay">
   <div class="ie-toolbar" id="ieToolbar" style="display:none;">
+    <button class="ie-btn-guardar-toque" onclick="mostrarImagenParaGuardar()">🖼️ Ver imagen para guardar</button>
     <button class="ie-btn-descargar" onclick="descargarInformeEjecutivoPNG()">⬇ Descargar imagen</button>
     <button class="ie-btn-pdf" onclick="descargarInformeEjecutivoLiviana()">📱 Descargar liviana (WhatsApp)</button>
     <button class="ie-btn-cerrar" onclick="cerrarInformeEjecutivo()">Cerrar</button>
@@ -2379,6 +2382,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   <div id="ieEstadoCarga" class="ie-loading">Generando informe ejecutivo…</div>
   <div class="ie-scale-wrap">
     <div class="ie-poster" id="iePoster" style="display:none;"></div>
+  </div>
+  <div id="ieImagenGuardarWrap" style="display:none; text-align:center; max-width:100%;">
+    <div class="ie-hint-guardar">📌 Mantén el dedo presionado sobre la imagen y elige <b>"Guardar imagen"</b> — así queda en tus Fotos, sin importar si estás en WhatsApp o en Safari.</div>
+    <img id="ieImagenGuardar" style="max-width:100%; border-radius:8px;">
   </div>
 </div>
 
@@ -5372,6 +5379,8 @@ async function generarInformeEjecutivoMensual(anoParam, mesParam){
   const poster = document.getElementById('iePoster');
   toolbar.style.display = 'none';
   poster.style.display = 'none';
+  poster.parentElement.style.display = '';
+  document.getElementById('ieImagenGuardarWrap').style.display = 'none';
   carga.style.display = 'block';
   carga.textContent = 'Generando informe ejecutivo…';
   overlay.classList.add('open');
@@ -5536,6 +5545,35 @@ function renderExecutiveReport(d){
 
 function cerrarInformeEjecutivo(){
   document.getElementById('ieOverlay').classList.remove('open');
+  document.getElementById('ieImagenGuardarWrap').style.display = 'none';
+  document.getElementById('iePoster').parentElement.style.display = '';
+}
+
+// Los navegadores integrados (el de WhatsApp, Instagram, etc.) muchas
+// veces NO dejan que una página "descargue" un archivo directamente —
+// el botón de descarga simplemente no hace nada, así el código esté
+// bien. Esto es una alternativa que sí funciona ahí: se genera la
+// imagen y se muestra como una foto normal en la pantalla, para que el
+// usuario la guarde con el gesto nativo de "mantener presionado" —
+// eso funciona en cualquier navegador, integrado o no.
+async function mostrarImagenParaGuardar(){
+  const poster = document.getElementById('iePoster');
+  const toolbar = document.getElementById('ieToolbar');
+  const wrap = document.getElementById('ieImagenGuardarWrap');
+  const img = document.getElementById('ieImagenGuardar');
+  toolbar.style.display = 'none';
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await html2canvas(poster, {scale:1.5, backgroundColor:'#0d1420', useCORS:true});
+    img.src = canvas.toDataURL('image/jpeg', 0.85);
+    poster.parentElement.style.display = 'none';
+    wrap.style.display = 'block';
+  } catch(err){
+    console.error('Error generando imagen para guardar:', err);
+    alert('No fue posible generar la imagen. Intenta de nuevo.');
+  } finally {
+    toolbar.style.display = 'flex';
+  }
 }
 
 async function descargarInformeEjecutivoPNG(){
