@@ -48,7 +48,7 @@
    (una tarjeta, un carrusel, una lista de mesas) se pasa del ancho de la
    pantalla, esto evita que arrastre TODA la página al lado — solo se ve
    recortado ese elemento puntual, en vez de mover la pantalla completa. */
-html, body{overflow-x:hidden; max-width:100%;}
+html, body{overflow-x:hidden; max-width:100%; overscroll-behavior-x:none;}
 body{
   background:var(--bg);
   color:var(--text);
@@ -577,7 +577,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 .rdd-cards-top{ display:flex; gap:10px; margin-bottom:14px; }
 .rdd-card{
-  flex:1; display:flex; align-items:center; gap:12px;
+  flex:1; min-width:0; display:flex; align-items:center; gap:12px;
   background:var(--rdd-marfil); border-radius:14px; padding:14px;
 }
 .rdd-card-icon{
@@ -597,7 +597,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .rdd-panel-title{ font-size:15.5px; font-weight:700; color:var(--text); }
 .rdd-panel-cols{ display:flex; gap:18px; }
-.rdd-panel-cols span{ font-size:11px; font-weight:700; color:var(--text-muted); width:34px; text-align:right; }
+.rdd-panel-cols span{ font-size:10px; font-weight:700; color:var(--text-muted); width:42px; flex-shrink:0; text-align:right; overflow-wrap:break-word; }
 
 .rdd-row{
   display:flex; align-items:center; gap:10px;
@@ -617,13 +617,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .rdd-row-icon.neutro svg{ color:var(--text-muted); }
 .rdd-row-icon.blue{ background:rgba(125,199,232,0.15); }
 .rdd-row-icon.blue svg{ color:var(--rdd-blue); }
-.rdd-row-label{ flex:1; font-size:12.5px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
-.rdd-row-val{ width:34px; text-align:right; font-size:14.5px; font-weight:700; color:var(--text); }
+.rdd-row-label{ flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
+.rdd-row-val{ width:50px; flex-shrink:0; text-align:right; font-size:12.5px; font-weight:700; color:var(--text); overflow-wrap:break-word; line-height:1.2; }
 .rdd-row-val.cero{ color:var(--text-dim); font-weight:600; }
 
 .rdd-mesa-grid{ display:flex; gap:10px; }
 .rdd-mesa-card{
-  flex:1; background:var(--rdd-marfil); border-radius:14px; padding:13px;
+  flex:1; min-width:0; background:var(--rdd-marfil); border-radius:14px; padding:13px;
 }
 .rdd-mesa-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
 .rdd-mesa-head svg{ width:18px; height:18px; color:var(--rdd-marfil-icon); flex-shrink:0; }
@@ -637,10 +637,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   background:linear-gradient(135deg, var(--gold-bright), var(--gold));
   border-radius:14px; padding:14px 16px; margin-top:2px;
 }
-.rdd-total-label{ font-size:11px; font-weight:800; color:#3a2a0a; text-transform:uppercase; letter-spacing:0.3px; }
-.rdd-total-label small{ display:block; font-size:10.5px; font-weight:600; color:#5c4212; text-transform:none; margin-top:2px; }
-.rdd-total-divider{ width:1px; align-self:stretch; background:rgba(58,42,10,0.25); }
-.rdd-total-num{ font-size:20px; font-weight:800; color:#241a05; line-height:1.15; text-align:center; }
+.rdd-total-label{ flex:1; min-width:0; font-size:11px; font-weight:800; color:#3a2a0a; text-transform:uppercase; letter-spacing:0.3px; }
+.rdd-total-label small{ display:block; font-size:10.5px; font-weight:600; color:#5c4212; text-transform:none; margin-top:2px; overflow-wrap:break-word; }
+.rdd-total-divider{ width:1px; flex-shrink:0; align-self:stretch; background:rgba(58,42,10,0.25); }
+.rdd-total-num{ flex-shrink:0; font-size:20px; font-weight:800; color:#241a05; line-height:1.15; text-align:center; }
 .rdd-total-num small{ display:block; font-size:9.5px; font-weight:800; color:#5c4212; letter-spacing:0.3px; }
 @media (max-width:360px){
   .rdd-titulo{ font-size:19px; }
@@ -1770,7 +1770,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.86</div>
+<div class="version-tag">v4.87</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
