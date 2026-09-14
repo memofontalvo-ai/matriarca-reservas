@@ -1920,7 +1920,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.00</div>
+<div class="version-tag">v5.01</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4093,8 +4093,19 @@ function validarHorarioReal(fechaIso, turno, horaHHMM){
   if(!t || t.activo === false){
     return `Este turno está fuera del horario real de atención. ${textoHorariosDelDia(fechaIso)}`;
   }
-  if(horaHHMM && t.inicio && t.fin && (horaHHMM < t.inicio || horaHHMM > t.fin)){
-    return `Esta hora está fuera del horario real de atención. ${textoHorariosDelDia(fechaIso)}`;
+  if(horaHHMM && t.inicio && t.fin){
+    // Si "fin" es menor que "inicio" (ej. Cena de 17:30 a 03:00), el turno
+    // cruza la medianoche — ahí la hora es válida si es DESPUÉS de inicio
+    // O ANTES de fin, no "entre los dos" como en un turno normal (si no,
+    // una comparación de texto simple marcaba 8pm como fuera de horario
+    // por "ser mayor" que "03:00").
+    const cruzaMedianoche = t.fin < t.inicio;
+    const dentroDeHorario = cruzaMedianoche
+      ? (horaHHMM >= t.inicio || horaHHMM <= t.fin)
+      : (horaHHMM >= t.inicio && horaHHMM <= t.fin);
+    if(!dentroDeHorario){
+      return `Esta hora está fuera del horario real de atención. ${textoHorariosDelDia(fechaIso)}`;
+    }
   }
   return null;
 }

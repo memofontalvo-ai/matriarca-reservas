@@ -208,7 +208,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.31</div>
+<div class="version-tag">v3.32</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -534,8 +534,16 @@ const firebaseConfig = {
     if(!t || t.activo === false){
       return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
     }
-    if(horaHHMM && t.inicio && t.fin && (horaHHMM < t.inicio || horaHHMM > t.fin)){
-      return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
+    if(horaHHMM && t.inicio && t.fin){
+      // Turno que cruza la medianoche (ej. Cena 17:30 a 03:00): la hora es
+      // válida si es después de inicio O antes de fin — no "entre los dos".
+      const cruzaMedianoche = t.fin < t.inicio;
+      const dentroDeHorario = cruzaMedianoche
+        ? (horaHHMM >= t.inicio || horaHHMM <= t.fin)
+        : (horaHHMM >= t.inicio && horaHHMM <= t.fin);
+      if(!dentroDeHorario){
+        return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
+      }
     }
     return null;
   }
