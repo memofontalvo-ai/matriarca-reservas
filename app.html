@@ -30,6 +30,16 @@
   --walkin-bg: rgba(154,163,178,0.14);
   --cancelled: #e5636a;
   --cancelled-bg: rgba(229,99,106,0.14);
+  /* Variables específicas para el nuevo "Resumen del día" (tarjetas tipo
+     informe) — no reemplazan las de arriba, se suman para ese componente. */
+  --rdd-marfil: #f4efe5;
+  --rdd-marfil-text: #2b2418;
+  --rdd-marfil-text-dim: #8a7a5c;
+  --rdd-marfil-icon: #7b5513;
+  --rdd-panel: #171e27;
+  --rdd-panel-border: #2a3440;
+  --rdd-amber: #e9aa35;
+  --rdd-blue: #7dc7e8;
   --radius: 10px;
   --radius-lg: 16px;
 }
@@ -546,6 +556,97 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .resumen-total > span:first-child{ font-size:13px; font-weight:700; color:#e9d9b3; }
 .resumen-total > span:last-child{ font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:800; color:#f0c869; }
 .resumen-total-sub{font-size:10.5px; font-weight:500; color:#a99c7f;}
+
+/* ===== RESUMEN DEL DÍA — componente nuevo (tarjetas + panel de estados +
+   preferencia de mesa + franja de total). Usado en "Solicitudes" y
+   "Por día". Namespace .rdd- para no chocar con nada más de la app. ===== */
+.rdd{ margin-top:14px; }
+.rdd-header{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-bottom:14px; flex-wrap:wrap;
+}
+.rdd-titulo{
+  font-family:'Fraunces',serif; font-size:22px; font-weight:700; color:var(--text); margin:0;
+}
+.rdd-fecha-pill{
+  display:flex; align-items:center; gap:6px;
+  background:var(--rdd-panel); border:1px solid var(--rdd-panel-border); border-radius:20px;
+  padding:6px 13px; font-size:12.5px; font-weight:700; color:var(--text); white-space:nowrap;
+}
+.rdd-fecha-pill svg{ width:14px; height:14px; color:var(--gold); flex-shrink:0; }
+
+.rdd-cards-top{ display:flex; gap:10px; margin-bottom:14px; }
+.rdd-card{
+  flex:1; display:flex; align-items:center; gap:12px;
+  background:var(--rdd-marfil); border-radius:14px; padding:14px;
+}
+.rdd-card-icon{
+  width:44px; height:44px; border-radius:50%; background:rgba(123,85,19,0.12);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.rdd-card-icon svg{ width:22px; height:22px; color:var(--rdd-marfil-icon); }
+.rdd-card-num{ font-size:26px; font-weight:800; color:var(--rdd-marfil-text); line-height:1.1; }
+.rdd-card-label{ font-size:12px; font-weight:600; color:var(--rdd-marfil-text-dim); margin-top:1px; }
+
+.rdd-panel{
+  background:var(--rdd-panel); border:1px solid var(--rdd-panel-border); border-radius:14px;
+  padding:14px; margin-bottom:12px;
+}
+.rdd-panel-head{
+  display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px;
+}
+.rdd-panel-title{ font-size:15.5px; font-weight:700; color:var(--text); }
+.rdd-panel-cols{ display:flex; gap:18px; }
+.rdd-panel-cols span{ font-size:11px; font-weight:700; color:var(--text-muted); width:34px; text-align:right; }
+
+.rdd-row{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 0; border-bottom:1px solid var(--rdd-panel-border);
+}
+.rdd-row:last-child{ border-bottom:none; padding-bottom:2px; }
+.rdd-row-icon{
+  width:26px; height:26px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.rdd-row-icon svg{ width:15px; height:15px; }
+.rdd-row-icon.ok{ background:rgba(37,182,111,0.15); }
+.rdd-row-icon.ok svg{ color:var(--confirmed); }
+.rdd-row-icon.amber{ background:rgba(233,170,53,0.15); }
+.rdd-row-icon.amber svg{ color:var(--rdd-amber); }
+.rdd-row-icon.neutro{ background:rgba(237,238,241,0.1); }
+.rdd-row-icon.neutro svg{ color:var(--text-muted); }
+.rdd-row-icon.blue{ background:rgba(125,199,232,0.15); }
+.rdd-row-icon.blue svg{ color:var(--rdd-blue); }
+.rdd-row-label{ flex:1; font-size:12.5px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
+.rdd-row-val{ width:34px; text-align:right; font-size:14.5px; font-weight:700; color:var(--text); }
+.rdd-row-val.cero{ color:var(--text-dim); font-weight:600; }
+
+.rdd-mesa-grid{ display:flex; gap:10px; }
+.rdd-mesa-card{
+  flex:1; background:var(--rdd-marfil); border-radius:14px; padding:13px;
+}
+.rdd-mesa-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.rdd-mesa-head svg{ width:18px; height:18px; color:var(--rdd-marfil-icon); flex-shrink:0; }
+.rdd-mesa-head span{ font-size:11.5px; font-weight:800; color:var(--rdd-marfil-text); text-transform:uppercase; letter-spacing:0.3px; }
+.rdd-mesa-nums{ display:flex; gap:10px; padding-top:9px; border-top:1px solid rgba(123,85,19,0.15); }
+.rdd-mesa-nums > div{ font-size:14.5px; font-weight:800; color:var(--rdd-marfil-text); }
+.rdd-mesa-nums > div small{ font-size:10.5px; font-weight:600; color:var(--rdd-marfil-text-dim); margin-left:3px; }
+
+.rdd-total{
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(135deg, var(--gold-bright), var(--gold));
+  border-radius:14px; padding:14px 16px; margin-top:2px;
+}
+.rdd-total-label{ font-size:11px; font-weight:800; color:#3a2a0a; text-transform:uppercase; letter-spacing:0.3px; }
+.rdd-total-label small{ display:block; font-size:10.5px; font-weight:600; color:#5c4212; text-transform:none; margin-top:2px; }
+.rdd-total-divider{ width:1px; align-self:stretch; background:rgba(58,42,10,0.25); }
+.rdd-total-num{ font-size:20px; font-weight:800; color:#241a05; line-height:1.15; text-align:center; }
+.rdd-total-num small{ display:block; font-size:9.5px; font-weight:800; color:#5c4212; letter-spacing:0.3px; }
+@media (max-width:360px){
+  .rdd-titulo{ font-size:19px; }
+  .rdd-card-num{ font-size:22px; }
+  .rdd-total{ flex-wrap:wrap; row-gap:8px; }
+}
 
 /* ===== FLOOR PLAN ===== */
 .salon-group{margin-bottom:26px;}
@@ -1669,7 +1770,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.85</div>
+<div class="version-tag">v4.86</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4702,6 +4803,122 @@ let estadoSeleccionado = 'pendiente';
 
 const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS_CORTO = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// ===== ICONOS lineales (SVG inline, sin librería externa) para el
+// componente "Resumen del día" — trazo simple, heredan color por CSS. =====
+const RDD_ICONS = {
+  documento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>',
+  personas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  calendario: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+  reloj: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  sobre: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m4 6 8 7 8-7"/></svg>',
+  alerta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  subir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+  mesa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="9" x2="21" y2="9"/><line x1="6" y1="9" x2="6" y2="20"/><line x1="18" y1="9" x2="18" y2="20"/><line x1="3" y1="9" x2="3" y2="5"/><line x1="21" y1="9" x2="21" y2="5"/></svg>',
+  corona: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 17 3-10 5 6 2-9 2 9 5-6 3 10Z"/><line x1="4" y1="21" x2="20" y2="21"/></svg>',
+  billete: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>',
+  ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><line x1="13" y1="5" x2="13" y2="19" stroke-dasharray="2 3"/></svg>',
+};
+
+// ===== Componente reutilizable "Resumen del día" — usado en Solicitudes y
+// Por día. Recibe todos los números ya calculados por cada pantalla; no
+// vuelve a calcular nada por su cuenta, solo arma el HTML. =====
+// opts = {
+//   fechaObj, unidadSingular, unidadPlural,     // ej. "Solicitud"/"Solicitudes" o "Reserva"/"Reservas"
+//   totalCount, totalPax,
+//   panelTitulo, filas: [{icono, color, label, count, pax}],  // pax puede ser null si esa fila no aplica
+//   mesaGeneral: {count, pax}, mesaVip: {count, pax},
+//   extraPanelTitulo, extraFilasHtml,           // panel opcional adicional (ej. salones VIP, o ingresos)
+// }
+function renderResumenDiaV2(opts){
+  const d = opts.fechaObj;
+  const fechaCorta = `${DIAS_CORTO[d.getDay()]}, ${d.getDate()} ${MESES_CORTO[d.getMonth()]}`;
+  const fechaLarga = `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
+  const unidadTotal = opts.totalCount === 1 ? opts.unidadSingular : opts.unidadPlural;
+
+  const filasHtml = (opts.filas||[]).map(f => `
+    <div class="rdd-row">
+      <div class="rdd-row-icon ${f.color}">${RDD_ICONS[f.icono]}</div>
+      <div class="rdd-row-label">${f.label}</div>
+      <div class="rdd-row-val ${f.count===0?'cero':''}">${f.count}</div>
+      <div class="rdd-row-val ${(!f.pax)?'cero':''}">${f.pax==null?'—':f.pax}</div>
+    </div>`).join('');
+
+  const mesaGridHtml = (opts.mesaGeneral || opts.mesaVip) ? `
+    <div class="rdd-panel">
+      <div class="rdd-panel-title" style="margin-bottom:10px;">Preferencia de mesa</div>
+      <div class="rdd-mesa-grid">
+        <div class="rdd-mesa-card">
+          <div class="rdd-mesa-head">${RDD_ICONS.mesa}<span>Mesa general</span></div>
+          <div class="rdd-mesa-nums">
+            <div>${opts.mesaGeneral.count}<small>${opts.mesaGeneral.count===1?'solicitud':'solicitudes'}</small></div>
+            <div>${opts.mesaGeneral.pax}<small>pax</small></div>
+          </div>
+        </div>
+        <div class="rdd-mesa-card">
+          <div class="rdd-mesa-head">${RDD_ICONS.corona}<span>Mesa VIP</span></div>
+          <div class="rdd-mesa-nums">
+            <div>${opts.mesaVip.count}<small>${opts.mesaVip.count===1?'solicitud':'solicitudes'}</small></div>
+            <div>${opts.mesaVip.pax}<small>pax</small></div>
+          </div>
+        </div>
+      </div>
+    </div>` : '';
+
+  const extraPanelHtml = opts.extraFilasHtml ? `
+    <div class="rdd-panel">
+      <div class="rdd-panel-title" style="margin-bottom:8px;">${opts.extraPanelTitulo}</div>
+      ${opts.extraFilasHtml}
+    </div>` : '';
+
+  return `
+    <div class="rdd">
+      <div class="rdd-header">
+        <h2 class="rdd-titulo">Resumen del día</h2>
+        <div class="rdd-fecha-pill">${RDD_ICONS.calendario}<span>${fechaCorta}</span></div>
+      </div>
+
+      <div class="rdd-cards-top">
+        <div class="rdd-card">
+          <div class="rdd-card-icon">${RDD_ICONS.documento}</div>
+          <div>
+            <div class="rdd-card-num">${opts.totalCount}</div>
+            <div class="rdd-card-label">${unidadTotal}</div>
+          </div>
+        </div>
+        <div class="rdd-card">
+          <div class="rdd-card-icon">${RDD_ICONS.personas}</div>
+          <div>
+            <div class="rdd-card-num">${opts.totalPax}</div>
+            <div class="rdd-card-label">${opts.totalPax===1?'Persona':'Personas'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rdd-panel">
+        <div class="rdd-panel-head">
+          <span class="rdd-panel-title">${opts.panelTitulo}</span>
+          <div class="rdd-panel-cols"><span>${opts.colLabel1||'Reservas'}</span><span>${opts.colLabel2||'Pax'}</span></div>
+        </div>
+        ${filasHtml}
+      </div>
+
+      ${mesaGridHtml}
+      ${extraPanelHtml}
+
+      <div class="rdd-total">
+        <div class="rdd-total-label">Total del día<small>${fechaLarga}</small></div>
+        <div class="rdd-total-divider"></div>
+        <div class="rdd-total-num">${opts.totalCount}<small>${unidadTotal.toUpperCase()}</small></div>
+        <div class="rdd-total-divider"></div>
+        <div class="rdd-total-num">${opts.totalPax}<small>PAX</small></div>
+      </div>
+    </div>
+  `;
+}
 
 function fechaISO(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -5109,61 +5326,49 @@ function renderResumenTurnoHTML(rsTodas){
   const turnoLabelResumen = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'}[turnoActivo] || 'Todos los turnos';
 
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
-    const filas = reservas.length
-      ? reservas.map(r => `<div class="resumen-fila">
-          <span class="resumen-fila-label">${escapeHtml(r.nombre)}</span>
-          <span class="resumen-fila-val">${r.pax} pax</span>
-        </div>`).join('')
-      : `<div class="resumen-fila resumen-vacio"><span>Sin reservas</span></div>`;
-    return `<div class="resumen-subsalon">
-      <div class="resumen-subsalon-head">
-        <span>${salon.nombre}</span>
-        <span>${reservas.length} reserva${reservas.length===1?'':'s'} · ${pax} pax</span>
-      </div>
-      ${filas}
+    const nombres = reservas.length ? reservas.map(r=>escapeHtml(r.nombre)).join(', ') : 'Sin reservas';
+    return `<div class="rdd-row">
+      <div class="rdd-row-icon neutro">${RDD_ICONS.corona}</div>
+      <div class="rdd-row-label">${escapeHtml(salon.nombre)}<div style="font-size:10.5px; color:var(--text-dim); font-weight:400; margin-top:2px;">${nombres}</div></div>
+      <div class="rdd-row-val ${reservas.length===0?'cero':''}">${reservas.length}</div>
+      <div class="rdd-row-val ${pax===0?'cero':''}">${pax}</div>
     </div>`;
   }).join('');
 
+  const ingresosFilasHtml = `
+    <div class="rdd-row">
+      <div class="rdd-row-icon amber">${RDD_ICONS.billete}</div>
+      <div class="rdd-row-label">Abonos registrados</div>
+      <div class="rdd-row-val ${reservasConAbono.length===0?'cero':''}">${reservasConAbono.length}</div>
+      <div class="rdd-row-val ${totalAbonos===0?'cero':''}">$${totalAbonos.toLocaleString('es-CO')}</div>
+    </div>
+    <div class="rdd-row">
+      <div class="rdd-row-icon amber">${RDD_ICONS.ticket}</div>
+      <div class="rdd-row-label">Cover registrados</div>
+      <div class="rdd-row-val ${reservasConCover.length===0?'cero':''}">${reservasConCover.length}</div>
+      <div class="rdd-row-val ${totalCover===0?'cero':''}">$${totalCover.toLocaleString('es-CO')}</div>
+    </div>`;
+
   return `
     ${resumenDiaHtml}
-    <div class="resumen-turno">
-      <div class="resumen-turno-title">Resumen de ${turnoLabelResumen}</div>
-      <div class="resumen-turno-fecha">${fechaLegibleResumen}</div>
-
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head">
-          <span>Mesas generales</span>
-          <span>${generalReservas.length} mesas · ${generalPax} pax</span>
-        </div>
-      </div>
-
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head">
-          <span>♛ Mesas VIP (3 salones)</span>
-          <span>${vipReservasCount} mesas · ${vipPax} pax</span>
-        </div>
-        ${vipSalonesHtml}
-      </div>
-
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head">
-          <span>💰 Abonos registrados</span>
-          <span>${reservasConAbono.length} reserva${reservasConAbono.length===1?'':'s'} · $${totalAbonos.toLocaleString('es-CO')}</span>
-        </div>
-      </div>
-
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head">
-          <span>🎫 Cover registrados</span>
-          <span>${reservasConCover.length} reserva${reservasConCover.length===1?'':'s'} · $${totalCover.toLocaleString('es-CO')}</span>
-        </div>
-      </div>
-
-      <div class="resumen-total">
-        <span>Total de ${turnoActivo==='todos'?'todos los turnos':'este turno'}<br><span class="resumen-total-sub">Generales + VIP</span></span>
-        <span>${totalReservas} reservas · ${totalPax} pax</span>
-      </div>
-    </div>
+    ${renderResumenDiaV2({
+      fechaObj: fechaActual,
+      unidadSingular: 'Reserva',
+      unidadPlural: 'Reservas',
+      totalCount: totalReservas,
+      totalPax,
+      panelTitulo: 'Ingresos registrados',
+      colLabel1: 'Reservas',
+      colLabel2: 'Total',
+      filas: [
+        {icono:'billete', color:'amber', label:'Abonos registrados', count:reservasConAbono.length, pax:'$'+totalAbonos.toLocaleString('es-CO')},
+        {icono:'ticket', color:'amber', label:'Cover registrados', count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
+      ],
+      mesaGeneral: {count:generalReservas.length, pax:generalPax},
+      mesaVip: {count:vipReservasCount, pax:vipPax},
+      extraPanelTitulo: '♛ Salones VIP',
+      extraFilasHtml: vipSalonesHtml,
+    })}
   `;
 }
 
@@ -6648,40 +6853,24 @@ function renderSolicitudesScreen(){
   const vipPax = vipSols.reduce((a,r)=>a+Number(r.pax||0),0);
   const generalPax = generalSols.reduce((a,r)=>a+Number(r.pax||0),0);
 
-  const resumenHtml = `
-    <div class="resumen-turno">
-      <div class="resumen-turno-title">Resumen del día</div>
-
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>✓ Aprobadas por el cliente</span><span>${aprobadas.length} · ${aprobadasPax} pax</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>Sin aprobar todavía</span><span>${noAprobadas.length} · ${noAprobadasPax} pax</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>📨 Mensaje enviado, sin respuesta</span><span>${mensajesEnviados.length}</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>⚠ Sin gestionar</span><span>${sinGestionar.length} · ${sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>📤 Por aprobar del cliente</span><span>${porAprobar.length} · ${porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>🕒 En lista de espera</span><span>${listaEsperaDelDia.length} · ${listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)} pax</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>Piden mesa general</span><span>${generalSols.length} · ${generalPax} pax</span></div>
-      </div>
-      <div class="resumen-seccion">
-        <div class="resumen-seccion-head"><span>♛ Piden mesa VIP</span><span>${vipSols.length} · ${vipPax} pax</span></div>
-      </div>
-      <div class="resumen-total">
-        <span>Total del día<br><span class="resumen-total-sub">${formatearFechaCorta(iso)}</span></span>
-        <span>${delDia.length} solicitudes · ${totalPax} pax</span>
-      </div>
-    </div>
-  `;
+  const resumenHtml = renderResumenDiaV2({
+    fechaObj: fechaSolicitudes,
+    unidadSingular: 'Solicitud',
+    unidadPlural: 'Solicitudes',
+    totalCount: delDia.length,
+    totalPax,
+    panelTitulo: 'Estado de gestión',
+    filas: [
+      {icono:'check', color:'ok', label:'Aprobadas por el cliente', count:aprobadas.length, pax:aprobadasPax},
+      {icono:'reloj', color:'amber', label:'Sin aprobar todavía', count:noAprobadas.length, pax:noAprobadasPax},
+      {icono:'sobre', color:'neutro', label:'Mensaje enviado, sin respuesta', count:mensajesEnviados.length, pax:null},
+      {icono:'alerta', color:'amber', label:'Sin gestionar', count:sinGestionar.length, pax:sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)},
+      {icono:'subir', color:'neutro', label:'Por aprobar del cliente', count:porAprobar.length, pax:porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)},
+      {icono:'reloj', color:'blue', label:'En lista de espera', count:listaEsperaDelDia.length, pax:listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)},
+    ],
+    mesaGeneral: {count:generalSols.length, pax:generalPax},
+    mesaVip: {count:vipSols.length, pax:vipPax},
+  });
 
   el.innerHTML = cardsHtml + resumenHtml;
 
