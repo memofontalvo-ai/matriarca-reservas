@@ -597,7 +597,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .rdd-panel-title{ font-size:15.5px; font-weight:700; color:var(--text); }
 .rdd-panel-cols{ display:flex; gap:18px; }
-.rdd-panel-cols span{ font-size:10px; font-weight:700; color:var(--text-muted); width:42px; flex-shrink:0; text-align:right; overflow-wrap:break-word; }
+.rdd-panel-cols span{ font-size:10px; font-weight:700; color:var(--text-muted); width:60px; flex-shrink:0; text-align:right; white-space:nowrap; }
 
 .rdd-row{
   display:flex; align-items:center; gap:10px;
@@ -618,7 +618,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .rdd-row-icon.blue{ background:rgba(125,199,232,0.15); }
 .rdd-row-icon.blue svg{ color:var(--rdd-blue); }
 .rdd-row-label{ flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
-.rdd-row-val{ width:50px; flex-shrink:0; text-align:right; font-size:12.5px; font-weight:700; color:var(--text); overflow-wrap:break-word; line-height:1.2; }
+.rdd-row-val{ width:60px; flex-shrink:0; text-align:right; font-size:12px; font-weight:700; color:var(--text); white-space:nowrap; }
 .rdd-row-val.cero{ color:var(--text-dim); font-weight:600; }
 
 .rdd-mesa-grid{ display:flex; gap:10px; }
@@ -1770,7 +1770,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.87</div>
+<div class="version-tag">v4.88</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -4933,11 +4933,15 @@ function renderHeader(){
   const grupo = HORARIOS[grupoDeFecha(d)];
   const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
   document.getElementById('turnosBar').innerHTML = turnos.map(([key,label])=>{
-    // "Todos" siempre está disponible; los demás dependen del horario del día.
+    // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
+    // sin importar si ese turno está prendido o apagado en el horario de
+    // atención configurado — "apagado" solo bloquea que un CLIENTE pida
+    // una reserva nueva ahí (eso se valida en solicitud.html), no que el
+    // staff pueda filtrar y ver reservas de ese turno en "Por día".
     const cfg = key==='todos' ? {activo:true} : grupo[key];
-    const off = !cfg.activo;
-    const active = turnoActivo===key && !off;
-    return `<button class="turno-pill ${off?'off':''} ${active?'active':''}" ${off?'disabled':`onclick="setTurno('${key}')"`}>
+    const inactivoEseDia = key!=='todos' && !cfg.activo;
+    const active = turnoActivo===key;
+    return `<button class="turno-pill ${inactivoEseDia?'off':''} ${active?'active':''}" onclick="setTurno('${key}')" ${inactivoEseDia?'title="Este turno está apagado en el horario de atención de este día"':''}>
       <span class="dot"></span>${label}
     </button>`;
   }).join('');
