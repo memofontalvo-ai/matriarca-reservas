@@ -1593,7 +1593,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <span><span class="cal-star-leyenda">⭐</span> Incluye reserva especial (20+)</span>
       </div>
       <div class="cal-aviso-navegando" id="calAvisoNavegando" style="display:none;"></div>
-      <button class="btn-informe-ejecutivo" onclick="generarInformeEjecutivoMensual()">📊 Generar informe ejecutivo</button>
     </div>
 
     <div class="subbar">
@@ -1830,6 +1829,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <button class="btn-config-guardar" onclick="generarInformeGeneralMes()">📋 Generar informe</button>
           </div>
         </div>
+        <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">🖼️ Informe ejecutivo mensual (cartelera visual)</div>
+          <div class="config-mensaje-sub">Una cartelera con el comportamiento del mes: pax totales, participación por turno, comportamiento diario, días de mayor demanda y lectura ejecutiva — para descargar como imagen y compartir. Solo visible aquí, en Configuración.</div>
+          <div class="field-row phone-two-cols" style="margin-top:10px;">
+            <div class="field">
+              <label>Mes</label>
+              <input type="month" id="fInformeEjecutivoMes">
+            </div>
+          </div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="generarInformeEjecutivoMensualDesdeConfig()">🖼️ Generar informe ejecutivo</button>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -1896,7 +1908,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v4.91</div>
+<div class="version-tag">v4.92</div>
 
 <div class="overlay" id="overlay">
   <div class="modal reserva-modal-v372">
@@ -5329,7 +5341,21 @@ function calcularOportunidad(porServicio, porDiaSemana, metrics){
 
 let ieMesActual = null; // {ano, mes} del último informe generado, para el nombre del archivo
 
-async function generarInformeEjecutivoMensual(){
+// Ahora se genera desde Config → Informes administrativos (no desde "Por
+// día") para que solo lo pueda usar quien tenga acceso a esa sección —
+// se le pide explícitamente el mes en vez de tomarlo del calendario de
+// "Por día", que era de acceso general.
+async function generarInformeEjecutivoMensualDesdeConfig(){
+  const valor = document.getElementById('fInformeEjecutivoMes').value; // "YYYY-MM"
+  if(!valor){
+    alert('Elige el mes del que quieres generar el informe.');
+    return;
+  }
+  const [anoStr, mesStr] = valor.split('-');
+  await generarInformeEjecutivoMensual(Number(anoStr), Number(mesStr)-1);
+}
+
+async function generarInformeEjecutivoMensual(anoParam, mesParam){
   const overlay = document.getElementById('ieOverlay');
   const toolbar = document.getElementById('ieToolbar');
   const carga = document.getElementById('ieEstadoCarga');
@@ -5345,7 +5371,8 @@ async function generarInformeEjecutivoMensual(){
   await new Promise(r => setTimeout(r, 30));
 
   try{
-    const ano = calInlineAno, mes = calInlineMes;
+    const ano = anoParam!=null ? anoParam : calInlineAno;
+    const mes = mesParam!=null ? mesParam : calInlineMes;
     const rsMesTodas = getMonthlyReservationData(ano, mes);
     const rsMes = filterValidReservations(rsMesTodas);
 
