@@ -2055,7 +2055,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.12</div>
+<div class="version-tag">v5.13</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2291,7 +2291,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </div>
 
       <div class="field-row phone-two-cols">
-        <div class="field"><label>Abono ($)</label><input type="number" id="fAbono" placeholder="0"></div>
+        <div class="field"><label>Abono ($)</label><input type="number" id="fAbono" placeholder="0" class="input-compacto"></div>
         <div class="field">
           <label>Menú</label>
           <select id="fMenu">
@@ -2300,6 +2300,40 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option>Menú 4</option><option>Menú 5</option>
             <option>Menú Típico</option><option>Carta abierta</option>
           </select>
+        </div>
+      </div>
+
+      <div class="field-check-cover">
+        <label class="checkbox-label"><input type="checkbox" id="fTieneAbonoPactado" onchange="toggleAbonoPactadoFields()"> Este abono es pactado por partes (varios pagos hasta completar un total)</label>
+      </div>
+      <div id="abonoPactadoFieldsBlock" style="display:none;">
+        <div class="field">
+          <label>Valor del abono pactado ($)</label>
+          <input type="number" id="fAbonoPactadoValor" placeholder="0" class="input-compacto" oninput="renderAbonoPactadoResumen()">
+        </div>
+        <div class="field" id="abonoPactadoAbonosBlock">
+          <label>Abonos registrados <span class="fecha-solicitud-hint">(cada abono necesita su comprobante — es el soporte del pago)</span></label>
+          <div id="abonoPactadoAbonosLista" class="cover-abonos-lista"></div>
+          <div id="abonoPactadoResumen"></div>
+
+          <div id="nuevoAbonoPactadoForm" class="nuevo-abono-cover-form" style="display:none;">
+            <div class="field">
+              <label>Monto abonado ahora ($)</label>
+              <input type="number" id="fNuevoAbonoPactadoMonto" placeholder="0" class="input-compacto">
+            </div>
+            <div class="field">
+              <label>Comprobante de este abono</label>
+              <label class="btn-elegir-mesa phone-mesa-btn" id="labelNuevoAbonoPactadoComprobante" for="fNuevoAbonoPactadoComprobante" style="display:block; text-align:center; cursor:pointer;">📎 Subir comprobante</label>
+              <input type="file" id="fNuevoAbonoPactadoComprobante" accept="image/*" style="display:none;" onchange="previsualizarNuevoAbonoPactadoComprobante(this)">
+              <img id="previewNuevoAbonoPactadoComprobante" style="display:none; max-width:100%; border-radius:8px; margin-top:6px;">
+            </div>
+            <div class="nuevo-abono-cover-botones">
+              <button type="button" class="btn btn-ghost" onclick="cancelarAgregarAbonoPactado()">Cancelar</button>
+              <button type="button" class="btn btn-primary" onclick="confirmarAgregarAbonoPactado()">Agregar abono</button>
+            </div>
+          </div>
+
+          <button type="button" class="btn-elegir-mesa phone-mesa-btn" id="btnMostrarNuevoAbonoPactado" style="display:block; text-align:center; cursor:pointer; margin-top:8px;" onclick="mostrarFormNuevoAbonoPactado()">💰 Agregar abono</button>
         </div>
       </div>
 
@@ -3536,6 +3570,23 @@ function toggleCoverFields(){
 // en vivo mientras se escribe cualquiera de los dos campos.
 // Cuánto falta por pagar del cover de una reserva — usado en las tarjetas
 // para que se vea de un vistazo sin tener que abrir la reserva.
+// Cuánto falta por pagar de un abono PACTADO por partes — igual que
+// pendienteCover pero para el abono de consumo. Si la reserva no usa el
+// modo pactado (la mayoría, con el campo simple de siempre), no aplica.
+function pendienteAbonoPactado(r){
+  if(!r || !(Number(r.abonoPactado) > 0)) return 0;
+  const abonado = Array.isArray(r.abonoAbonos) ? r.abonoAbonos.reduce((s,a) => s + Number(a.monto||0), 0) : 0;
+  return Number(r.abonoPactado) - abonado;
+}
+function textoAbonoBadge(r){
+  if(!(Number(r.abono) > 0)) return '';
+  if(Number(r.abonoPactado) > 0){
+    const pendiente = pendienteAbonoPactado(r);
+    const sufijo = pendiente > 0 ? ` de $${Number(r.abonoPactado).toLocaleString('es-CO')} — pendiente $${pendiente.toLocaleString('es-CO')}` : ' (completo)';
+    return `<span>Abono $${Number(r.abono).toLocaleString('es-CO')}${sufijo}</span>`;
+  }
+  return `<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`;
+}
 function pendienteCover(r){
   if(!r || !(Number(r.coverValor) > 0)) return 0;
   const abonado = Array.isArray(r.coverAbonos) ? r.coverAbonos.reduce((s,a) => s + Number(a.monto||0), 0) : 0;
@@ -3670,6 +3721,128 @@ function quitarAbonoCover(indice){
   if(!confirm('¿Quitar este abono del cover (y su comprobante)? Por si se registró por error.')) return;
   coverAbonosTemp.splice(indice, 1);
   renderCoverAbonos();
+}
+
+// ===== Abono pactado por mesa (consumo) — mismo sistema que el cover,
+// pero SEPARADO: su propia lista de abonos parciales, su propio
+// comprobante por cada uno, y su propio valor pactado (que no se
+// multiplica por pax, es un monto fijo que se acuerda con el cliente).
+// r.abono (el campo de siempre, usado en reportes, tarjetas y el mensaje
+// de WhatsApp) se sigue llenando automáticamente con la suma de estos
+// abonos — así todo lo que ya existía sigue funcionando igual, sin haber
+// tenido que tocar reportes ni nada más.
+let abonoPactadoAbonosTemp = [];
+let nuevoAbonoPactadoComprobanteTemp = null;
+function toggleAbonoPactadoFields(){
+  const marcado = document.getElementById('fTieneAbonoPactado').checked;
+  document.getElementById('abonoPactadoFieldsBlock').style.display = marcado ? 'block' : 'none';
+  if(marcado) renderAbonoPactadoResumen();
+}
+function renderAbonoPactadoResumen(){
+  const lista = document.getElementById('abonoPactadoAbonosLista');
+  const resumen = document.getElementById('abonoPactadoResumen');
+  if(!lista || !resumen) return;
+  if(abonoPactadoAbonosTemp.length === 0){
+    lista.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Todavía no se ha registrado ningún abono.</div>';
+  } else {
+    lista.innerHTML = abonoPactadoAbonosTemp.map((a, i) => `
+      <div class="cover-abono-item">
+        <span>${new Date(a.fecha).toLocaleDateString('es-CO')} — $${Number(a.monto).toLocaleString('es-CO')}</span>
+        <div class="cover-abono-item-acciones">
+          ${a.comprobante ? `<button type="button" class="cover-abono-ver" onclick="verComprobanteAbonoPactado(${i})" title="Ver comprobante">🧾</button>` : ''}
+          <button type="button" class="cover-abono-quitar" onclick="quitarAbonoPactado(${i})" title="Quitar este abono">✕</button>
+        </div>
+      </div>`).join('');
+  }
+  const totalPactado = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
+  const totalAbonado = abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
+  const pendiente = totalPactado - totalAbonado;
+  resumen.classList.remove('pendiente','completo');
+  if(totalPactado <= 0){
+    resumen.textContent = '';
+  } else if(pendiente <= 0){
+    resumen.textContent = `✓ Abono pagado completo — $${totalAbonado.toLocaleString('es-CO')} de $${totalPactado.toLocaleString('es-CO')}` + (pendiente < 0 ? ` (pagó $${Math.abs(pendiente).toLocaleString('es-CO')} de más)` : '');
+    resumen.classList.add('completo');
+  } else {
+    resumen.textContent = `Abonado: $${totalAbonado.toLocaleString('es-CO')} — Pendiente: $${pendiente.toLocaleString('es-CO')} de $${totalPactado.toLocaleString('es-CO')}`;
+    resumen.classList.add('pendiente');
+  }
+}
+function mostrarFormNuevoAbonoPactado(){
+  const totalPactado = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
+  if(totalPactado <= 0){ alert('Primero escribe el valor del abono pactado.'); return; }
+  nuevoAbonoPactadoComprobanteTemp = null;
+  document.getElementById('fNuevoAbonoPactadoMonto').value = '';
+  document.getElementById('fNuevoAbonoPactadoComprobante').value = '';
+  document.getElementById('previewNuevoAbonoPactadoComprobante').style.display = 'none';
+  document.getElementById('previewNuevoAbonoPactadoComprobante').src = '';
+  document.getElementById('labelNuevoAbonoPactadoComprobante').textContent = '📎 Subir comprobante';
+  document.getElementById('nuevoAbonoPactadoForm').style.display = 'flex';
+  document.getElementById('btnMostrarNuevoAbonoPactado').style.display = 'none';
+}
+function cancelarAgregarAbonoPactado(){
+  document.getElementById('nuevoAbonoPactadoForm').style.display = 'none';
+  document.getElementById('btnMostrarNuevoAbonoPactado').style.display = 'block';
+}
+function previsualizarNuevoAbonoPactadoComprobante(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 700;
+      const escala = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      let calidad = 0.72;
+      let resultado = canvas.toDataURL('image/jpeg', calidad);
+      while(resultado.length > 700000 && calidad > 0.2){
+        calidad -= 0.12;
+        resultado = canvas.toDataURL('image/jpeg', calidad);
+      }
+      nuevoAbonoPactadoComprobanteTemp = resultado;
+      const preview = document.getElementById('previewNuevoAbonoPactadoComprobante');
+      preview.src = resultado;
+      preview.style.display = 'block';
+      document.getElementById('labelNuevoAbonoPactadoComprobante').textContent = '📎 Cambiar comprobante';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function confirmarAgregarAbonoPactado(){
+  const monto = Number(document.getElementById('fNuevoAbonoPactadoMonto').value) || 0;
+  if(monto <= 0){ alert('Escribe cuánto abonó, un valor mayor a 0.'); return; }
+  if(!nuevoAbonoPactadoComprobanteTemp){ alert('Falta subir el comprobante de este abono — es obligatorio, es el soporte del pago.'); return; }
+  abonoPactadoAbonosTemp.push({ monto, fecha: new Date().toISOString(), comprobante: nuevoAbonoPactadoComprobanteTemp });
+  cancelarAgregarAbonoPactado();
+  renderAbonoPactadoResumen();
+}
+function verComprobanteAbonoPactado(indice){
+  const item = abonoPactadoAbonosTemp[indice];
+  if(!item || !item.comprobante) return;
+  document.getElementById('comprobanteViewerImg').src = item.comprobante;
+  document.getElementById('comprobanteViewerOverlay').classList.add('open');
+}
+function quitarAbonoPactado(indice){
+  if(!confirm('¿Quitar este abono (y su comprobante)? Por si se registró por error.')) return;
+  abonoPactadoAbonosTemp.splice(indice, 1);
+  renderAbonoPactadoResumen();
+}
+// El campo de siempre (abono) sigue siendo "cuánto se ha abonado en
+// total" — si el abono es pactado por partes, se calcula solo como la
+// suma de esos abonos; si no, es el número que se escribió directo en el
+// campo simple. Así todos los reportes, tarjetas y el mensaje de
+// WhatsApp que ya usan r.abono siguen funcionando exactamente igual.
+function valorAbonoParaGuardar(){
+  if(document.getElementById('fTieneAbonoPactado').checked){
+    return abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
+  }
+  return Number(document.getElementById('fAbono').value)||0;
 }
 function previsualizarComprobanteCover(input){
   const file = input.files[0];
@@ -6264,7 +6437,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
       ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
       ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
-      ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
+      ${textoAbonoBadge(r)}
       ${textoCoverBadge(r)}
       ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
       ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
@@ -8046,6 +8219,15 @@ function abrirModal(id, mesaId){
     actualizarBotonMesa();
     document.getElementById('fCanal').value = r.canal;
     document.getElementById('fAbono').value = r.abono;
+    // Abono pactado por partes — si esta reserva ya tenía un valor
+    // pactado o abonos parciales guardados, se abre en modo "pactado"
+    // (checkbox marcado); si no, se queda en el campo simple de siempre.
+    const tienePactado = Number(r.abonoPactado) > 0 || (Array.isArray(r.abonoAbonos) && r.abonoAbonos.length > 0);
+    document.getElementById('fTieneAbonoPactado').checked = tienePactado;
+    document.getElementById('fAbonoPactadoValor').value = r.abonoPactado || '';
+    abonoPactadoAbonosTemp = Array.isArray(r.abonoAbonos) ? [...r.abonoAbonos] : [];
+    cancelarAgregarAbonoPactado();
+    toggleAbonoPactadoFields();
     document.getElementById('fMenu').value = r.menu;
     document.getElementById('fObs').value = r.obs;
     estadoSeleccionado = r.estado;
@@ -8158,6 +8340,11 @@ function abrirModal(id, mesaId){
     actualizarBotonMesa();
     document.getElementById('fCanal').value = 'Teléfono';
     document.getElementById('fAbono').value = '';
+    document.getElementById('fTieneAbonoPactado').checked = false;
+    document.getElementById('fAbonoPactadoValor').value = '';
+    abonoPactadoAbonosTemp = [];
+    cancelarAgregarAbonoPactado();
+    toggleAbonoPactadoFields();
     coverComprobanteBase64Temp = null;
     document.getElementById('fTieneCover').checked = false;
     document.getElementById('fCoverValor').value = '';
@@ -8634,7 +8821,9 @@ function guardarReserva(){
     cumpleanos: document.getElementById('fCumpleanos').value,
     mesa: document.getElementById('fMesa').value,
     canal: document.getElementById('fCanal').value,
-    abono: Number(document.getElementById('fAbono').value)||0,
+    abono: valorAbonoParaGuardar(),
+    abonoPactado: document.getElementById('fTieneAbonoPactado').checked ? (Number(document.getElementById('fAbonoPactadoValor').value)||0) : 0,
+    abonoAbonos: document.getElementById('fTieneAbonoPactado').checked ? abonoPactadoAbonosTemp : [],
     menu: document.getElementById('fMenu').value,
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
@@ -8803,7 +8992,9 @@ function enviarParaAprobacion(){
     celular,
     mesa,
     canal: document.getElementById('fCanal').value,
-    abono: Number(document.getElementById('fAbono').value)||0,
+    abono: valorAbonoParaGuardar(),
+    abonoPactado: document.getElementById('fTieneAbonoPactado').checked ? (Number(document.getElementById('fAbonoPactadoValor').value)||0) : 0,
+    abonoAbonos: document.getElementById('fTieneAbonoPactado').checked ? abonoPactadoAbonosTemp : [],
     menu: document.getElementById('fMenu').value,
     obs: document.getElementById('fObs').value.trim(),
     estado: 'pendiente_aprobacion',
