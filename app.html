@@ -2069,7 +2069,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.17</div>
+<div class="version-tag">v5.18</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6453,11 +6453,10 @@ function tarjetaReservaHTML(r, mostrarFecha){
     ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
     <div class="res-top">
       <div>
-        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
+        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}</div>
         <div class="res-nombre">${escapeHtml(r.nombre)}</div>
       </div>
       <div class="res-top-right">
-        ${(mostrarFecha || turnoActivo==='todos')?`<span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}
         <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
         <span class="edit-hint">✎ Editar / Eliminar</span>
       </div>
@@ -7842,6 +7841,18 @@ function formatearFechaCorta(iso){
   return `${DIAS[fecha.getDay()]} ${d} de ${MESES[m-1]}`;
 }
 
+// La hora de la reserva se guarda en 24h (ej. "21:00") porque así es más
+// fácil de comparar/ordenar en el código, pero para MOSTRARLA en las
+// tarjetas es más fácil de leer en formato 12h con AM/PM.
+function formatearHora12(hora24){
+  if(!hora24) return '';
+  const [h,m] = String(hora24).split(':').map(Number);
+  if(!isFinite(h)) return escapeHtml(hora24);
+  const ampm = h>=12 ? 'PM' : 'AM';
+  const h12 = (h%12)||12;
+  return `${h12}:${String(isFinite(m)?m:0).padStart(2,'0')} ${ampm}`;
+}
+
 // Convierte el timestamp ISO guardado en horaSolicitud a algo legible tipo
 // "2:46 pm" — para saber a qué hora exacta llegó esa solicitud, no solo
 // qué día. Si el registro es viejo y no tiene este campo (creado antes de
@@ -8053,7 +8064,7 @@ function renderSolicitudesScreen(){
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
-          <div class="sc-hora">${escapeHtml(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${escapeHtml(r.horaSalida)}</span>`:''}</div>
+          <div class="sc-hora">${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}</div>
           <div class="sc-nombre">${escapeHtml(r.nombre)}</div>
         </div>
         <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
