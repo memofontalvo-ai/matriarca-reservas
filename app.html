@@ -444,6 +444,17 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .toast-cerrar:active{background:rgba(255,255,255,0.16);}
 
 .input-compacto{max-width:150px;}
+/* ===== SEGURO DE FECHA Y HORA (reservas ya agendadas) ===== */
+.hora-fecha-lock-banner{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  background:rgba(230,180,90,0.12); border:1px solid var(--gold); border-radius:10px;
+  padding:9px 12px; margin-bottom:10px; font-size:12.5px; font-weight:700; color:var(--gold-bright);
+}
+.hora-fecha-lock-banner button{
+  margin-left:auto; background:var(--gold); color:#1a1408; border:none;
+  border-radius:8px; padding:6px 12px; font-size:12px; font-weight:700;
+}
+.bloqueado-visual{opacity:0.45; pointer-events:none; filter:grayscale(0.3);}
 /* ===== ABONOS DEL COVER (pagos parciales, uno o varios) ===== */
 .cover-abonos-lista{display:flex; flex-direction:column; gap:6px; margin-top:6px;}
 .cover-abono-item{
@@ -2044,7 +2055,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.11</div>
+<div class="version-tag">v5.12</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2147,6 +2158,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <div id="eventoFechaFijaResumenTexto" style="font-size:14px; font-weight:700;"></div>
       </div>
       <div class="field phone-date-section" id="fechaReservaEditBlock" style="display:none;">
+        <div id="horaFechaLockBanner" class="hora-fecha-lock-banner" style="display:none;">
+          🔒 <span>Fecha y hora bloqueadas</span>
+          <button type="button" onclick="desbloquearHoraFecha()">Editar fecha y hora</button>
+        </div>
         <div class="phone-section-title">▣ <span>Fecha y turno de la reserva</span></div>
         <div class="phone-date-carousel" id="phoneDateCarousel">
           <button type="button" class="phone-date-card phone-calendar-card" id="phoneOpenCalendar" aria-label="Ver calendario completo">
@@ -9216,6 +9231,11 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   let calCursor = new Date();
   let initializingWheels = false;
   let timeHadOriginalValue = false;
+  // "Seguro" de fecha y hora: una vez que una reserva YA tiene fecha y
+  // hora guardadas, se abren bloqueadas (nadie puede moverlas por
+  // accidente al entrar a gestionar la mesa, el abono, etc.) — hay que
+  // tocar "Editar fecha y hora" a propósito para poder cambiarlas.
+  let horaFechaBloqueada = false;
 
   function parseISO(s){
     const p=(s||'').split('-').map(Number);
@@ -9223,7 +9243,24 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   }
   function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function same(a,b){return iso(a)===iso(b);}
-  function isReadOnly(){const ov=document.getElementById('overlay'); return ov.classList.contains('modal-solo-lectura') || ov.classList.contains('modal-reserva-vencida');}
+  function isReadOnly(){const ov=document.getElementById('overlay'); return ov.classList.contains('modal-solo-lectura') || ov.classList.contains('modal-reserva-vencida') || horaFechaBloqueada;}
+  function bloquearHoraFecha(){
+    horaFechaBloqueada = true;
+    const banner = document.getElementById('horaFechaLockBanner');
+    if(banner) banner.style.display = 'flex';
+    document.getElementById('phoneDateCarousel')?.classList.add('bloqueado-visual');
+    document.getElementById('phoneTurnButtons')?.classList.add('bloqueado-visual');
+    document.getElementById('horaWheelBlock')?.classList.add('bloqueado-visual');
+  }
+  function desbloquearHoraFecha(){
+    horaFechaBloqueada = false;
+    const banner = document.getElementById('horaFechaLockBanner');
+    if(banner) banner.style.display = 'none';
+    document.getElementById('phoneDateCarousel')?.classList.remove('bloqueado-visual');
+    document.getElementById('phoneTurnButtons')?.classList.remove('bloqueado-visual');
+    document.getElementById('horaWheelBlock')?.classList.remove('bloqueado-visual');
+  }
+  window.desbloquearHoraFecha = desbloquearHoraFecha;
 
   function setDateValue(value){
     if(isReadOnly()) return;
@@ -9265,7 +9302,12 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   }));
 
   function syncHiddenTime(){
-    if(initializingWheels && !timeHadOriginalValue) return;
+    // Mientras las 3 ruedas (hora/minutos/AM-PM) se están posicionando en
+    // su valor inicial, NUNCA se escribe de vuelta en #fHora — no hace
+    // falta (el valor que se está leyendo YA es el que está guardado) y
+    // evita que una rueda que termine de posicionarse antes que las otras
+    // dos alcance a guardar una combinación a medio armar por accidente.
+    if(initializingWheels) return;
     const h12=Number(wheelState.hour)||12, min=Number(wheelState.minute)||0;
     let h24=h12%12; if(wheelState.ampm==='PM') h24+=12;
     document.getElementById('fHora').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
@@ -9384,7 +9426,15 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       if(resto) resto.style.display = 'block';
       if(btnConfHora) btnConfHora.style.display = 'none';
       if(avisoConfHora) avisoConfHora.style.display = 'none';
+      // Seguro: si esta reserva YA tenía fecha y hora guardadas, se abre
+      // bloqueada — así entrar a asignar mesa, registrar un abono, etc.
+      // nunca puede mover la hora por accidente. Si falta fecha u hora
+      // (una solicitud a medio llenar, por ejemplo), se deja abierta.
+      const yaTeniaFecha = !!document.getElementById('fFechaReservaEdit').value;
+      const yaTeniaHora = !!document.getElementById('fHora').value;
+      if(yaTeniaFecha && yaTeniaHora) bloquearHoraFecha(); else desbloquearHoraFecha();
     } else {
+      desbloquearHoraFecha();
       // Sincroniza el turno de arriba con la hora que haya quedado
       // seleccionada en la rueda, por si el modal arrancó con un turno
       // que ya no coincide con la hora (por ejemplo, quedó en "Cena" de
