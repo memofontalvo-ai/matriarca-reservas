@@ -2016,7 +2016,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.06</div>
+<div class="version-tag">v5.07</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -8766,7 +8766,7 @@ function descargarBackup(){
     db.collection('configuracion').doc('contadorReservas').get(),
     db.collection('configuracion').doc('planoMesas').get(),
     db.collection('configuracion').doc('horarios').get(),
-  ]).then(([reservasSnap, mensajesDoc, carruselDoc, contadorDoc, planoDoc, horariosDoc]) => {
+  ]).then(async ([reservasSnap, mensajesDoc, carruselDoc, contadorDoc, planoDoc, horariosDoc]) => {
     const ahora = new Date();
     const fechaLegible = `${DIAS[ahora.getDay()]} ${ahora.getDate()} de ${MESES[ahora.getMonth()]} de ${ahora.getFullYear()}, ${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}`;
     const backup = {
@@ -8783,13 +8783,45 @@ function descargarBackup(){
         horarios: horariosDoc.exists ? horariosDoc.data() : null,
       }
     };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
     const nombreArchivo = `backup-la-matriarca-${fechaISO(ahora)}-${String(ahora.getHours()).padStart(2,'0')}${String(ahora.getMinutes()).padStart(2,'0')}.json`;
-    const a = document.createElement('a');
-    a.href = url; a.download = nombreArchivo;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const contenidoJSON = JSON.stringify(backup, null, 2);
+    const blob = new Blob([contenidoJSON], {type:'application/json'});
+
+    // En iOS/Safari (y en el navegador integrado de WhatsApp), el truco
+    // clásico de <a download> con un blob NO guarda el archivo de verdad
+    // — el navegador actúa como si descargara pero nada llega a
+    // Archivos. Por eso primero se intenta con el panel nativo de
+    // "Compartir" del teléfono (Web Share API con un archivo real), que
+    // sí incluye la opción "Guardar en Archivos". Si el navegador no
+    // soporta compartir archivos (la mayoría de computadores), se cae
+    // al método anterior, que en computador sí funciona bien.
+    let compartidoConExito = false;
+    try{
+      const archivo = new File([blob], nombreArchivo, {type:'application/json'});
+      if(navigator.canShare && navigator.canShare({files:[archivo]})){
+        await navigator.share({files:[archivo], title: nombreArchivo});
+        compartidoConExito = true;
+      }
+    } catch(errShare){
+      // Si la persona cierra el panel de compartir sin elegir nada,
+      // el navegador reporta esto como un error (AbortError) — no es
+      // un fallo real, así que no mostramos alerta ni probamos el
+      // método de respaldo, simplemente no hacemos nada más.
+      if(errShare && errShare.name === 'AbortError'){
+        if(btn){ btn.disabled = false; btn.textContent = '⬇️ Descargar backup ahora'; }
+        return;
+      }
+      console.error('No se pudo compartir el backup, se prueba el método de respaldo:', errShare);
+    }
+
+    if(!compartidoConExito){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = nombreArchivo;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+
     if(estadoEl) estadoEl.textContent = `✓ Backup generado: ${fechaLegible} — ${backup.reservas.length} reservas incluidas.`;
   }).catch(err => {
     console.error('Error generando backup:', err);
