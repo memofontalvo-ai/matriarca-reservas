@@ -375,6 +375,20 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .res-meta{font-size:11.5px; color:var(--text-muted); margin-top:4px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; max-width:100%;}
 .res-meta span{overflow-wrap:anywhere; max-width:100%;}
 .tel-destacado{font-size:15px !important; font-weight:800; color:#ffffff !important; letter-spacing:.3px;}
+.contacto-icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; border-radius:50%; font-size:16px;
+  text-decoration:none; flex-shrink:0; background:var(--panel-raised);
+  border:1px solid var(--border);
+}
+.contacto-icon-btn:active{transform:scale(0.92);}
+.contacto-icon-btn.contacto-llamar{border-color:#4a9eff;}
+.contacto-icon-btn.contacto-whatsapp{border-color:#25d366;}
+.contacto-icon-btn.contacto-email{border-color:#e8a33d;}
+.contacto-row{
+  display:flex; gap:20px; margin-top:10px; padding-top:10px;
+  border-top:1px dashed rgba(255,255,255,0.14);
+}
 /* Fila fija de "identificación" (código, hora de solicitud, iniciales de
    quien la tomó): siempre abajo del todo y pegada a la derecha, separada
    de los demás datos — así la tarjeta se ve ordenada sin importar cuántos
@@ -2055,7 +2069,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.14</div>
+<div class="version-tag">v5.17</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -3058,6 +3072,23 @@ function abrirWhatsappForzado(url, ev){
   if(!url || url === '#') return false;
   window.open(url, '_blank_wa_' + Date.now());
   return false;
+}
+
+// Botones de contacto directo en cada tarjeta de reserva/solicitud —
+// llamar, WhatsApp y correo — para que el staff nunca tenga que copiar
+// el número o el correo a mano: toca el ícono y el celular ya abre el
+// marcador, WhatsApp o el correo listos para escribirle a ESE cliente.
+function botonesContactoHTML(r){
+  const digitos = r.celular ? digitosWhatsapp(r.celular) : null;
+  let html = '';
+  if(digitos){
+    html += `<a class="contacto-icon-btn contacto-llamar" href="tel:${digitos}" onclick='event.stopPropagation();' title="Llamar a ${escapeHtml(r.celular)}">📞</a>`;
+    html += `<a class="contacto-icon-btn contacto-whatsapp" href="https://wa.me/${digitos}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' title="Escribir por WhatsApp">💬</a>`;
+  }
+  if(r.correo){
+    html += `<a class="contacto-icon-btn contacto-email" href="mailto:${escapeHtml(r.correo)}" onclick='event.stopPropagation();' title="Enviar correo a ${escapeHtml(r.correo)}">✉️</a>`;
+  }
+  return html;
 }
 
 function emailInternoDesdeUsuario(usuario){
@@ -6434,7 +6465,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     <div class="res-meta">
       <span>${r.pax} pax</span>
       ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
-      ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
+      ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${textoAbonoBadge(r)}
       ${textoCoverBadge(r)}
@@ -6453,6 +6484,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     ${r.estado==='solicitud'?`<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
     ${r.estado==='pendiente_aprobacion'?`<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`:''}
     ${r.estado==='lista_espera'?`<div class="solicitud-hint">🕒 En lista de espera — avísale si se libera cupo${r.obs?': '+escapeHtml(r.obs):''}</div>`:''}
+    ${(r.celular || r.correo) ? `<div class="contacto-row">${botonesContactoHTML(r)}</div>` : ''}
   </div>`;
 }
 
@@ -8004,7 +8036,7 @@ function renderSolicitudesScreen(){
           <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
         </div>
         <div class="sc-meta">
-          ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
+          ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
         </div>
         ${(r.codigoReserva || formatearHoraSolicitud(r.horaSolicitud)) ? `
         <div class="sc-firma">
@@ -8012,6 +8044,7 @@ function renderSolicitudesScreen(){
           ${formatearHoraSolicitud(r.horaSolicitud)?`<span title="Hora en que llegó la solicitud">🕒 ${formatearHoraSolicitud(r.horaSolicitud)}</span>`:''}
         </div>` : ''}
         ${hint}
+        ${(r.celular || r.correo) ? `<div class="contacto-row">${botonesContactoHTML(r)}</div>` : ''}
       </div>`;
     }
     return `
@@ -8028,7 +8061,7 @@ function renderSolicitudesScreen(){
       <div class="sc-meta">
         <span>${r.pax} pax</span>
         ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
-        ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
+        ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.listaEspera?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🕒 Lista de espera</span>`:''}
@@ -8046,6 +8079,7 @@ function renderSolicitudesScreen(){
       </div>` : ''}
       ${r.obs?`<div class="sc-obs">${escapeHtml(r.obs)}</div>`:''}
       ${hint}
+      ${(r.celular || r.correo) ? `<div class="contacto-row">${botonesContactoHTML(r)}</div>` : ''}
     </div>`;
   }).join('');
 
