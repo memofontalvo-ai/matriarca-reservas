@@ -443,6 +443,34 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 }
 .toast-cerrar:active{background:rgba(255,255,255,0.16);}
 
+.input-compacto{max-width:150px;}
+/* ===== ABONOS DEL COVER (pagos parciales, uno o varios) ===== */
+.cover-abonos-lista{display:flex; flex-direction:column; gap:6px; margin-top:6px;}
+.cover-abono-item{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:8px;
+  padding:7px 10px; font-size:12.5px;
+}
+.cover-abono-item-acciones{display:flex; align-items:center; gap:4px; flex-shrink:0;}
+.cover-abono-ver, .cover-abono-quitar{
+  background:none; border:none; font-size:13px;
+  width:24px; height:24px; border-radius:50%; flex-shrink:0;
+}
+.cover-abono-ver{color:var(--gold-bright);}
+.cover-abono-ver:active{background:rgba(214,170,85,0.15);}
+.cover-abono-quitar{color:var(--cancelled);}
+.cover-abono-quitar:active{background:rgba(229,99,106,0.15);}
+#coverAbonosResumen{font-size:12.5px; font-weight:700; margin-top:8px;}
+#coverAbonosResumen.pendiente{color:#e8a33d;}
+#coverAbonosResumen.completo{color:var(--confirmed);}
+.nuevo-abono-cover-form{
+  margin-top:10px; background:var(--panel); border:1px solid var(--border);
+  border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:10px;
+}
+.nuevo-abono-cover-form .field{margin:0;}
+.nuevo-abono-cover-botones{display:flex; gap:8px;}
+.nuevo-abono-cover-botones .btn{flex:1; padding:9px; font-size:13px;}
+
 /* ===== FILA DE ESTADO (conexión + presencia) ===== */
 /* Antes "Conectado a la base de datos" y "En línea ahora" eran dos franjas
    completas apiladas, cada una ocupando el ancho entero — se veían como dos
@@ -2016,7 +2044,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.09</div>
+<div class="version-tag">v5.11</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2266,14 +2294,36 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div id="coverFieldsBlock" style="display:none;">
         <div class="field">
           <label>Valor del cover por persona ($)</label>
-          <input type="number" id="fCoverValor" placeholder="0" oninput="actualizarTotalCover()">
+          <input type="number" id="fCoverValor" placeholder="0" class="input-compacto" oninput="actualizarTotalCover()">
           <div id="coverTotalDisplay" style="font-size:12.5px; color:var(--text-dim); margin-top:4px;"></div>
         </div>
-        <div class="field">
-          <label>Comprobante de pago del cover</label>
-          <label class="btn-elegir-mesa phone-mesa-btn" id="fCoverComprobanteLabel" for="fCoverComprobanteInput" style="display:block; text-align:center; cursor:pointer;">📎 Subir comprobante del cover</label>
-          <input type="file" id="fCoverComprobanteInput" accept="image/*" style="display:none;" onchange="previsualizarComprobanteCover(this)">
-          <img id="fCoverComprobantePreview" style="display:none; max-width:100%; border-radius:8px; margin-top:8px;">
+        <div class="field" id="coverAbonosBlock">
+          <label>Abonos del cover <span class="fecha-solicitud-hint">(cada abono necesita su comprobante — es el soporte del pago)</span></label>
+          <div id="coverAbonosLista" class="cover-abonos-lista"></div>
+          <div id="coverAbonosResumen"></div>
+
+          <div id="nuevoAbonoCoverForm" class="nuevo-abono-cover-form" style="display:none;">
+            <div class="field">
+              <label>Monto abonado ahora ($)</label>
+              <input type="number" id="fNuevoAbonoCoverMonto" placeholder="0" class="input-compacto">
+            </div>
+            <div class="field">
+              <label>Comprobante de este abono</label>
+              <label class="btn-elegir-mesa phone-mesa-btn" id="labelNuevoAbonoCoverComprobante" for="fNuevoAbonoCoverComprobante" style="display:block; text-align:center; cursor:pointer;">📎 Subir comprobante</label>
+              <input type="file" id="fNuevoAbonoCoverComprobante" accept="image/*" style="display:none;" onchange="previsualizarNuevoAbonoCoverComprobante(this)">
+              <img id="previewNuevoAbonoCoverComprobante" style="display:none; max-width:100%; border-radius:8px; margin-top:6px;">
+            </div>
+            <div class="nuevo-abono-cover-botones">
+              <button type="button" class="btn btn-ghost" onclick="cancelarAgregarAbonoCover()">Cancelar</button>
+              <button type="button" class="btn btn-primary" onclick="confirmarAgregarAbonoCover()">Agregar abono</button>
+            </div>
+          </div>
+
+          <button type="button" class="btn-elegir-mesa phone-mesa-btn" id="btnMostrarNuevoAbonoCover" style="display:block; text-align:center; cursor:pointer; margin-top:8px;" onclick="mostrarFormNuevoAbonoCover()">💰 Agregar abono al cover</button>
+        </div>
+        <div class="field" id="coverComprobanteLegacyBlock" style="display:none;">
+          <label>Comprobante antiguo del cover <span class="fecha-solicitud-hint">(de antes de que cada abono llevara el suyo — ábrelo para revisarlo, ya no se puede reemplazar aquí)</span></label>
+          <button type="button" class="btn-elegir-mesa phone-mesa-btn" id="btnVerComprobanteCoverLegacy" style="display:block; text-align:center; cursor:pointer;">🧾 Ver comprobante</button>
         </div>
       </div>
 
@@ -3454,6 +3504,12 @@ function elegirTurnoEvento(t){
 // ancho máximo de 1000px en JPEG de calidad media, para no pasarse del
 // límite de 1MB por documento en Firestore.
 let coverComprobanteBase64Temp = null;
+// Abonos del cover: se van acumulando mientras la reserva está abierta en
+// el modal (uno o varios, cada vez que el cliente paga una parte) y se
+// guardan junto con el resto de la reserva al tocar "Guardar reserva" —
+// igual que el comprobante, no se escriben solos en Firestore antes de
+// eso. Al reabrir una reserva ya guardada, se cargan los que ya tenía.
+let coverAbonosTemp = [];
 function toggleCoverFields(){
   const marcado = document.getElementById('fTieneCover').checked;
   document.getElementById('coverFieldsBlock').style.display = marcado ? 'block' : 'none';
@@ -3463,6 +3519,19 @@ function toggleCoverFields(){
 // total (lo que hay que cobrar/mostrarle al cliente) sale de
 // multiplicarlo por el número de personas de la reserva. Se recalcula
 // en vivo mientras se escribe cualquiera de los dos campos.
+// Cuánto falta por pagar del cover de una reserva — usado en las tarjetas
+// para que se vea de un vistazo sin tener que abrir la reserva.
+function pendienteCover(r){
+  if(!r || !(Number(r.coverValor) > 0)) return 0;
+  const abonado = Array.isArray(r.coverAbonos) ? r.coverAbonos.reduce((s,a) => s + Number(a.monto||0), 0) : 0;
+  return Number(r.coverValor) - abonado;
+}
+function textoCoverBadge(r){
+  if(!(Number(r.coverValor) > 0)) return '';
+  const pendiente = pendienteCover(r);
+  const sufijo = pendiente > 0 ? ` — pendiente $${pendiente.toLocaleString('es-CO')}` : ' — pagado';
+  return `<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}${sufijo}</span>`;
+}
 function actualizarTotalCover(){
   const el = document.getElementById('coverTotalDisplay');
   if(!el) return;
@@ -3470,10 +3539,122 @@ function actualizarTotalCover(){
   const pax = Number(document.getElementById('fPax').value) || 0;
   if(porPersona <= 0 || pax <= 0){
     el.textContent = '';
-    return;
+  } else {
+    const total = porPersona * pax;
+    el.textContent = `Total: $${total.toLocaleString('es-CO')} (${pax} personas × $${porPersona.toLocaleString('es-CO')})`;
   }
-  const total = porPersona * pax;
-  el.textContent = `Total: $${total.toLocaleString('es-CO')} (${pax} personas × $${porPersona.toLocaleString('es-CO')})`;
+  renderCoverAbonos();
+}
+// ===== Abonos del cover (pagos parciales) =====
+// El cover es distinto del abono de consumo: es la entrada de un evento
+// especial, y el cliente a veces la paga de a poquitos ("te abono 100 mil
+// ahora, el resto después"). Esto lleva la cuenta de cada abono por
+// separado (con su fecha) y calcula cuánto ya pagó y cuánto le falta,
+// sin necesidad de escribir todo de nuevo cada vez — solo se agrega el
+// abono nuevo y se suma al total ya registrado.
+function renderCoverAbonos(){
+  const lista = document.getElementById('coverAbonosLista');
+  const resumen = document.getElementById('coverAbonosResumen');
+  if(!lista || !resumen) return;
+  if(coverAbonosTemp.length === 0){
+    lista.innerHTML = '<div style="font-size:12px; color:var(--text-dim);">Todavía no se ha registrado ningún abono del cover.</div>';
+  } else {
+    lista.innerHTML = coverAbonosTemp.map((a, i) => `
+      <div class="cover-abono-item">
+        <span>${new Date(a.fecha).toLocaleDateString('es-CO')} — $${Number(a.monto).toLocaleString('es-CO')}</span>
+        <div class="cover-abono-item-acciones">
+          ${a.comprobante ? `<button type="button" class="cover-abono-ver" onclick="verComprobanteAbonoCover(${i})" title="Ver comprobante">🧾</button>` : ''}
+          <button type="button" class="cover-abono-quitar" onclick="quitarAbonoCover(${i})" title="Quitar este abono">✕</button>
+        </div>
+      </div>`).join('');
+  }
+  const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+  const pax = Number(document.getElementById('fPax').value) || 0;
+  const totalCover = porPersona * pax;
+  const totalAbonado = coverAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
+  const pendiente = totalCover - totalAbonado;
+  resumen.classList.remove('pendiente','completo');
+  if(totalCover <= 0){
+    resumen.textContent = '';
+  } else if(pendiente <= 0){
+    resumen.textContent = `✓ Cover pagado completo — $${totalAbonado.toLocaleString('es-CO')} de $${totalCover.toLocaleString('es-CO')}` + (pendiente < 0 ? ` (pagó $${Math.abs(pendiente).toLocaleString('es-CO')} de más)` : '');
+    resumen.classList.add('completo');
+  } else {
+    resumen.textContent = `Abonado: $${totalAbonado.toLocaleString('es-CO')} — Pendiente: $${pendiente.toLocaleString('es-CO')} de $${totalCover.toLocaleString('es-CO')}`;
+    resumen.classList.add('pendiente');
+  }
+}
+// El comprobante es obligatorio en cada abono del cover — es el soporte
+// del pago, tal como el comprobante de abono de consumo. Por eso se pide
+// en un mini-formulario (monto + foto) en vez de un simple prompt() de
+// texto, que no podría pedir una imagen.
+let nuevoAbonoCoverComprobanteTemp = null;
+function mostrarFormNuevoAbonoCover(){
+  const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+  const pax = Number(document.getElementById('fPax').value) || 0;
+  if(porPersona * pax <= 0){ alert('Primero escribe el valor del cover por persona.'); return; }
+  nuevoAbonoCoverComprobanteTemp = null;
+  document.getElementById('fNuevoAbonoCoverMonto').value = '';
+  document.getElementById('fNuevoAbonoCoverComprobante').value = '';
+  document.getElementById('previewNuevoAbonoCoverComprobante').style.display = 'none';
+  document.getElementById('previewNuevoAbonoCoverComprobante').src = '';
+  document.getElementById('labelNuevoAbonoCoverComprobante').textContent = '📎 Subir comprobante';
+  document.getElementById('nuevoAbonoCoverForm').style.display = 'flex';
+  document.getElementById('btnMostrarNuevoAbonoCover').style.display = 'none';
+}
+function cancelarAgregarAbonoCover(){
+  document.getElementById('nuevoAbonoCoverForm').style.display = 'none';
+  document.getElementById('btnMostrarNuevoAbonoCover').style.display = 'block';
+}
+function previsualizarNuevoAbonoCoverComprobante(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Mismo criterio de compresión que el resto de comprobantes.
+      const maxW = 700;
+      const escala = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * escala);
+      canvas.height = Math.round(img.height * escala);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      let calidad = 0.72;
+      let resultado = canvas.toDataURL('image/jpeg', calidad);
+      while(resultado.length > 700000 && calidad > 0.2){
+        calidad -= 0.12;
+        resultado = canvas.toDataURL('image/jpeg', calidad);
+      }
+      nuevoAbonoCoverComprobanteTemp = resultado;
+      const preview = document.getElementById('previewNuevoAbonoCoverComprobante');
+      preview.src = resultado;
+      preview.style.display = 'block';
+      document.getElementById('labelNuevoAbonoCoverComprobante').textContent = '📎 Cambiar comprobante';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function confirmarAgregarAbonoCover(){
+  const monto = Number(document.getElementById('fNuevoAbonoCoverMonto').value) || 0;
+  if(monto <= 0){ alert('Escribe cuánto abonó, un valor mayor a 0.'); return; }
+  if(!nuevoAbonoCoverComprobanteTemp){ alert('Falta subir el comprobante de este abono — es obligatorio, es el soporte del pago.'); return; }
+  coverAbonosTemp.push({ monto, fecha: new Date().toISOString(), comprobante: nuevoAbonoCoverComprobanteTemp });
+  cancelarAgregarAbonoCover();
+  renderCoverAbonos();
+}
+function verComprobanteAbonoCover(indice){
+  const item = coverAbonosTemp[indice];
+  if(!item || !item.comprobante) return;
+  document.getElementById('comprobanteViewerImg').src = item.comprobante;
+  document.getElementById('comprobanteViewerOverlay').classList.add('open');
+}
+function quitarAbonoCover(indice){
+  if(!confirm('¿Quitar este abono del cover (y su comprobante)? Por si se registró por error.')) return;
+  coverAbonosTemp.splice(indice, 1);
+  renderCoverAbonos();
 }
 function previsualizarComprobanteCover(input){
   const file = input.files[0];
@@ -6069,7 +6250,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
       ${r.celular?`<a class="tel-destacado" href="https://wa.me/${digitosWhatsapp(r.celular)||''}" onclick='event.stopPropagation(); return abrirWhatsappForzado(this.href, event)' style="text-decoration:none;">📞 ${escapeHtml(r.celular)}</a>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${r.abono>0?`<span>Abono $${Number(r.abono).toLocaleString('es-CO')}</span>`:''}
-      ${r.coverValor>0?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}</span>`:''}
+      ${textoCoverBadge(r)}
       ${r.aprobadaPorCliente?`<span class="aprobada-tag">✓ Aprobada por cliente</span>`:''}
       ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
       ${r.comprobanteCover?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)},"cover")'>🎫 Ver comprobante cover</button>`:''}
@@ -7665,7 +7846,7 @@ function renderSolicitudesScreen(){
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
         ${r.listaEspera?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🕒 Lista de espera</span>`:''}
         ${r.comprobanteAbono?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)})'>🧾 Ver comprobante</button>`:''}
-        ${r.coverValor>0?`<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}</span>`:''}
+        ${textoCoverBadge(r)}
         ${r.comprobanteCover?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verComprobante(${JSON.stringify(r.id)},"cover")'>🎫 Ver comprobante cover</button>`:''}
         ${r.mesa?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verMesasDeReserva(${JSON.stringify(r.id)})'>🪑 Ver mesas</button>`:''}
         ${r.obs?`<button class="btn-ver-comprobante" onclick='event.stopPropagation(); verObservacionesDeReserva(${JSON.stringify(r.id)})'>📝 Ver observaciones</button>`:''}
@@ -7902,18 +8083,19 @@ function abrirModal(id, mesaId){
       ? r.coverValorPersona
       : (Number(r.coverValor) > 0 && Number(r.pax) > 0 ? Math.round(Number(r.coverValor) / Number(r.pax)) : '');
     document.getElementById('fCoverValor').value = coverPersonaGuardado || '';
+    coverAbonosTemp = Array.isArray(r.coverAbonos) ? [...r.coverAbonos] : [];
+    cancelarAgregarAbonoCover();
     toggleCoverFields();
-    document.getElementById('fCoverComprobanteInput').value = '';
-    const coverPreview = document.getElementById('fCoverComprobantePreview');
-    const coverLabel = document.getElementById('fCoverComprobanteLabel');
-    if(r.comprobanteCover){
-      coverPreview.src = r.comprobanteCover;
-      coverPreview.style.display = 'block';
-      coverLabel.textContent = '📎 Cambiar comprobante del cover';
+    // Comprobante ÚNICO del cover, de antes de que existieran los abonos
+    // por partes — ya no se puede reemplazar desde acá (cada abono nuevo
+    // lleva el suyo propio), solo se deja verlo si la reserva es de esa
+    // época y todavía no tiene ningún abono registrado en el formato nuevo.
+    const legacyBlock = document.getElementById('coverComprobanteLegacyBlock');
+    if(r.comprobanteCover && coverAbonosTemp.length === 0){
+      legacyBlock.style.display = 'block';
+      document.getElementById('btnVerComprobanteCoverLegacy').onclick = () => verComprobante(r.id, 'cover');
     } else {
-      coverPreview.style.display = 'none';
-      coverPreview.src = '';
-      coverLabel.textContent = '📎 Subir comprobante del cover';
+      legacyBlock.style.display = 'none';
     }
    } catch(errAbrirModal){
     // Si algo falla llenando el formulario, que se vea CLARO en pantalla
@@ -7964,10 +8146,9 @@ function abrirModal(id, mesaId){
     coverComprobanteBase64Temp = null;
     document.getElementById('fTieneCover').checked = false;
     document.getElementById('fCoverValor').value = '';
-    document.getElementById('fCoverComprobanteInput').value = '';
-    document.getElementById('fCoverComprobantePreview').style.display = 'none';
-    document.getElementById('fCoverComprobantePreview').src = '';
-    document.getElementById('fCoverComprobanteLabel').textContent = '📎 Subir comprobante del cover';
+    coverAbonosTemp = [];
+    cancelarAgregarAbonoCover();
+    document.getElementById('coverComprobanteLegacyBlock').style.display = 'none';
     toggleCoverFields();
     document.getElementById('fMenu').value = '';
     document.getElementById('fObs').value = '';
@@ -8447,6 +8628,9 @@ function guardarReserva(){
     // de la tarjeta y el mensaje de WhatsApp pueden seguir mostrando el
     // total sin tener que recalcularlo cada vez.
     coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) * (Number(document.getElementById('fPax').value)||1) : 0,
+    // Abonos parciales del cover (fecha + monto de cada pago) — separado
+    // del abono de consumo. Se guarda vacío si no tiene cover.
+    coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
@@ -8615,6 +8799,7 @@ function enviarParaAprobacion(){
     // de la tarjeta y el mensaje de WhatsApp pueden seguir mostrando el
     // total sin tener que recalcularlo cada vez.
     coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) * (Number(document.getElementById('fPax').value)||1) : 0,
+    coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
