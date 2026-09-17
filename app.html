@@ -2079,7 +2079,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.23</div>
+<div class="version-tag">v5.24</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6648,18 +6648,25 @@ function renderResumenTurnoHTML(rsTodas){
   // Desglose del cover por su valor por persona (ej. $80.000 vs $50.000)
   // — el cover se cobra por persona, así que agrupar por reserva no dice
   // mucho; agrupar por el valor pactado sí permite ver cuánta gente paga
-  // cada tarifa.
+  // cada tarifa — y DENTRO de cada tarifa, cuánta gente ya pagó y cuánta
+  // debe, para que no toque adivinar sumando por separado.
   const gruposCoverPorValor = {};
   reservasConCover.forEach(r => {
     const pax = Number(r.pax)||0;
     const valorPersona = Number(r.coverValorPersona) || (pax>0 ? Math.round(Number(r.coverValor)/pax) : Number(r.coverValor));
-    if(!gruposCoverPorValor[valorPersona]) gruposCoverPorValor[valorPersona] = {reservas:0, pax:0};
+    if(!gruposCoverPorValor[valorPersona]) gruposCoverPorValor[valorPersona] = {reservas:0, pax:0, paxPagado:0, paxPendiente:0};
     gruposCoverPorValor[valorPersona].reservas += 1;
     gruposCoverPorValor[valorPersona].pax += pax;
+    if(pendienteCover(r) <= 0) gruposCoverPorValor[valorPersona].paxPagado += pax;
+    else gruposCoverPorValor[valorPersona].paxPendiente += pax;
   });
   const filasCoverPorValorObjs = Object.entries(gruposCoverPorValor)
     .sort((a,b) => Number(b[0]) - Number(a[0]))
-    .map(([valor, g]) => ({icono:'ticket', color:'blue', label:`　· Cover de $${Number(valor).toLocaleString('es-CO')}/persona`, count:g.reservas, pax:g.pax+' pax'}));
+    .map(([valor, g]) => ({
+      icono:'ticket', color:'blue',
+      label:`　· Cover de $${Number(valor).toLocaleString('es-CO')}/persona<div style="font-size:10.5px; color:var(--text-dim); font-weight:400; margin-top:2px;">✓ ${g.paxPagado} pax pagaron completo${g.paxPendiente>0?` · ⚠ ${g.paxPendiente} pax deben`:''}</div>`,
+      count:g.reservas, pax:g.pax+' pax'
+    }));
 
   const coverFilasHtml = [
     {icono:'ticket', color:'amber', label:`Total a cobrar · ${paxConCover} pax`, count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
