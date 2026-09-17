@@ -2079,7 +2079,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.20</div>
+<div class="version-tag">v5.22</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6589,6 +6589,20 @@ function renderResumenTurnoHTML(rsTodas){
   const totalCover = reservasConCover.reduce((a,r) => a + Number(r.coverValor||0), 0);
   const totalCoverPendiente = reservasConCover.reduce((a,r) => a + pendienteCover(r), 0);
   const totalCoverRecaudado = totalCover - totalCoverPendiente;
+  // El cover se cobra POR PERSONA (a diferencia del abono, que es por
+  // mesa/reserva) — por eso aquí también se cuentan las personas (pax),
+  // no solo las reservas: cuántas personas ya tienen su cover pagado del
+  // todo, y a cuántas todavía les falta una parte o todo.
+  const paxConCover = reservasConCover.reduce((a,r) => a + (Number(r.pax)||0), 0);
+  const paxCoverPagado = reservasConCover.filter(r => pendienteCover(r) <= 0).reduce((a,r) => a + (Number(r.pax)||0), 0);
+  const paxCoverPendiente = reservasConCover.filter(r => pendienteCover(r) > 0).reduce((a,r) => a + (Number(r.pax)||0), 0);
+  // Reservas de este turno que NO tienen cover marcado — para detectar de
+  // un vistazo si a alguien se le olvidó marcarlo (por ejemplo, en un día
+  // de evento especial donde TODOS deberían tener cover). No asume nada:
+  // solo muestra la diferencia entre el total de reservas y las que sí
+  // tienen cover, para que el staff las revise una por una.
+  const reservasSinCover = rsTodas.filter(r => !(Number(r.coverValor) > 0));
+  const paxSinCover = reservasSinCover.reduce((a,r) => a + (Number(r.pax)||0), 0);
 
   // Fecha legible para que el resumen se entienda solo, si alguien le toma
   // una captura de pantalla sin más contexto (a qué día y turno corresponde).
@@ -6634,9 +6648,10 @@ function renderResumenTurnoHTML(rsTodas){
         {icono:'billete', color:'amber', label:'Abonos — total pactado', count:reservasConAbono.length, pax:'$'+totalAbonoPactado.toLocaleString('es-CO')},
         {icono:'check', color:'ok', label:'Abonos — recaudado', count:reservasConAbono.length, pax:'$'+totalAbonos.toLocaleString('es-CO')},
         {icono:'alerta', color:'rojo', label:'Abonos — pendiente', count:reservasConAbono.filter(r=>pendienteAbonoPactado(r)>0).length, pax:'$'+totalAbonoPendiente.toLocaleString('es-CO')},
-        {icono:'ticket', color:'amber', label:'Cover — total a cobrar', count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
-        {icono:'check', color:'ok', label:'Cover — recaudado', count:reservasConCover.length, pax:'$'+totalCoverRecaudado.toLocaleString('es-CO')},
-        {icono:'alerta', color:'rojo', label:'Cover — pendiente', count:reservasConCover.filter(r=>pendienteCover(r)>0).length, pax:'$'+totalCoverPendiente.toLocaleString('es-CO')},
+        {icono:'ticket', color:'amber', label:`Cover — total a cobrar · ${paxConCover} pax`, count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
+        {icono:'check', color:'ok', label:`Cover — recaudado · ${paxCoverPagado} pax al día`, count:reservasConCover.length, pax:'$'+totalCoverRecaudado.toLocaleString('es-CO')},
+        {icono:'alerta', color:'rojo', label:`Cover — pendiente · ${paxCoverPendiente} pax deben`, count:reservasConCover.filter(r=>pendienteCover(r)>0).length, pax:'$'+totalCoverPendiente.toLocaleString('es-CO')},
+        ...(reservasSinCover.length > 0 ? [{icono:'alerta', color:'rojo', label:`⚠ Sin cover marcado (revisar)`, count:reservasSinCover.length, pax:paxSinCover+' pax'}] : []),
       ],
       mesaGeneral: {count:generalReservas.length, pax:generalPax},
       mesaVip: {count:vipReservasCount, pax:vipPax},
