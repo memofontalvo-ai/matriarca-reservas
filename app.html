@@ -412,7 +412,9 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .categoria-cliente-badge{
   font-size:10.5px; font-weight:700; padding:5px 10px; border-radius:20px;
   white-space:nowrap; flex-shrink:0; margin-left:auto;
+  font-family:inherit; cursor:pointer;
 }
+.categoria-cliente-badge:active{transform:scale(0.96);}
 .categoria-cliente-badge.cat-nuevo{background:rgba(125,199,232,0.15); color:var(--rdd-blue, #7dc7e8); border:1px solid rgba(125,199,232,0.4);}
 .categoria-cliente-badge.cat-a{background:rgba(71,184,129,0.15); color:var(--confirmed); border:1px solid rgba(71,184,129,0.4);}
 .categoria-cliente-badge.cat-aa{background:rgba(214,170,85,0.18); color:var(--gold-bright); border:1px solid rgba(214,170,85,0.5);}
@@ -2124,7 +2126,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.34</div>
+<div class="version-tag">v5.35</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -3147,24 +3149,48 @@ function botonesContactoHTML(r){
   }
   return html;
 }
-// Categoría del cliente según cuántas reservas lleva registradas con ese
-// mismo número de celular (cantidadSolicitudes, en la base de clientes —
-// se incrementa solo con cada reserva guardada, ya sea por web o por
-// teléfono). Sirve para identificar de un vistazo si es cliente nuevo o
-// recurrente, sin tener que ir a buscarlo en la base de clientes.
+// Categoría del cliente según cuántas reservas APROBADAS lleva ese mismo
+// número de celular — no cuenta solicitudes sin aprobar ni canceladas,
+// solo visitas efectivas (aprobadaPorCliente===true o estado==='confirmada').
+// Se calcula directo del arreglo de reservas ya cargado en memoria, con
+// su desglose por turno, para poder mostrar el historial al tocarla.
+function historialClienteAprobadas(celular){
+  const tel = normalizarTelefono(celular);
+  const vacio = { total:0, desayuno:0, almuerzo:0, cena:0 };
+  if(!tel) return vacio;
+  const aprobadas = reservas.filter(r =>
+    normalizarTelefono(r.celular) === tel &&
+    (r.aprobadaPorCliente === true || r.estado === 'confirmada')
+  );
+  const h = { total: aprobadas.length, desayuno:0, almuerzo:0, cena:0 };
+  aprobadas.forEach(r => { if(h[r.turno] !== undefined) h[r.turno]++; });
+  return h;
+}
 function categoriaClienteHTML(r){
   if(!r.celular) return '';
-  const tel = normalizarTelefono(r.celular);
-  if(!tel) return '';
-  const cliente = clientesDB.find(c => c.id === tel);
-  const n = cliente ? Number(cliente.cantidadSolicitudes||0) : 0;
-  if(n <= 0) return '';
+  const h = historialClienteAprobadas(r.celular);
   let texto, clase;
-  if(n === 1){ texto = '🆕 Primera vez'; clase = 'nuevo'; }
-  else if(n <= 5){ texto = 'Categoría A'; clase = 'a'; }
-  else if(n <= 10){ texto = 'Categoría AA'; clase = 'aa'; }
+  if(h.total === 0){ texto = '🆕 Primera vez'; clase = 'nuevo'; }
+  else if(h.total <= 5){ texto = 'Categoría A'; clase = 'a'; }
+  else if(h.total <= 10){ texto = 'Categoría AA'; clase = 'aa'; }
   else { texto = 'Categoría AAA'; clase = 'aaa'; }
-  return `<span class="categoria-cliente-badge cat-${clase}" title="${n} reserva${n===1?' registrada':'s registradas'} con este número">${texto}</span>`;
+  return `<button type="button" class="categoria-cliente-badge cat-${clase}" onclick='event.stopPropagation(); mostrarHistorialCliente(${JSON.stringify(r.celular)})' title="Toca para ver el historial de este cliente">${texto}</button>`;
+}
+// Detalle del historial: cuántas veces ha visitado en total y cómo se
+// reparte entre desayuno/almuerzo/cena — para saber de un vistazo qué
+// tipo de cliente es, sin ir a buscarlo en la base de clientes.
+function mostrarHistorialCliente(celular){
+  const h = historialClienteAprobadas(celular);
+  if(h.total === 0){
+    alert('Este cliente todavía no tiene ninguna reserva aprobada con nosotros — esta sería su primera visita.');
+    return;
+  }
+  const partes = [];
+  if(h.desayuno>0) partes.push(`${h.desayuno} en desayuno`);
+  if(h.almuerzo>0) partes.push(`${h.almuerzo} en almuerzo`);
+  if(h.cena>0) partes.push(`${h.cena} en cena`);
+  const detalle = partes.length ? ` (${partes.join(', ')})` : '';
+  alert(`Este cliente te ha visitado ${h.total} ${h.total===1?'vez':'veces'}${detalle}.`);
 }
 
 function emailInternoDesdeUsuario(usuario){
