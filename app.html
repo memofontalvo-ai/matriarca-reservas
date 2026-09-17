@@ -2079,7 +2079,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.22</div>
+<div class="version-tag">v5.23</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -5582,19 +5582,22 @@ const RDD_ICONS = {
 //   mesaGeneral: {count, pax}, mesaVip: {count, pax},
 //   extraPanelTitulo, extraFilasHtml,           // panel opcional adicional (ej. salones VIP, o ingresos)
 // }
+function filaRddHtml(f){
+  return `
+    <div class="rdd-row">
+      <div class="rdd-row-icon ${f.color}">${RDD_ICONS[f.icono]}</div>
+      <div class="rdd-row-label">${f.label}</div>
+      <div class="rdd-row-val ${f.count===0?'cero':''}">${f.count}</div>
+      <div class="rdd-row-val ${(!f.pax)?'cero':''}">${f.pax==null?'—':f.pax}</div>
+    </div>`;
+}
 function renderResumenDiaV2(opts){
   const d = opts.fechaObj;
   const fechaCorta = `${DIAS_CORTO[d.getDay()]}, ${d.getDate()} ${MESES_CORTO[d.getMonth()]}`;
   const fechaLarga = `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
   const unidadTotal = opts.totalCount === 1 ? opts.unidadSingular : opts.unidadPlural;
 
-  const filasHtml = (opts.filas||[]).map(f => `
-    <div class="rdd-row">
-      <div class="rdd-row-icon ${f.color}">${RDD_ICONS[f.icono]}</div>
-      <div class="rdd-row-label">${f.label}</div>
-      <div class="rdd-row-val ${f.count===0?'cero':''}">${f.count}</div>
-      <div class="rdd-row-val ${(!f.pax)?'cero':''}">${f.pax==null?'—':f.pax}</div>
-    </div>`).join('');
+  const filasHtml = (opts.filas||[]).map(filaRddHtml).join('');
 
   const mesaGridHtml = (opts.mesaGeneral || opts.mesaVip) ? `
     <div class="rdd-panel">
@@ -5623,6 +5626,25 @@ function renderResumenDiaV2(opts){
       ${opts.extraFilasHtml}
     </div>` : '';
 
+  const mainPanelHtml = opts.filas ? `
+    <div class="rdd-panel">
+      <div class="rdd-panel-head">
+        <span class="rdd-panel-title">${opts.panelTitulo}</span>
+        <div class="rdd-panel-cols"><span>${opts.colLabel1||'Reservas'}</span><span>${opts.colLabel2||'Pax'}</span></div>
+      </div>
+      ${filasHtml}
+    </div>` : '';
+
+  // Paneles adicionales de ingresos, cada uno con su propio título — para
+  // que Abonos (por mesa/reserva) y Cover (por persona) queden separados
+  // visualmente y no se mezclen en una sola lista, ya que son dos cosas
+  // distintas con unidades distintas.
+  const panelesExtraHtml = (opts.panelesExtra||[]).map(p => `
+    <div class="rdd-panel">
+      <div class="rdd-panel-title" style="margin-bottom:8px;">${p.titulo}</div>
+      ${p.filasHtml}
+    </div>`).join('');
+
   return `
     <div class="rdd">
       <div class="rdd-header">
@@ -5647,16 +5669,10 @@ function renderResumenDiaV2(opts){
         </div>
       </div>
 
-      <div class="rdd-panel">
-        <div class="rdd-panel-head">
-          <span class="rdd-panel-title">${opts.panelTitulo}</span>
-          <div class="rdd-panel-cols"><span>${opts.colLabel1||'Reservas'}</span><span>${opts.colLabel2||'Pax'}</span></div>
-        </div>
-        ${filasHtml}
-      </div>
-
+      ${mainPanelHtml}
       ${mesaGridHtml}
       ${extraPanelHtml}
+      ${panelesExtraHtml}
 
       <div class="rdd-total">
         <div class="rdd-total-label">Total del día<small>${fechaLarga}</small></div>
@@ -6619,19 +6635,39 @@ function renderResumenTurnoHTML(rsTodas){
     </div>`;
   }).join('');
 
-  const ingresosFilasHtml = `
-    <div class="rdd-row">
-      <div class="rdd-row-icon amber">${RDD_ICONS.billete}</div>
-      <div class="rdd-row-label">Abonos registrados</div>
-      <div class="rdd-row-val ${reservasConAbono.length===0?'cero':''}">${reservasConAbono.length}</div>
-      <div class="rdd-row-val ${totalAbonos===0?'cero':''}">$${totalAbonos.toLocaleString('es-CO')}</div>
-    </div>
-    <div class="rdd-row">
-      <div class="rdd-row-icon amber">${RDD_ICONS.ticket}</div>
-      <div class="rdd-row-label">Cover registrados</div>
-      <div class="rdd-row-val ${reservasConCover.length===0?'cero':''}">${reservasConCover.length}</div>
-      <div class="rdd-row-val ${totalCover===0?'cero':''}">$${totalCover.toLocaleString('es-CO')}</div>
-    </div>`;
+  // Abonos y cover van en paneles SEPARADOS — son dos cosas distintas con
+  // unidades distintas (abono = por mesa/reserva; cover = por persona), y
+  // mezclarlos en una sola lista genera confusión sobre qué se está
+  // contando en cada fila.
+  const abonosFilasHtml = [
+    {icono:'billete', color:'amber', label:'Total pactado', count:reservasConAbono.length, pax:'$'+totalAbonoPactado.toLocaleString('es-CO')},
+    {icono:'check', color:'ok', label:'Recaudado', count:reservasConAbono.length, pax:'$'+totalAbonos.toLocaleString('es-CO')},
+    {icono:'alerta', color:'rojo', label:'Pendiente', count:reservasConAbono.filter(r=>pendienteAbonoPactado(r)>0).length, pax:'$'+totalAbonoPendiente.toLocaleString('es-CO')},
+  ].map(filaRddHtml).join('');
+
+  // Desglose del cover por su valor por persona (ej. $80.000 vs $50.000)
+  // — el cover se cobra por persona, así que agrupar por reserva no dice
+  // mucho; agrupar por el valor pactado sí permite ver cuánta gente paga
+  // cada tarifa.
+  const gruposCoverPorValor = {};
+  reservasConCover.forEach(r => {
+    const pax = Number(r.pax)||0;
+    const valorPersona = Number(r.coverValorPersona) || (pax>0 ? Math.round(Number(r.coverValor)/pax) : Number(r.coverValor));
+    if(!gruposCoverPorValor[valorPersona]) gruposCoverPorValor[valorPersona] = {reservas:0, pax:0};
+    gruposCoverPorValor[valorPersona].reservas += 1;
+    gruposCoverPorValor[valorPersona].pax += pax;
+  });
+  const filasCoverPorValorObjs = Object.entries(gruposCoverPorValor)
+    .sort((a,b) => Number(b[0]) - Number(a[0]))
+    .map(([valor, g]) => ({icono:'ticket', color:'blue', label:`　· Cover de $${Number(valor).toLocaleString('es-CO')}/persona`, count:g.reservas, pax:g.pax+' pax'}));
+
+  const coverFilasHtml = [
+    {icono:'ticket', color:'amber', label:`Total a cobrar · ${paxConCover} pax`, count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
+    ...filasCoverPorValorObjs,
+    {icono:'check', color:'ok', label:`Recaudado · ${paxCoverPagado} pax al día`, count:reservasConCover.length, pax:'$'+totalCoverRecaudado.toLocaleString('es-CO')},
+    {icono:'alerta', color:'rojo', label:`Pendiente · ${paxCoverPendiente} pax deben`, count:reservasConCover.filter(r=>pendienteCover(r)>0).length, pax:'$'+totalCoverPendiente.toLocaleString('es-CO')},
+    ...(reservasSinCover.length > 0 ? [{icono:'alerta', color:'rojo', label:'⚠ Sin cover marcado (revisar)', count:reservasSinCover.length, pax:paxSinCover+' pax'}] : []),
+  ].map(filaRddHtml).join('');
 
   return `
     ${resumenDiaHtml}
@@ -6641,22 +6677,14 @@ function renderResumenTurnoHTML(rsTodas){
       unidadPlural: 'Reservas',
       totalCount: totalReservas,
       totalPax,
-      panelTitulo: 'Ingresos registrados',
-      colLabel1: 'Reservas',
-      colLabel2: 'Total',
-      filas: [
-        {icono:'billete', color:'amber', label:'Abonos — total pactado', count:reservasConAbono.length, pax:'$'+totalAbonoPactado.toLocaleString('es-CO')},
-        {icono:'check', color:'ok', label:'Abonos — recaudado', count:reservasConAbono.length, pax:'$'+totalAbonos.toLocaleString('es-CO')},
-        {icono:'alerta', color:'rojo', label:'Abonos — pendiente', count:reservasConAbono.filter(r=>pendienteAbonoPactado(r)>0).length, pax:'$'+totalAbonoPendiente.toLocaleString('es-CO')},
-        {icono:'ticket', color:'amber', label:`Cover — total a cobrar · ${paxConCover} pax`, count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
-        {icono:'check', color:'ok', label:`Cover — recaudado · ${paxCoverPagado} pax al día`, count:reservasConCover.length, pax:'$'+totalCoverRecaudado.toLocaleString('es-CO')},
-        {icono:'alerta', color:'rojo', label:`Cover — pendiente · ${paxCoverPendiente} pax deben`, count:reservasConCover.filter(r=>pendienteCover(r)>0).length, pax:'$'+totalCoverPendiente.toLocaleString('es-CO')},
-        ...(reservasSinCover.length > 0 ? [{icono:'alerta', color:'rojo', label:`⚠ Sin cover marcado (revisar)`, count:reservasSinCover.length, pax:paxSinCover+' pax'}] : []),
-      ],
       mesaGeneral: {count:generalReservas.length, pax:generalPax},
       mesaVip: {count:vipReservasCount, pax:vipPax},
       extraPanelTitulo: '♛ Salones VIP',
       extraFilasHtml: vipSalonesHtml,
+      panelesExtra: [
+        {titulo: '💰 Abonos (por mesa / reserva)', filasHtml: abonosFilasHtml},
+        {titulo: '🎫 Cover (por persona)', filasHtml: coverFilasHtml},
+      ],
     })}
   `;
 }
