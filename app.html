@@ -2083,7 +2083,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.28</div>
+<div class="version-tag">v5.29</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -8205,25 +8205,25 @@ function renderSolicitudesScreen(){
   // tarjetas resumen de "Recibidas/Respondidas/Aprobadas".
   const totalPax = delDia.reduce((a,r)=>a+Number(r.pax||0),0);
   const aprobadas = delDia.filter(r=>r.aprobadaPorCliente===true || r.estado==='confirmada');
-  // Las canceladas se sacan aparte — antes quedaban mezcladas dentro de
-  // "Sin aprobar todavía" (por no tener aprobadaPorCliente===true), lo
-  // cual hacía ver como pendientes solicitudes que en realidad ya están
-  // cerradas/canceladas y no necesitan gestión.
   const canceladasSol = delDia.filter(r=>r.estado==='cancelada');
   const canceladasSolPax = canceladasSol.reduce((a,r)=>a+Number(r.pax||0),0);
   const aprobadasPax = aprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
 
-  const porAprobar = delDia.filter(r=>r.estado==='pendiente_aprobacion');
-  const listaEsperaDelDia = delDia.filter(r=>r.estado==='lista_espera');
-  // "Sin gestionar" agrupa TODO lo que no es aprobada, cancelada, "por
-  // aprobar" ni "lista de espera" — incluyendo mensaje_enviado y
-  // cualquier estado viejo o distinto que ya no se use. Así la lista de
-  // categorías queda plana (sin subcategorías anidadas que confundan) y
-  // siempre suma exacto con el total de solicitudes del día.
-  const sinGestionar = delDia.filter(r =>
-    r.estado!=='cancelada' && !(r.aprobadaPorCliente===true || r.estado==='confirmada') &&
-    r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'
+  // Los 4 estados reales que se manejan en el programa (los mismos que
+  // se ven en "Estado de la reserva" al abrir una reserva: Aprobada,
+  // Pendiente, Cancelada — más "En proceso" para lo que todavía no ha
+  // tenido ninguna respuesta):
+  // - Pendiente: el staff la marcó pendiente a propósito (falta algún
+  //   dato o confirmación de su parte) — estado==='pendiente'.
+  // - En proceso: todavía no se le ha contestado nada al cliente —
+  //   cubre solicitud recién llegada, mensaje ya enviado sin respuesta,
+  //   esperando que apruebe por el link, o en lista de espera.
+  const pendientesSol = delDia.filter(r => r.estado==='pendiente');
+  const pendientesSolPax = pendientesSol.reduce((a,r)=>a+Number(r.pax||0),0);
+  const enProceso = delDia.filter(r =>
+    r.estado!=='cancelada' && r.estado!=='pendiente' && !(r.aprobadaPorCliente===true || r.estado==='confirmada')
   );
+  const enProcesoPax = enProceso.reduce((a,r)=>a+Number(r.pax||0),0);
 
   const vipSols = delDia.filter(r=>r.vipSolicitada && r.estado!=='mensaje_enviado');
   const generalSols = delDia.filter(r=>!r.vipSolicitada && r.estado!=='mensaje_enviado');
@@ -8238,10 +8238,9 @@ function renderSolicitudesScreen(){
     totalPax,
     panelTitulo: 'Estado de gestión',
     filas: [
-      {icono:'check', color:'ok', label:'Aprobadas por el cliente', count:aprobadas.length, pax:aprobadasPax},
-      {icono:'alerta', color:'amber', label:'Sin gestionar', count:sinGestionar.length, pax:sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)},
-      {icono:'subir', color:'neutro', label:'Por aprobar del cliente', count:porAprobar.length, pax:porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)},
-      {icono:'reloj', color:'blue', label:'En lista de espera', count:listaEsperaDelDia.length, pax:listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)},
+      {icono:'check', color:'ok', label:'Aprobadas', count:aprobadas.length, pax:aprobadasPax},
+      {icono:'reloj', color:'amber', label:'En proceso <span class="fecha-solicitud-hint">(sin contestar todavía)</span>', count:enProceso.length, pax:enProcesoPax},
+      {icono:'subir', color:'blue', label:'Pendientes', count:pendientesSol.length, pax:pendientesSolPax},
       {icono:'alerta', color:'rojo', label:'Canceladas', count:canceladasSol.length, pax:canceladasSolPax},
     ],
     mesaGeneral: {count:generalSols.length, pax:generalPax},
