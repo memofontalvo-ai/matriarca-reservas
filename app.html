@@ -629,6 +629,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   font-size:11px; color:var(--text-dim); text-align:center; margin-bottom:10px;
 }
 .resumen-dia-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+.resumen-dia-canceladas{
+  margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.14);
+  font-size:12px; font-weight:700; color:var(--cancelled); text-align:center;
+}
 .resumen-dia-card{
   background:var(--panel-alt); border-radius:8px; padding:8px 4px; text-align:center;
   border:1px solid transparent;
@@ -2079,7 +2083,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.25</div>
+<div class="version-tag">v5.26</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6538,6 +6542,11 @@ function renderResumenTurnoHTML(rsTodas){
   // vistazo cuántas reservas hay en cada turno y el total del día completo.
   const iso = fechaISO(fechaActual);
   const reservasDia = reservas.filter(r=>r.fecha===iso && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
+  // Canceladas de este mismo día — aparte del conteo de arriba (que es
+  // solo lo activo), para saber cuánto se perdió/canceló sin tener que
+  // ir a buscarlo reserva por reserva.
+  const canceladasDia = reservas.filter(r=>r.fecha===iso && r.estado==='cancelada');
+  const canceladasDiaPax = canceladasDia.reduce((a,r)=>a+Number(r.pax||0),0);
   const porTurnoDia = ['desayuno','almuerzo','cena'].map(t=>{
     const rs = reservasDia.filter(r=>r.turno===t);
     return { turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo',cena:'Cena'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) };
@@ -6561,6 +6570,7 @@ function renderResumenTurnoHTML(rsTodas){
           <div class="resumen-dia-card-sub">${totalDiaReservas} reserva${totalDiaReservas===1?'':'s'}</div>
         </div>
       </div>
+      ${canceladasDia.length > 0 ? `<div class="resumen-dia-canceladas">⚠ ${canceladasDia.length} reserva${canceladasDia.length===1?'':'s'} cancelada${canceladasDia.length===1?'':'s'} ese día · ${canceladasDiaPax} pax</div>` : ''}
     </div>
   `;
 
@@ -8195,7 +8205,13 @@ function renderSolicitudesScreen(){
   // tarjetas resumen de "Recibidas/Respondidas/Aprobadas".
   const totalPax = delDia.reduce((a,r)=>a+Number(r.pax||0),0);
   const aprobadas = delDia.filter(r=>r.aprobadaPorCliente===true || r.estado==='confirmada');
-  const noAprobadas = delDia.filter(r=>!(r.aprobadaPorCliente===true || r.estado==='confirmada'));
+  // Las canceladas se sacan aparte — antes quedaban mezcladas dentro de
+  // "Sin aprobar todavía" (por no tener aprobadaPorCliente===true), lo
+  // cual hacía ver como pendientes solicitudes que en realidad ya están
+  // cerradas/canceladas y no necesitan gestión.
+  const canceladasSol = delDia.filter(r=>r.estado==='cancelada');
+  const canceladasSolPax = canceladasSol.reduce((a,r)=>a+Number(r.pax||0),0);
+  const noAprobadas = delDia.filter(r=>r.estado!=='cancelada' && !(r.aprobadaPorCliente===true || r.estado==='confirmada'));
   const aprobadasPax = aprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
   const noAprobadasPax = noAprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
 
@@ -8223,6 +8239,7 @@ function renderSolicitudesScreen(){
       {icono:'alerta', color:'amber', label:'Sin gestionar', count:sinGestionar.length, pax:sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)},
       {icono:'subir', color:'neutro', label:'Por aprobar del cliente', count:porAprobar.length, pax:porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)},
       {icono:'reloj', color:'blue', label:'En lista de espera', count:listaEsperaDelDia.length, pax:listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)},
+      {icono:'alerta', color:'rojo', label:'Canceladas', count:canceladasSol.length, pax:canceladasSolPax},
     ],
     mesaGeneral: {count:generalSols.length, pax:generalPax},
     mesaVip: {count:vipSols.length, pax:vipPax},
