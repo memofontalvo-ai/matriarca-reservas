@@ -2083,7 +2083,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.27</div>
+<div class="version-tag">v5.28</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -8211,22 +8211,18 @@ function renderSolicitudesScreen(){
   // cerradas/canceladas y no necesitan gestión.
   const canceladasSol = delDia.filter(r=>r.estado==='cancelada');
   const canceladasSolPax = canceladasSol.reduce((a,r)=>a+Number(r.pax||0),0);
-  const noAprobadas = delDia.filter(r=>r.estado!=='cancelada' && !(r.aprobadaPorCliente===true || r.estado==='confirmada'));
   const aprobadasPax = aprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
-  const noAprobadasPax = noAprobadas.reduce((a,r)=>a+Number(r.pax||0),0);
 
-  const sinGestionar = delDia.filter(r=>r.estado==='solicitud');
   const porAprobar = delDia.filter(r=>r.estado==='pendiente_aprobacion');
-  const mensajesEnviados = delDia.filter(r=>r.estado==='mensaje_enviado');
   const listaEsperaDelDia = delDia.filter(r=>r.estado==='lista_espera');
-  // Red de seguridad: si alguna reserva cae en "no aprobada" pero no
-  // encaja en ninguno de los 4 estados de abajo (por ejemplo, un estado
-  // viejo o distinto que ya no se usa), igual se cuenta aquí — así la
-  // fila de arriba ("Sin aprobar todavía") siempre cuadra exactamente
-  // con la suma de las de abajo, nunca puede quedar un número suelto sin
-  // explicación.
-  const otroEstadoSinClasificar = noAprobadas.filter(r =>
-    r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='mensaje_enviado' && r.estado!=='lista_espera'
+  // "Sin gestionar" agrupa TODO lo que no es aprobada, cancelada, "por
+  // aprobar" ni "lista de espera" — incluyendo mensaje_enviado y
+  // cualquier estado viejo o distinto que ya no se use. Así la lista de
+  // categorías queda plana (sin subcategorías anidadas que confundan) y
+  // siempre suma exacto con el total de solicitudes del día.
+  const sinGestionar = delDia.filter(r =>
+    r.estado!=='cancelada' && !(r.aprobadaPorCliente===true || r.estado==='confirmada') &&
+    r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'
   );
 
   const vipSols = delDia.filter(r=>r.vipSolicitada && r.estado!=='mensaje_enviado');
@@ -8243,12 +8239,9 @@ function renderSolicitudesScreen(){
     panelTitulo: 'Estado de gestión',
     filas: [
       {icono:'check', color:'ok', label:'Aprobadas por el cliente', count:aprobadas.length, pax:aprobadasPax},
-      {icono:'reloj', color:'amber', label:'Sin aprobar todavía <span class="fecha-solicitud-hint">(suma de las 4 de abajo)</span>', count:noAprobadas.length, pax:noAprobadasPax},
-      {icono:'sobre', color:'neutro', label:'　· Mensaje enviado, sin respuesta', count:mensajesEnviados.length, pax:null},
-      {icono:'alerta', color:'amber', label:'　· Sin gestionar', count:sinGestionar.length, pax:sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)},
-      {icono:'subir', color:'neutro', label:'　· Por aprobar del cliente', count:porAprobar.length, pax:porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)},
-      {icono:'reloj', color:'blue', label:'　· En lista de espera', count:listaEsperaDelDia.length, pax:listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)},
-      ...(otroEstadoSinClasificar.length > 0 ? [{icono:'alerta', color:'rojo', label:'　· Otro estado (revisar)', count:otroEstadoSinClasificar.length, pax:otroEstadoSinClasificar.reduce((a,r)=>a+Number(r.pax||0),0)}] : []),
+      {icono:'alerta', color:'amber', label:'Sin gestionar', count:sinGestionar.length, pax:sinGestionar.reduce((a,r)=>a+Number(r.pax||0),0)},
+      {icono:'subir', color:'neutro', label:'Por aprobar del cliente', count:porAprobar.length, pax:porAprobar.reduce((a,r)=>a+Number(r.pax||0),0)},
+      {icono:'reloj', color:'blue', label:'En lista de espera', count:listaEsperaDelDia.length, pax:listaEsperaDelDia.reduce((a,r)=>a+Number(r.pax||0),0)},
       {icono:'alerta', color:'rojo', label:'Canceladas', count:canceladasSol.length, pax:canceladasSolPax},
     ],
     mesaGeneral: {count:generalSols.length, pax:generalPax},
