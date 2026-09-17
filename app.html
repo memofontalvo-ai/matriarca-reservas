@@ -762,6 +762,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .rdd-row-icon.neutro svg{ color:var(--text-muted); }
 .rdd-row-icon.blue{ background:rgba(125,199,232,0.15); }
 .rdd-row-icon.blue svg{ color:var(--rdd-blue); }
+.rdd-row-icon.rojo{ background:rgba(229,99,106,0.15); }
+.rdd-row-icon.rojo svg{ color:var(--cancelled); }
 .rdd-row-label{ flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
 .rdd-row-val{ width:60px; flex-shrink:0; text-align:right; font-size:12px; font-weight:700; color:var(--text); white-space:nowrap; }
 .rdd-row-val.cero{ color:var(--text-dim); font-weight:600; }
@@ -2077,7 +2079,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.19</div>
+<div class="version-tag">v5.20</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -3629,7 +3631,14 @@ function textoAbonoBadge(r){
 }
 function pendienteCover(r){
   if(!r || !(Number(r.coverValor) > 0)) return 0;
-  const abonado = Array.isArray(r.coverAbonos) ? r.coverAbonos.reduce((s,a) => s + Number(a.monto||0), 0) : 0;
+  if(!Array.isArray(r.coverAbonos) || r.coverAbonos.length === 0){
+    // Reservas de antes de que existiera el registro de abonos por
+    // partes: si tienen el comprobante único de aquella época, se asume
+    // que el cover quedó pagado completo (así funcionaba el sistema
+    // viejo) — si no tienen ni eso, sigue pendiente el total.
+    return r.comprobanteCover ? 0 : Number(r.coverValor);
+  }
+  const abonado = r.coverAbonos.reduce((s,a) => s + Number(a.monto||0), 0);
   return Number(r.coverValor) - abonado;
 }
 function textoCoverBadge(r){
@@ -6562,14 +6571,24 @@ function renderResumenTurnoHTML(rsTodas){
 
   // Total de abonos de este turno — para hacerle seguimiento a cuánto se
   // ha recaudado y cuántas reservas de las de hoy ya dejaron abono.
-  const reservasConAbono = rsTodas.filter(r => Number(r.abono) > 0);
+  const reservasConAbono = rsTodas.filter(r => Number(r.abono) > 0 || Number(r.abonoPactado) > 0);
   const totalAbonos = reservasConAbono.reduce((a,r) => a + Number(r.abono||0), 0);
+  // "Pactado" = lo acordado con el cliente (si es abono por partes, el
+  // valor pactado; si es el abono simple de siempre, ese mismo número,
+  // porque ahí no se maneja la idea de "falta una parte" — se registró
+  // como recibido). Recaudado ya está arriba (totalAbonos); pendiente es
+  // la diferencia — casi siempre $0, salvo los abonos pactados a medias.
+  const totalAbonoPactado = reservasConAbono.reduce((a,r) => a + (Number(r.abonoPactado)>0 ? Number(r.abonoPactado) : Number(r.abono||0)), 0);
+  const totalAbonoPendiente = reservasConAbono.reduce((a,r) => a + pendienteAbonoPactado(r), 0);
 
   // Lo mismo, pero para el cover de evento especial — es una plata aparte
   // del abono (una reserva puede tener las dos), así que se cuenta y se
-  // suma por separado.
+  // suma por separado. Acá el total (coverValor) SIEMPRE es lo pactado —
+  // por eso hay que restarle lo pendiente para saber lo recaudado.
   const reservasConCover = rsTodas.filter(r => Number(r.coverValor) > 0);
   const totalCover = reservasConCover.reduce((a,r) => a + Number(r.coverValor||0), 0);
+  const totalCoverPendiente = reservasConCover.reduce((a,r) => a + pendienteCover(r), 0);
+  const totalCoverRecaudado = totalCover - totalCoverPendiente;
 
   // Fecha legible para que el resumen se entienda solo, si alguien le toma
   // una captura de pantalla sin más contexto (a qué día y turno corresponde).
@@ -6612,8 +6631,12 @@ function renderResumenTurnoHTML(rsTodas){
       colLabel1: 'Reservas',
       colLabel2: 'Total',
       filas: [
-        {icono:'billete', color:'amber', label:'Abonos registrados', count:reservasConAbono.length, pax:'$'+totalAbonos.toLocaleString('es-CO')},
-        {icono:'ticket', color:'amber', label:'Cover registrados', count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
+        {icono:'billete', color:'amber', label:'Abonos — total pactado', count:reservasConAbono.length, pax:'$'+totalAbonoPactado.toLocaleString('es-CO')},
+        {icono:'check', color:'ok', label:'Abonos — recaudado', count:reservasConAbono.length, pax:'$'+totalAbonos.toLocaleString('es-CO')},
+        {icono:'alerta', color:'rojo', label:'Abonos — pendiente', count:reservasConAbono.filter(r=>pendienteAbonoPactado(r)>0).length, pax:'$'+totalAbonoPendiente.toLocaleString('es-CO')},
+        {icono:'ticket', color:'amber', label:'Cover — total a cobrar', count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
+        {icono:'check', color:'ok', label:'Cover — recaudado', count:reservasConCover.length, pax:'$'+totalCoverRecaudado.toLocaleString('es-CO')},
+        {icono:'alerta', color:'rojo', label:'Cover — pendiente', count:reservasConCover.filter(r=>pendienteCover(r)>0).length, pax:'$'+totalCoverPendiente.toLocaleString('es-CO')},
       ],
       mesaGeneral: {count:generalReservas.length, pax:generalPax},
       mesaVip: {count:vipReservasCount, pax:vipPax},
