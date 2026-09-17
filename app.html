@@ -495,6 +495,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .nuevo-abono-cover-form .field{margin:0;}
 .nuevo-abono-cover-botones{display:flex; gap:8px;}
 .nuevo-abono-cover-botones .btn{flex:1; padding:9px; font-size:13px;}
+.nuevo-abono-cover-aviso{
+  font-size:11.5px; font-weight:700; color:#e8a33d; text-align:center;
+  background:rgba(232,163,61,0.12); border:1px solid #e8a33d; border-radius:8px;
+  padding:6px 8px;
+}
+.btn-cargar-abono{
+  font-weight:800 !important; box-shadow:0 0 0 2px rgba(230,180,90,0.25);
+}
 
 /* ===== FILA DE ESTADO (conexión + presencia) ===== */
 /* Antes "Conectado a la base de datos" y "En línea ahora" eran dos franjas
@@ -2069,7 +2077,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.18</div>
+<div class="version-tag">v5.19</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2340,9 +2348,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
               <input type="file" id="fNuevoAbonoPactadoComprobante" accept="image/*" style="display:none;" onchange="previsualizarNuevoAbonoPactadoComprobante(this)">
               <img id="previewNuevoAbonoPactadoComprobante" style="display:none; max-width:100%; border-radius:8px; margin-top:6px;">
             </div>
+            <div class="nuevo-abono-cover-aviso">⬇️ Falta tocar "Cargar abono" para que quede guardado</div>
             <div class="nuevo-abono-cover-botones">
               <button type="button" class="btn btn-ghost" onclick="cancelarAgregarAbonoPactado()">Cancelar</button>
-              <button type="button" class="btn btn-primary" onclick="confirmarAgregarAbonoPactado()">Agregar abono</button>
+              <button type="button" class="btn btn-primary btn-cargar-abono" onclick="confirmarAgregarAbonoPactado()">💾 Cargar abono</button>
             </div>
           </div>
 
@@ -2375,9 +2384,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
               <input type="file" id="fNuevoAbonoCoverComprobante" accept="image/*" style="display:none;" onchange="previsualizarNuevoAbonoCoverComprobante(this)">
               <img id="previewNuevoAbonoCoverComprobante" style="display:none; max-width:100%; border-radius:8px; margin-top:6px;">
             </div>
+            <div class="nuevo-abono-cover-aviso">⬇️ Falta tocar "Cargar abono" para que quede guardado</div>
             <div class="nuevo-abono-cover-botones">
               <button type="button" class="btn btn-ghost" onclick="cancelarAgregarAbonoCover()">Cancelar</button>
-              <button type="button" class="btn btn-primary" onclick="confirmarAgregarAbonoCover()">Agregar abono</button>
+              <button type="button" class="btn btn-primary btn-cargar-abono" onclick="confirmarAgregarAbonoCover()">💾 Cargar abono</button>
             </div>
           </div>
 
@@ -3728,6 +3738,9 @@ function previsualizarNuevoAbonoCoverComprobante(input){
       preview.src = resultado;
       preview.style.display = 'block';
       document.getElementById('labelNuevoAbonoCoverComprobante').textContent = '📎 Cambiar comprobante';
+      // El botón de confirmar sube a la vista solo, para que después de
+      // subir la foto sea imposible no verlo y quede a medias sin guardar.
+      document.querySelector('#nuevoAbonoCoverForm .btn-cargar-abono')?.scrollIntoView({block:'center', behavior:'smooth'});
     };
     img.src = e.target.result;
   };
@@ -3839,6 +3852,7 @@ function previsualizarNuevoAbonoPactadoComprobante(input){
       preview.src = resultado;
       preview.style.display = 'block';
       document.getElementById('labelNuevoAbonoPactadoComprobante').textContent = '📎 Cambiar comprobante';
+      document.querySelector('#nuevoAbonoPactadoForm .btn-cargar-abono')?.scrollIntoView({block:'center', behavior:'smooth'});
     };
     img.src = e.target.result;
   };
