@@ -2079,7 +2079,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.24</div>
+<div class="version-tag">v5.25</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6654,19 +6654,25 @@ function renderResumenTurnoHTML(rsTodas){
   reservasConCover.forEach(r => {
     const pax = Number(r.pax)||0;
     const valorPersona = Number(r.coverValorPersona) || (pax>0 ? Math.round(Number(r.coverValor)/pax) : Number(r.coverValor));
-    if(!gruposCoverPorValor[valorPersona]) gruposCoverPorValor[valorPersona] = {reservas:0, pax:0, paxPagado:0, paxPendiente:0};
-    gruposCoverPorValor[valorPersona].reservas += 1;
-    gruposCoverPorValor[valorPersona].pax += pax;
-    if(pendienteCover(r) <= 0) gruposCoverPorValor[valorPersona].paxPagado += pax;
-    else gruposCoverPorValor[valorPersona].paxPendiente += pax;
+    if(!gruposCoverPorValor[valorPersona]) gruposCoverPorValor[valorPersona] = {reservas:0, pax:0, paxPagado:0, paxPendiente:0, subtotal:0, recaudado:0};
+    const g = gruposCoverPorValor[valorPersona];
+    g.reservas += 1;
+    g.pax += pax;
+    g.subtotal += Number(r.coverValor)||0;
+    const pend = pendienteCover(r);
+    g.recaudado += (Number(r.coverValor)||0) - pend;
+    if(pend <= 0) g.paxPagado += pax; else g.paxPendiente += pax;
   });
   const filasCoverPorValorObjs = Object.entries(gruposCoverPorValor)
     .sort((a,b) => Number(b[0]) - Number(a[0]))
-    .map(([valor, g]) => ({
-      icono:'ticket', color:'blue',
-      label:`　· Cover de $${Number(valor).toLocaleString('es-CO')}/persona<div style="font-size:10.5px; color:var(--text-dim); font-weight:400; margin-top:2px;">✓ ${g.paxPagado} pax pagaron completo${g.paxPendiente>0?` · ⚠ ${g.paxPendiente} pax deben`:''}</div>`,
-      count:g.reservas, pax:g.pax+' pax'
-    }));
+    .map(([valor, g]) => {
+      const pendienteGrupo = g.subtotal - g.recaudado;
+      return {
+        icono:'ticket', color:'blue',
+        label:`　· Cover de $${Number(valor).toLocaleString('es-CO')}/persona<div style="font-size:10.5px; color:var(--text-dim); font-weight:400; margin-top:2px;">${g.pax} pax — ✓ $${g.recaudado.toLocaleString('es-CO')} recaudados${pendienteGrupo>0?` · ⚠ $${pendienteGrupo.toLocaleString('es-CO')} pendientes`:''}</div>`,
+        count:g.reservas, pax:'$'+g.subtotal.toLocaleString('es-CO')
+      };
+    });
 
   const coverFilasHtml = [
     {icono:'ticket', color:'amber', label:`Total a cobrar · ${paxConCover} pax`, count:reservasConCover.length, pax:'$'+totalCover.toLocaleString('es-CO')},
