@@ -2005,6 +2005,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           </div>
         </div>
         <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">📈 Estadísticas de solicitudes</div>
+          <div class="config-mensaje-sub">Qué día de la semana llegan más solicitudes y cuál menos, en qué rango de horario llegan más, y cuántas se cancelaron en el mes (con su porcentaje) — total y solo las especiales (20+).</div>
+          <div class="field-row phone-two-cols" style="margin-top:10px;">
+            <div class="field">
+              <label>Mes</label>
+              <input type="month" id="fInformeEstadisticasMes">
+            </div>
+          </div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="generarInformeEstadisticasSolicitudesMes()">📈 Generar informe</button>
+          </div>
+        </div>
+        <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">🖼️ Informe ejecutivo mensual (cartelera visual)</div>
           <div class="config-mensaje-sub">Una cartelera con el comportamiento del mes: pax totales, participación por turno, comportamiento diario, días de mayor demanda y lectura ejecutiva — para descargar como imagen y compartir. Solo visible aquí, en Configuración.</div>
           <div class="field-row phone-two-cols" style="margin-top:10px;">
@@ -2083,7 +2096,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.31</div>
+<div class="version-tag">v5.32</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6958,6 +6971,113 @@ function generarInformeGeneralMes(){
   }
   const tipoInforme = document.getElementById('fInformeGeneralTipo').value; // 'aprobadas' | 'solicitudes'
   renderInformeReservas(yearMonth, tipoInforme, 0);
+}
+function generarInformeEstadisticasSolicitudesMes(){
+  const inputMes = document.getElementById('fInformeEstadisticasMes').value;
+  let yearMonth = inputMes;
+  if(!yearMonth){
+    const hoy = new Date();
+    yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  }
+  renderInformeEstadisticasSolicitudes(yearMonth);
+}
+// Estadísticas de solicitudes: día de la semana con más/menos, rango de
+// horario en que llegan más, y seguimiento de canceladas (total y
+// especiales) con su porcentaje sobre el total del mes. Usa el mismo
+// criterio de "todas las solicitudes" que la pantalla de Solicitudes
+// (pasoPorSolicitud===true), agrupadas por el día en que LLEGÓ la
+// solicitud (fechaSolicitud) — igual que el informe general/especiales.
+function renderInformeEstadisticasSolicitudes(yearMonth){
+  const [anio, mes] = yearMonth.split('-').map(Number);
+  const mesLabel = `${MESES[mes-1]} ${anio}`;
+  const fechaClave = r => r.fechaSolicitud || r.fecha;
+
+  const todasDelMes = reservas.filter(r =>
+    r.pasoPorSolicitud === true && fechaClave(r) && fechaClave(r).startsWith(yearMonth)
+  );
+  const totalSolicitudes = todasDelMes.length;
+  const canceladas = todasDelMes.filter(r => r.estado === 'cancelada');
+  const canceladasEspeciales = canceladas.filter(r => Number(r.pax) >= 20);
+  const pctCanceladas = totalSolicitudes>0 ? (canceladas.length/totalSolicitudes*100) : 0;
+  const pctCanceladasEspeciales = totalSolicitudes>0 ? (canceladasEspeciales.length/totalSolicitudes*100) : 0;
+
+  // Por día de la semana en que llegó la solicitud.
+  const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const porDiaSemana = new Array(7).fill(0);
+  todasDelMes.forEach(r => {
+    const f = fechaClave(r);
+    const [y,m,d] = f.split('-').map(Number);
+    const fecha = new Date(y, m-1, d, 12);
+    porDiaSemana[fecha.getDay()]++;
+  });
+  let diaMax = 0, diaMin = 0;
+  for(let i=1;i<7;i++){
+    if(porDiaSemana[i] > porDiaSemana[diaMax]) diaMax = i;
+    if(porDiaSemana[i] < porDiaSemana[diaMin]) diaMin = i;
+  }
+  const hayDatosDia = totalSolicitudes > 0;
+
+  // Por rango de horario en que llegó la solicitud (según horaSolicitud,
+  // la hora exacta de llegada — no la hora de la reserva pedida).
+  const rangos = [
+    {label:'Antes de las 8:00 am', min:0, max:8, count:0},
+    {label:'8:00 am – 12:00 pm', min:8, max:12, count:0},
+    {label:'12:00 pm – 6:00 pm', min:12, max:18, count:0},
+    {label:'6:00 pm en adelante', min:18, max:24, count:0},
+  ];
+  let conHora = 0;
+  todasDelMes.forEach(r => {
+    if(!r.horaSolicitud) return;
+    const d = new Date(r.horaSolicitud);
+    if(isNaN(d.getTime())) return;
+    conHora++;
+    const h = d.getHours();
+    const rango = rangos.find(rg => h >= rg.min && h < rg.max);
+    if(rango) rango.count++;
+  });
+  const rangoMax = conHora>0 ? rangos.reduce((a,b) => b.count>a.count?b:a, rangos[0]) : null;
+
+  const filasDia = DIAS_SEMANA.map((nombre,i) => `
+    <tr>
+      <td>${nombre}${hayDatosDia && i===diaMax ? ' 🔺 <b>el que más recibe</b>' : ''}${hayDatosDia && i===diaMin && diaMin!==diaMax ? ' 🔻 <b>el que menos recibe</b>' : ''}</td>
+      <td style="text-align:center;">${porDiaSemana[i]}</td>
+    </tr>`).join('');
+
+  const filasRango = rangos.map(rg => `
+    <tr>
+      <td>${rg.label}${rangoMax===rg && rg.count>0 ? ' 🔺 <b>el rango con más</b>' : ''}</td>
+      <td style="text-align:center;">${rg.count}</td>
+    </tr>`).join('');
+
+  document.getElementById('informeContenido').innerHTML = `
+    <div class="informe-header">
+      <h1>La Matriarca Barranquilla — Estadísticas de solicitudes</h1>
+      <div class="informe-subtitulo">${mesLabel} · Todas las solicitudes recibidas (web y teléfono) · Agrupado por el día en que llegó la solicitud</div>
+    </div>
+    <div class="informe-turno">
+      <h2>📅 Por día de la semana</h2>
+      ${totalSolicitudes===0 ? `<div style="font-size:12.5px; color:#777;">No hubo solicitudes en ${mesLabel}.</div>` : `<table>
+        <thead><tr><th>Día</th><th>Solicitudes</th></tr></thead>
+        <tbody>${filasDia}</tbody>
+      </table>`}
+    </div>
+    <div class="informe-turno">
+      <h2>🕐 Por rango de horario de llegada</h2>
+      ${conHora===0 ? `<div style="font-size:12.5px; color:#777;">No hay solicitudes con hora de llegada registrada en ${mesLabel}.</div>` : `<table>
+        <thead><tr><th>Rango</th><th>Solicitudes</th></tr></thead>
+        <tbody>${filasRango}</tbody>
+      </table>`}
+      ${(conHora < totalSolicitudes && totalSolicitudes>0) ? `<div style="margin-top:6px; font-size:11.5px; color:#777;">${totalSolicitudes-conHora} solicitud${totalSolicitudes-conHora===1?'':'es'} sin hora de llegada registrada (de antes de que se guardara este dato) no entra${totalSolicitudes-conHora===1?'':'n'} en este desglose.</div>` : ''}
+    </div>
+    <div class="informe-turno" style="background:#fdf2f2; border:1px solid #e8b8b8; border-radius:6px; padding:10px 12px;">
+      <h2 style="background:none; color:#a33; padding:0; margin-bottom:8px;">🚫 Canceladas del mes</h2>
+      <div style="font-size:13px;">Total canceladas: <b>${canceladas.length}</b> de ${totalSolicitudes} solicitudes — <b>${pctCanceladas.toFixed(1)}%</b> del total</div>
+      <div style="font-size:13px; margin-top:4px;">Especiales (20+ personas) canceladas: <b>${canceladasEspeciales.length}</b> de ${totalSolicitudes} solicitudes totales — <b>${pctCanceladasEspeciales.toFixed(1)}%</b> del total</div>
+    </div>
+    <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
+      <b>Total de solicitudes en ${mesLabel}:</b> ${totalSolicitudes}
+    </div>`;
+  document.getElementById('overlayInforme').classList.add('open');
 }
 // Motor común de los dos informes (especiales y general) — la única
 // diferencia real entre ambos es el umbral mínimo de pax: 20 para el de
