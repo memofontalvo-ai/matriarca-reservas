@@ -359,6 +359,24 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   #overlayInforme{position:absolute; inset:0; display:block; background:#fff; padding:0;}
   #overlayInforme .informe-modal{position:static; max-width:none; max-height:none; overflow:visible; box-shadow:none; border:none; padding:12px; margin:0;}
   .informe-toolbar{display:none;}
+  .informe-turno, .ie-total-card, .ie-bloque-gestion{break-inside:avoid; page-break-inside:avoid;}
+  .informe-header{break-after:avoid; page-break-after:avoid;}
+}
+.ie-total-card{
+  background:#f1e6cf; border:1px solid #d4af37; border-radius:8px;
+  padding:16px 10px; text-align:center; margin-bottom:16px;
+}
+.ie-total-num{font-size:38px; font-weight:800; color:#1a1408; line-height:1;}
+.ie-total-label{font-size:12px; font-weight:700; color:#6b5a2a; letter-spacing:.5px; margin-top:4px;}
+.ie-bloque-gestion{border-radius:8px; padding:12px 14px; margin-bottom:16px;}
+.ie-bloque-general{background:#fdf2f2; border:1px solid #e8b8b8;}
+.ie-bloque-especial{background:#fdf8ea; border:1px solid #e8c96a;}
+.ie-bloque-dato{background:#f3f3f3; border:1px solid #d8d8d8;}
+.ie-fila-metrica{display:flex; justify-content:space-between; gap:10px; font-size:13px; color:#1a1a1a; padding:3px 0;}
+.ie-formula{margin-top:8px; font-size:11px; color:#999; font-family:monospace;}
+.ie-dato-pill{
+  background:#e2e2e2; color:#555; font-size:10.5px; font-weight:700;
+  padding:3px 9px; border-radius:20px; white-space:nowrap;
 }
 .btn-toggle-hora-salida{
   background:none; border:1px dashed var(--border); color:var(--text-dim);
@@ -2096,7 +2114,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.32</div>
+<div class="version-tag">v5.33</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6997,9 +7015,36 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   );
   const totalSolicitudes = todasDelMes.length;
   const canceladas = todasDelMes.filter(r => r.estado === 'cancelada');
-  const canceladasEspeciales = canceladas.filter(r => Number(r.pax) >= 20);
   const pctCanceladas = totalSolicitudes>0 ? (canceladas.length/totalSolicitudes*100) : 0;
-  const pctCanceladasEspeciales = totalSolicitudes>0 ? (canceladasEspeciales.length/totalSolicitudes*100) : 0;
+  const noCanceladas = totalSolicitudes - canceladas.length;
+  const pctNoCanceladas = totalSolicitudes>0 ? (noCanceladas/totalSolicitudes*100) : 0;
+
+  // Gestión de reservas ESPECIALES (20+ personas) — medición totalmente
+  // aparte: su propio universo (especialesDelMes), nunca el total general
+  // como denominador. Así la tasa de cancelación especial mide de verdad
+  // el desempeño sobre las reservas especiales, no se diluye entre todas
+  // las solicitudes del mes.
+  const especialesDelMes = todasDelMes.filter(r => Number(r.pax) >= 20);
+  const totalEspeciales = especialesDelMes.length;
+  const especialesCanceladas = especialesDelMes.filter(r => r.estado === 'cancelada');
+  const pctCancelEspecial = totalEspeciales>0 ? (especialesCanceladas.length/totalEspeciales*100) : 0;
+  const especialesNoCanceladas = totalEspeciales - especialesCanceladas.length;
+  const pctNoCancelEspecial = totalEspeciales>0 ? (especialesNoCanceladas/totalEspeciales*100) : 0;
+  // Dato complementario: qué parte de TODAS las cancelaciones del mes
+  // fueron especiales — no es el indicador principal, solo contexto.
+  const pctEspecialesDeCanceladas = canceladas.length>0 ? (especialesCanceladas.length/canceladas.length*100) : 0;
+
+  // Rango de fechas del reporte — si es el mes que está corriendo ahora
+  // mismo, se corta en hoy (todavía no puede haber solicitudes del resto
+  // del mes); si es un mes ya cerrado, va del 1 al último día completo.
+  const primerDiaMes = new Date(anio, mes-1, 1, 12);
+  const ultimoDiaMes = new Date(anio, mes, 0, 12);
+  const hoy = new Date();
+  const esMesActual = (hoy.getFullYear()===anio && hoy.getMonth()===mes-1);
+  const finRango = esMesActual ? hoy : ultimoDiaMes;
+  const rangoLabel = esMesActual
+    ? `Fecha de corte: 1 al ${finRango.getDate()} de ${MESES[mes-1]} de ${anio}`
+    : `Del 1 al ${ultimoDiaMes.getDate()} de ${MESES[mes-1]} de ${anio}`;
 
   // Por día de la semana en que llegó la solicitud.
   const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -7052,7 +7097,13 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
       <h1>La Matriarca Barranquilla — Estadísticas de solicitudes</h1>
-      <div class="informe-subtitulo">${mesLabel} · Todas las solicitudes recibidas (web y teléfono) · Agrupado por el día en que llegó la solicitud</div>
+      <div class="informe-subtitulo" style="margin-bottom:2px;">${mesLabel}</div>
+      <div class="informe-subtitulo" style="margin-bottom:2px;">${rangoLabel}</div>
+      <div class="informe-subtitulo">Todas las solicitudes recibidas (web y teléfono)</div>
+    </div>
+    <div class="ie-total-card">
+      <div class="ie-total-num">${totalSolicitudes}</div>
+      <div class="ie-total-label">TOTAL DE SOLICITUDES RECIBIDAS</div>
     </div>
     <div class="informe-turno">
       <h2>📅 Por día de la semana</h2>
@@ -7069,13 +7120,33 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
       </table>`}
       ${(conHora < totalSolicitudes && totalSolicitudes>0) ? `<div style="margin-top:6px; font-size:11.5px; color:#777;">${totalSolicitudes-conHora} solicitud${totalSolicitudes-conHora===1?'':'es'} sin hora de llegada registrada (de antes de que se guardara este dato) no entra${totalSolicitudes-conHora===1?'':'n'} en este desglose.</div>` : ''}
     </div>
-    <div class="informe-turno" style="background:#fdf2f2; border:1px solid #e8b8b8; border-radius:6px; padding:10px 12px;">
-      <h2 style="background:none; color:#a33; padding:0; margin-bottom:8px;">🚫 Canceladas del mes</h2>
-      <div style="font-size:13px;">Total canceladas: <b>${canceladas.length}</b> de ${totalSolicitudes} solicitudes — <b>${pctCanceladas.toFixed(1)}%</b> del total</div>
-      <div style="font-size:13px; margin-top:4px;">Especiales (20+ personas) canceladas: <b>${canceladasEspeciales.length}</b> de ${totalSolicitudes} solicitudes totales — <b>${pctCanceladasEspeciales.toFixed(1)}%</b> del total</div>
+    <div class="ie-bloque-gestion ie-bloque-general">
+      <h2 style="background:none; color:#a33; padding:0; margin-bottom:10px;">🚫 GESTIÓN GENERAL DE RESERVAS</h2>
+      <div class="ie-fila-metrica"><span>Total de solicitudes recibidas:</span><b>${totalSolicitudes}</b></div>
+      <div class="ie-fila-metrica"><span>Total de solicitudes canceladas:</span><b>${canceladas.length}</b></div>
+      <div class="ie-fila-metrica"><span>Tasa general de cancelación:</span><b style="color:#a33;">${pctCanceladas.toFixed(1)}%</b></div>
+      <div class="ie-fila-metrica"><span>Total de solicitudes no canceladas:</span><b>${noCanceladas}</b></div>
+      <div class="ie-fila-metrica"><span>Tasa de solicitudes no canceladas:</span><b>${pctNoCanceladas.toFixed(1)}%</b></div>
+      <div class="ie-formula">${canceladas.length} ÷ ${totalSolicitudes||0} × 100</div>
     </div>
-    <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
-      <b>Total de solicitudes en ${mesLabel}:</b> ${totalSolicitudes}
+    <div class="ie-bloque-gestion ie-bloque-especial">
+      <h2 style="background:none; color:#a17a1c; padding:0; margin-bottom:10px;">👥 GESTIÓN DE RESERVAS ESPECIALES · 20+ PERSONAS</h2>
+      <div class="ie-fila-metrica"><span>Total de solicitudes especiales recibidas:</span><b>${totalEspeciales}</b></div>
+      <div class="ie-fila-metrica"><span>Especiales canceladas:</span><b>${especialesCanceladas.length}</b></div>
+      <div class="ie-fila-metrica"><span>Especiales no canceladas:</span><b>${especialesNoCanceladas}</b></div>
+      <div class="ie-fila-metrica"><span>Tasa de cancelación especial:</span><b style="color:#a33;">${pctCancelEspecial.toFixed(1)}%</b></div>
+      <div class="ie-fila-metrica"><span>Tasa de no cancelación especial:</span><b>${pctNoCancelEspecial.toFixed(1)}%</b></div>
+      <div class="ie-formula">${especialesCanceladas.length} ÷ ${totalEspeciales||0} × 100</div>
+    </div>
+    <div class="ie-bloque-gestion ie-bloque-dato">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <h2 style="background:none; color:#1a1a1a; padding:0; margin:0;">📊 PARTICIPACIÓN EN LAS CANCELACIONES GENERALES</h2>
+        <span class="ie-dato-pill">Dato complementario</span>
+      </div>
+      <div style="margin-top:10px; font-size:13.5px;">${especialesCanceladas.length} de ${canceladas.length} cancelaciones fueron especiales: <b>${pctEspecialesDeCanceladas.toFixed(1)}%</b></div>
+    </div>
+    <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:12.5px; text-align:center; color:#666;">
+      Cada gestión se mide sobre su propio total.
     </div>`;
   document.getElementById('overlayInforme').classList.add('open');
 }
