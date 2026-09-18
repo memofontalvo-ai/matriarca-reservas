@@ -1201,6 +1201,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .rol-opcion span{display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px; line-height:1.4;}
 .bloqueo-turno-fila{display:flex; align-items:center; gap:8px;}
 .bloqueo-turno-bloque{margin-bottom:6px;}
+.bloqueo-evento-bloque{
+  margin-bottom:6px; padding:10px; border-radius:10px;
+  border:1px solid var(--gold); background:rgba(214,170,85,0.08);
+}
+.bloqueo-evento-bloque .rol-opcion{align-items:center;}
 .bloqueo-show-imagen{margin-top:8px; padding:10px; background:var(--panel-alt); border-radius:10px; border:1px dashed var(--border);}
 .bloqueo-show-imagen label{display:block; font-size:11px; color:var(--text-dim); margin-bottom:6px;}
 .bloqueo-show-imagen input[type="file"]{width:100%; font-size:11.5px; color:var(--text);}
@@ -2126,7 +2131,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.37</div>
+<div class="version-tag">v5.38</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2549,7 +2554,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <div class="overlay" id="overlayBloqueoDia">
   <div class="modal" style="max-width:440px; max-height:90vh; overflow-y:auto;">
     <h3 id="bloqueoDiaTitulo">Bloquear día</h3>
-    <div class="modal-sub">Marca los turnos que quieres cerrar y elige el motivo de cada uno: <b>Evento privado</b> cierra del todo, el cliente no puede ni intentarlo (el restaurante está reservado completo); <b>Sin disponibilidad</b> le muestra la opción de quedar en lista de espera. No afecta las reservas que ya tengas guardadas ese día. Si ese turno ya tiene un evento especial configurado (en Config → Eventos especiales), aparece la opción de bloquearlo directamente — no hace falta subir nada aquí, ese anuncio ya lo maneja la configuración del evento.</div>
+    <div class="modal-sub">Marca los turnos que quieres cerrar y elige el motivo de cada uno: <b>Evento privado</b> cierra del todo, el cliente no puede ni intentarlo (el restaurante está reservado completo); <b>Sin disponibilidad</b> le muestra la opción de quedar en lista de espera. No afecta las reservas que ya tengas guardadas ese día. Si algún turno tiene un evento especial configurado (en Config → Eventos especiales), aparece como una opción aparte más abajo — es independiente de si bloqueas ese turno o no, porque el show puede estar lleno aunque la cena normal siga teniendo cupo (o al revés).</div>
     <div class="rol-opciones" style="margin-top:10px;">
       <div class="bloqueo-turno-bloque" id="bloqueoBloqueDesayuno">
         <div class="bloqueo-turno-fila">
@@ -2561,12 +2566,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="disponibilidad">Sin disponibilidad</option>
             <option value="evento_privado">Evento privado</option>
           </select>
-        </div>
-        <div class="bloqueo-evento-configurado" id="fBloqueoDesayunoEventoWrap" style="display:none;">
-          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="fBloqueoDesayunoUsarEvento" onchange="toggleUsarEventoBloqueo('Desayuno')">
-            <span>🎤 Bloquear el evento ya configurado: <b id="fBloqueoDesayunoEventoNombre"></b></span>
-          </label>
         </div>
       </div>
       <div class="bloqueo-turno-bloque" id="bloqueoBloqueAlmuerzo">
@@ -2580,12 +2579,6 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="evento_privado">Evento privado</option>
           </select>
         </div>
-        <div class="bloqueo-evento-configurado" id="fBloqueoAlmuerzoEventoWrap" style="display:none;">
-          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="fBloqueoAlmuerzoUsarEvento" onchange="toggleUsarEventoBloqueo('Almuerzo')">
-            <span>🎤 Bloquear el evento ya configurado: <b id="fBloqueoAlmuerzoEventoNombre"></b></span>
-          </label>
-        </div>
       </div>
       <div class="bloqueo-turno-bloque" id="bloqueoBloqueCena">
         <div class="bloqueo-turno-fila">
@@ -2598,14 +2591,9 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="evento_privado">Evento privado</option>
           </select>
         </div>
-        <div class="bloqueo-evento-configurado" id="fBloqueoCenaEventoWrap" style="display:none;">
-          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="fBloqueoCenaUsarEvento" onchange="toggleUsarEventoBloqueo('Cena')">
-            <span>🎤 Bloquear el evento ya configurado: <b id="fBloqueoCenaEventoNombre"></b></span>
-          </label>
-        </div>
       </div>
     </div>
+    <div id="bloqueoEventosContainer"></div>
     <div class="field" style="margin-top:12px;">
       <label>Motivo (para uso interno)</label>
       <input type="text" id="fBloqueoMotivo" placeholder="Ej. Evento privado — cupo lleno">
@@ -5204,31 +5192,34 @@ function diaTieneShowEspecial(fechaIso){
 // de ancho, JPEG calidad media) — para que quepa en el documento de
 // Firestore sin pasarse del límite de 1MB, y cargue rápido en el celular
 // del cliente.
-let imagenesShowTemp = {};
-// Cuándo hay un evento especial YA configurado (en Config → Eventos
-// especiales) para este mismo día y turno: aparece un checkbox para
-// bloquearlo directo — este modal ya no maneja fotos ni nombres de
-// show, solo decide si ese evento queda bloqueado o no.
-let eventoParaBloqueoTemp = {};
-function toggleUsarEventoBloqueo(nombre){
-  const usando = document.getElementById('fBloqueo'+nombre+'UsarEvento').checked;
-  if(usando){
-    const ev = eventoParaBloqueoTemp[nombre];
-    if(ev){
-      imagenesShowTemp[nombre] = ev.imagen || null;
-      const motivoEl = document.getElementById('fBloqueoMotivo');
-      if(motivoEl && !motivoEl.value.trim()) motivoEl.value = ev.nombre;
-    }
-  } else {
-    delete imagenesShowTemp[nombre];
-  }
+// Los eventos especiales configurados (Config → Eventos especiales) se
+// bloquean COMPLETAMENTE APARTE del turno al que pertenecen — son dos
+// cosas independientes. Por ejemplo: la cena normal puede seguir con
+// cupo aunque el show de las 10pm ya se haya vendido completo (o al
+// revés). Por eso el bloqueo del evento vive en su propia llave en
+// Firestore (dia.eventos), no adentro de dia.cena/almuerzo/desayuno.
+let eventosDelDiaTemp = [];
+function toggleBloqueoEvento(idx){
+  const ev = eventosDelDiaTemp[idx];
+  if(!ev) return;
+  ev.bloqueado = document.getElementById('fBloqueoEvento'+idx).checked;
 }
-
+function construirEventosContainer(iso){
+  const cont = document.getElementById('bloqueoEventosContainer');
+  const turnoLabels = {desayuno:'☕ Desayuno', almuerzo:'☀️ Almuerzo', cena:'🌙 Cena'};
+  if(eventosDelDiaTemp.length === 0){ cont.innerHTML = ''; return; }
+  cont.innerHTML = eventosDelDiaTemp.map((ev, idx) => `
+    <div class="bloqueo-evento-bloque">
+      <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="fBloqueoEvento${idx}" ${ev.bloqueado ? 'checked' : ''} onchange="toggleBloqueoEvento(${idx})">
+        <span>🎤 Bloquear show especial (${turnoLabels[ev.turno]||ev.turno}): <b>${escapeHtml(ev.nombre)}</b></span>
+      </label>
+      ${ev.imagen ? `<img src="${ev.imagen}" style="width:100%; border-radius:8px; margin-top:8px;" alt="Publicidad del evento">` : ''}
+    </div>`).join('');
+}
 function abrirModalBloqueoDia(){
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
-  imagenesShowTemp = {};
-  eventoParaBloqueoTemp = {};
   document.getElementById('bloqueoDiaError').textContent = '';
   // El modal se ajusta a dónde estás parado: si tienes un turno puntual
   // activo (Desayuno/Almuerzo/Cena), solo se muestra ESE turno para
@@ -5255,28 +5246,20 @@ function abrirModalBloqueoDia(){
     const tipoViejo = info && info.tipo;
     const tipoGuardado = (tipoViejo === 'evento' || tipoViejo === 'show_especial') ? 'evento_privado' : (tipoViejo || 'disponibilidad');
     document.getElementById('fBloqueo'+nombre+'Tipo').value = tipoGuardado;
-
-    // ¿Hay un evento especial ya configurado (Config → Eventos
-    // especiales) para este mismo día y este turno? Si lo hay, se ofrece
-    // bloquearlo directo — la imagen y el nombre ya están en el evento,
-    // este modal no maneja fotos.
-    const eventoWrap = document.getElementById('fBloqueo'+nombre+'EventoWrap');
-    const eventoDelTurno = eventosCache.find(e => e.fecha === iso && e.turno === t);
-    eventoParaBloqueoTemp[nombre] = eventoDelTurno || null;
-    const usarEventoCheckbox = document.getElementById('fBloqueo'+nombre+'UsarEvento');
-    if(eventoDelTurno){
-      if(eventoWrap) eventoWrap.style.display = 'block';
-      document.getElementById('fBloqueo'+nombre+'EventoNombre').textContent = eventoDelTurno.nombre;
-      // Si el bloqueo ya guardado usa exactamente la misma imagen del
-      // evento, se marca el checkbox solo — así al reabrir el modal se
-      // ve reflejado que ya está bloqueando ese evento.
-      usarEventoCheckbox.checked = !!(info && info.imagen && eventoDelTurno.imagen && info.imagen === eventoDelTurno.imagen);
-      if(usarEventoCheckbox.checked) imagenesShowTemp[nombre] = eventoDelTurno.imagen;
-    } else {
-      if(eventoWrap) eventoWrap.style.display = 'none';
-      if(usarEventoCheckbox) usarEventoCheckbox.checked = false;
-    }
   });
+
+  // Eventos especiales de este día — independientes de los turnos de
+  // arriba (si hay uno para "Todos" los turnos que tengan show
+  // configurado, o solo el turno activo si estás parado en uno puntual).
+  const eventosGuardados = dia.eventos || {};
+  eventosDelDiaTemp = eventosCache
+    .filter(e => e.fecha === iso && (!soloEsteTurno || e.turno === soloEsteTurno))
+    .map(e => ({
+      turno: e.turno, nombre: e.nombre, imagen: e.imagen || null,
+      bloqueado: !!(eventosGuardados[e.turno] && eventosGuardados[e.turno].bloqueado),
+    }));
+  construirEventosContainer(iso);
+
   document.getElementById('fBloqueoMotivo').value = dia.motivo || '';
   document.getElementById('overlayBloqueoDia').classList.add('open');
 }
@@ -5285,7 +5268,6 @@ function guardarBloqueoDia(){
   const motivo = document.getElementById('fBloqueoMotivo').value.trim();
   const errEl = document.getElementById('bloqueoDiaError');
   errEl.textContent = '';
-
 
   const btn = document.getElementById('btnGuardarBloqueoDia');
   if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
@@ -5296,17 +5278,24 @@ function guardarBloqueoDia(){
     const marcado = document.getElementById('fBloqueo'+nombre).checked;
     if(marcado){
       const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
-      // La imagen se guarda si se subió una, sin importar el tipo — así
-      // un turno "Sin disponibilidad" o "Evento privado" puede seguir
-      // mostrando la publicidad del show, en vez de que solo se pueda
-      // anunciar cuando el turno queda sin bloquear.
-      turnos[t] = imagenesShowTemp[nombre] ? { tipo, imagen: imagenesShowTemp[nombre] } : { tipo };
+      turnos[t] = { tipo };
       algunoBloqueado = true;
     } else {
       turnos[t] = false;
     }
   });
-  const dataDia = algunoBloqueado ? { ...turnos, motivo } : firebase.firestore.FieldValue.delete();
+  // Los eventos especiales bloqueados van aparte, en su propia llave —
+  // independientes de si el turno que los contiene también está
+  // bloqueado o no (la cena puede seguir abierta con el show lleno, o
+  // al revés).
+  const eventos = {};
+  eventosDelDiaTemp.forEach(ev => {
+    if(ev.bloqueado){
+      eventos[ev.turno] = { bloqueado: true, nombre: ev.nombre, imagen: ev.imagen || null };
+      algunoBloqueado = true;
+    }
+  });
+  const dataDia = algunoBloqueado ? { ...turnos, eventos, motivo } : firebase.firestore.FieldValue.delete();
   fechasBloqueadasRef.set({ [iso]: dataDia }, { merge: true }).then(() => {
     document.getElementById('overlayBloqueoDia').classList.remove('open');
   }).catch(err => {
