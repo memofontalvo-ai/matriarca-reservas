@@ -395,13 +395,21 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    hay que salir de la app para imprimir, y "Cerrar" solo cierra el
    informe sin afectar nada más. */
 @media print{
-  body *{visibility:hidden;}
-  #overlayInforme, #overlayInforme *{visibility:visible;}
-  #overlayInforme{position:absolute; inset:0; display:block; background:#fff; padding:0;}
+  /* OJO: antes esto usaba visibility:hidden en todo body *, lo cual deja
+     el resto de la app (con sus imágenes enormes en base64: logo, fotos
+     de eventos, etc.) todavía "presente" para el motor de impresión,
+     solo invisible — eso inflaba muchísimo el PDF y en el celular hacía
+     que Safari cortara la impresión a la mitad (una sola hoja de varias).
+     display:none sí saca esos elementos del flujo por completo. */
+  body > *:not(#overlayInforme){display:none !important;}
+  #overlayInforme{position:static; display:block !important; background:#fff; padding:0; inset:auto;}
   #overlayInforme .informe-modal{position:static; max-width:none; max-height:none; overflow:visible; box-shadow:none; border:none; padding:12px; margin:0;}
   .informe-toolbar{display:none;}
   .informe-turno, .ie-total-card, .ie-bloque-gestion{break-inside:avoid; page-break-inside:avoid;}
   .informe-header{break-after:avoid; page-break-after:avoid;}
+  table{break-inside:auto;}
+  tr{break-inside:avoid; page-break-inside:avoid;}
+  thead{display:table-header-group;}
 }
 .ie-total-card{
   background:#f1e6cf; border:1px solid #d4af37; border-radius:8px;
@@ -2196,7 +2204,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.40</div>
+<div class="version-tag">v5.41</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
