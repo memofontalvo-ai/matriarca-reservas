@@ -2126,7 +2126,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.35</div>
+<div class="version-tag">v5.36</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2549,7 +2549,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 <div class="overlay" id="overlayBloqueoDia">
   <div class="modal" style="max-width:440px; max-height:90vh; overflow-y:auto;">
     <h3 id="bloqueoDiaTitulo">Bloquear día</h3>
-    <div class="modal-sub">Marca los turnos que quieres cerrar (o anunciar) y elige el motivo de cada uno: <b>Evento privado</b> cierra del todo, el cliente no puede ni intentarlo (el restaurante está reservado completo); <b>Sin disponibilidad</b> le muestra la opción de quedar en lista de espera; <b>Show especial / concierto</b> NO bloquea nada — le muestra la publicidad del evento al cliente y le pregunta si quiere continuar con su reserva normal. No afecta las reservas que ya tengas guardadas ese día.</div>
+    <div class="modal-sub">Marca los turnos que quieres cerrar (o anunciar) y elige el motivo de cada uno: <b>Evento privado</b> cierra del todo, el cliente no puede ni intentarlo (el restaurante está reservado completo); <b>Sin disponibilidad</b> le muestra la opción de quedar en lista de espera; <b>Show especial / concierto</b> NO bloquea nada — le muestra la publicidad del evento al cliente y le pregunta si quiere continuar con su reserva normal. No afecta las reservas que ya tengas guardadas ese día. La imagen de publicidad es opcional y se puede poner con cualquiera de los tres tipos — por ejemplo, para bloquear el turno con "Sin disponibilidad" y aun así seguir mostrando el anuncio del show.</div>
     <div class="rol-opciones" style="margin-top:10px;">
       <div class="bloqueo-turno-bloque" id="bloqueoBloqueDesayuno">
         <div class="bloqueo-turno-fila">
@@ -2563,8 +2563,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="show_especial">Show especial / concierto</option>
           </select>
         </div>
+        <div class="bloqueo-evento-configurado" id="fBloqueoDesayunoEventoWrap" style="display:none;">
+          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="fBloqueoDesayunoUsarEvento" onchange="toggleUsarEventoBloqueo('Desayuno')">
+            <span>🎤 Ya tienes configurado: <b id="fBloqueoDesayunoEventoNombre"></b> — usar este evento (no hace falta subir la imagen de nuevo)</span>
+          </label>
+        </div>
         <div class="bloqueo-show-imagen" id="fBloqueoDesayunoShowWrap" style="display:none;">
-          <label>Publicidad del show (mismo tamaño del carrusel)</label>
+          <label>Publicidad del show (opcional, mismo tamaño del carrusel — se puede poner con cualquiera de los 3 tipos)</label>
           <input type="file" accept="image/*" onchange="previsualizarImagenShow(this,'Desayuno')">
           <img id="fBloqueoDesayunoShowPreview" style="display:none; width:100%; border-radius:8px; margin-top:6px;">
         </div>
@@ -2581,8 +2587,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="show_especial">Show especial / concierto</option>
           </select>
         </div>
+        <div class="bloqueo-evento-configurado" id="fBloqueoAlmuerzoEventoWrap" style="display:none;">
+          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="fBloqueoAlmuerzoUsarEvento" onchange="toggleUsarEventoBloqueo('Almuerzo')">
+            <span>🎤 Ya tienes configurado: <b id="fBloqueoAlmuerzoEventoNombre"></b> — usar este evento (no hace falta subir la imagen de nuevo)</span>
+          </label>
+        </div>
         <div class="bloqueo-show-imagen" id="fBloqueoAlmuerzoShowWrap" style="display:none;">
-          <label>Publicidad del show (mismo tamaño del carrusel)</label>
+          <label>Publicidad del show (opcional, mismo tamaño del carrusel — se puede poner con cualquiera de los 3 tipos)</label>
           <input type="file" accept="image/*" onchange="previsualizarImagenShow(this,'Almuerzo')">
           <img id="fBloqueoAlmuerzoShowPreview" style="display:none; width:100%; border-radius:8px; margin-top:6px;">
         </div>
@@ -2599,8 +2611,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
             <option value="show_especial">Show especial / concierto</option>
           </select>
         </div>
+        <div class="bloqueo-evento-configurado" id="fBloqueoCenaEventoWrap" style="display:none;">
+          <label class="rol-opcion" style="flex-direction:row; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="fBloqueoCenaUsarEvento" onchange="toggleUsarEventoBloqueo('Cena')">
+            <span>🎤 Ya tienes configurado: <b id="fBloqueoCenaEventoNombre"></b> — usar este evento (no hace falta subir la imagen de nuevo)</span>
+          </label>
+        </div>
         <div class="bloqueo-show-imagen" id="fBloqueoCenaShowWrap" style="display:none;">
-          <label>Publicidad del show (mismo tamaño del carrusel)</label>
+          <label>Publicidad del show (opcional, mismo tamaño del carrusel — se puede poner con cualquiera de los 3 tipos)</label>
           <input type="file" accept="image/*" onchange="previsualizarImagenShow(this,'Cena')">
           <img id="fBloqueoCenaShowPreview" style="display:none; width:100%; border-radius:8px; margin-top:6px;">
         </div>
@@ -5206,10 +5224,37 @@ function diaTieneShowEspecial(fechaIso){
 // del cliente.
 let imagenesShowTemp = {};
 function actualizarVisibilidadImagenShow(nombre){
-  const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
   const marcado = document.getElementById('fBloqueo'+nombre).checked;
+  const usandoEvento = document.getElementById('fBloqueo'+nombre+'UsarEvento')?.checked;
   const wrap = document.getElementById('fBloqueo'+nombre+'ShowWrap');
-  if(wrap) wrap.style.display = (marcado && tipo === 'show_especial') ? 'block' : 'none';
+  // La imagen de publicidad ya NO depende de elegir "Show especial /
+  // concierto" — se puede adjuntar con cualquier tipo (incluyendo "Sin
+  // disponibilidad" o "Evento privado"), para poder bloquear el turno Y
+  // seguir anunciando el show al mismo tiempo. Si está usando el evento
+  // ya configurado (checkbox aparte), no hace falta el campo manual.
+  if(wrap) wrap.style.display = (marcado && !usandoEvento) ? 'block' : 'none';
+}
+// Cuándo hay un evento especial YA configurado (en Config → Eventos
+// especiales) para este mismo día y turno: en vez de tener que volver a
+// subir la imagen a mano, aparece un checkbox para reutilizar ese mismo
+// evento (nombre + imagen) directo en el bloqueo.
+let eventoParaBloqueoTemp = {};
+function toggleUsarEventoBloqueo(nombre){
+  const usando = document.getElementById('fBloqueo'+nombre+'UsarEvento').checked;
+  const preview = document.getElementById('fBloqueo'+nombre+'ShowPreview');
+  if(usando){
+    const ev = eventoParaBloqueoTemp[nombre];
+    if(ev){
+      imagenesShowTemp[nombre] = ev.imagen || null;
+      if(ev.imagen){ preview.src = ev.imagen; preview.style.display = 'block'; }
+      const motivoEl = document.getElementById('fBloqueoMotivo');
+      if(motivoEl && !motivoEl.value.trim()) motivoEl.value = ev.nombre;
+    }
+  } else {
+    delete imagenesShowTemp[nombre];
+    preview.style.display = 'none'; preview.src = '';
+  }
+  actualizarVisibilidadImagenShow(nombre);
 }
 function previsualizarImagenShow(input, nombre){
   const file = input.files[0];
@@ -5240,6 +5285,7 @@ function abrirModalBloqueoDia(){
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
   imagenesShowTemp = {};
+  eventoParaBloqueoTemp = {};
   document.getElementById('bloqueoDiaError').textContent = '';
   // El modal se ajusta a dónde estás parado: si tienes un turno puntual
   // activo (Desayuno/Almuerzo/Cena), solo se muestra ESE turno para
@@ -5262,8 +5308,28 @@ function abrirModalBloqueoDia(){
     // igual que 'evento_privado' — ambos son bloqueo total.
     const tipoGuardado = (info && info.tipo === 'evento') ? 'evento_privado' : ((info && info.tipo) || 'disponibilidad');
     document.getElementById('fBloqueo'+nombre+'Tipo').value = tipoGuardado;
+
+    // ¿Hay un evento especial ya configurado (Config → Eventos
+    // especiales) para este mismo día y este turno? Si lo hay, se ofrece
+    // reutilizarlo en vez de pedir subir la imagen de nuevo.
+    const eventoWrap = document.getElementById('fBloqueo'+nombre+'EventoWrap');
+    const eventoDelTurno = eventosCache.find(e => e.fecha === iso && e.turno === t);
+    eventoParaBloqueoTemp[nombre] = eventoDelTurno || null;
+    const usarEventoCheckbox = document.getElementById('fBloqueo'+nombre+'UsarEvento');
+    if(eventoDelTurno){
+      if(eventoWrap) eventoWrap.style.display = 'block';
+      document.getElementById('fBloqueo'+nombre+'EventoNombre').textContent = eventoDelTurno.nombre;
+      // Si el bloqueo ya guardado usa exactamente la misma imagen del
+      // evento, se marca el checkbox solo — así al reabrir el modal se
+      // ve reflejado que ya está usando el evento configurado.
+      usarEventoCheckbox.checked = !!(info && info.imagen && eventoDelTurno.imagen && info.imagen === eventoDelTurno.imagen);
+    } else {
+      if(eventoWrap) eventoWrap.style.display = 'none';
+      if(usarEventoCheckbox) usarEventoCheckbox.checked = false;
+    }
+
     const preview = document.getElementById('fBloqueo'+nombre+'ShowPreview');
-    if(info && info.tipo === 'show_especial' && info.imagen){
+    if(info && info.imagen){
       preview.src = info.imagen; preview.style.display = 'block';
       imagenesShowTemp[nombre] = info.imagen;
     } else {
@@ -5302,7 +5368,11 @@ function guardarBloqueoDia(){
     const marcado = document.getElementById('fBloqueo'+nombre).checked;
     if(marcado){
       const tipo = document.getElementById('fBloqueo'+nombre+'Tipo').value;
-      turnos[t] = tipo === 'show_especial' ? { tipo, imagen: imagenesShowTemp[nombre] } : { tipo };
+      // La imagen se guarda si se subió una, sin importar el tipo — así
+      // un turno "Sin disponibilidad" o "Evento privado" puede seguir
+      // mostrando la publicidad del show, en vez de que solo se pueda
+      // anunciar cuando el turno queda sin bloquear.
+      turnos[t] = imagenesShowTemp[nombre] ? { tipo, imagen: imagenesShowTemp[nombre] } : { tipo };
       algunoBloqueado = true;
     } else {
       turnos[t] = false;
