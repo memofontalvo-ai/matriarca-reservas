@@ -240,6 +240,47 @@ header{
   cursor:pointer; padding:2px 4px;
 }
 
+/* ===== FILTRO POR FECHA DE RESERVA EN SOLICITUDES ===== */
+/* Este filtro es únicamente visual: trabaja sobre las solicitudes que ya
+   están cargadas y nunca escribe ni modifica datos en Firebase. */
+.filtro-fecha-reserva-wrap{margin:10px 16px 0; flex-shrink:0;}
+.filtro-fecha-reserva-btn{
+  width:100%; display:flex; align-items:center; gap:9px; padding:11px 13px;
+  background:var(--panel-alt); border:1px solid var(--gold); border-radius:12px;
+  color:var(--gold-bright); font-family:inherit; font-size:12.5px; font-weight:700;
+  cursor:pointer; text-align:left;
+}
+.filtro-fecha-reserva-btn:hover{background:rgba(201,161,90,0.10);}
+.filtro-fecha-reserva-btn.activo{background:rgba(201,161,90,0.14);}
+.filtro-fecha-reserva-btn svg{width:17px; height:17px; flex-shrink:0;}
+.filtro-fecha-reserva-btn .filtro-fecha-texto{flex:1;}
+.filtro-fecha-reserva-btn .filtro-fecha-chevron{transition:transform .18s;}
+.filtro-fecha-reserva-btn.abierto .filtro-fecha-chevron{transform:rotate(180deg);}
+.filtro-fecha-reserva-panel{
+  display:none; margin-top:7px; padding:14px; background:var(--panel-alt);
+  border:1px solid var(--border); border-radius:14px;
+  box-shadow:0 12px 30px rgba(0,0,0,.28);
+}
+.filtro-fecha-reserva-panel.abierto{display:block;}
+.filtro-fecha-reserva-titulo{
+  text-align:center; color:var(--text); font-size:14px; font-weight:700;
+  margin-bottom:12px;
+}
+.filtro-fecha-reserva-panel .cal-days-inline .cal-day{height:40px;}
+.filtro-fecha-reserva-resumen{
+  min-height:18px; margin-top:11px; padding-top:11px;
+  border-top:1px solid var(--border-soft); color:var(--text-muted);
+  font-size:11.5px; font-weight:600; text-align:center;
+}
+.filtro-fecha-reserva-acciones{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;}
+.filtro-fecha-aplicar,.filtro-fecha-limpiar{
+  padding:10px 8px; border-radius:9px; font-family:inherit;
+  font-size:12px; font-weight:700; cursor:pointer;
+}
+.filtro-fecha-aplicar{background:var(--gold); border:1px solid var(--gold); color:#1a1408;}
+.filtro-fecha-limpiar{background:transparent; border:1px solid var(--gold); color:var(--gold-bright);}
+.filtro-fecha-aplicar:disabled{opacity:.45; cursor:not-allowed;}
+
 /* ===== RESUMEN DE SOLICITUDES DEL DÍA (arriba de la lista) ===== */
 .resumen-sol-dia{
   display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
@@ -1770,6 +1811,30 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <input type="text" id="buscarClienteSolicitudes" class="buscador-cliente-input" placeholder="Buscar por nombre o celular..." oninput="renderSolicitudesScreen()">
       <button type="button" class="buscador-cliente-limpiar" id="btnLimpiarBuscarSolicitudes" style="display:none;" onclick="document.getElementById('buscarClienteSolicitudes').value=''; renderSolicitudesScreen();">✕</button>
     </div>
+    <div class="filtro-fecha-reserva-wrap">
+      <button type="button" class="filtro-fecha-reserva-btn" id="btnFiltroFechaReserva" onclick="togglePanelFiltroFechaReserva()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span class="filtro-fecha-texto" id="textoFiltroFechaReserva">Filtrar por fecha de reserva</span>
+        <svg class="filtro-fecha-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="filtro-fecha-reserva-panel" id="panelFiltroFechaReserva">
+        <div class="filtro-fecha-reserva-titulo">Filtrar por fecha de reserva</div>
+        <div class="cal-head">
+          <button class="cal-nav-btn" onclick="cambiarMesFiltroFechaReserva(-1)">‹</button>
+          <div class="cal-title" id="tituloCalFiltroFechaReserva"></div>
+          <button class="cal-nav-btn" onclick="cambiarMesFiltroFechaReserva(1)">›</button>
+        </div>
+        <div class="cal-weekdays">
+          <span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span>
+        </div>
+        <div class="cal-days cal-days-inline" id="diasCalFiltroFechaReserva"></div>
+        <div class="filtro-fecha-reserva-resumen" id="resumenFiltroFechaReserva">Selecciona una fecha</div>
+        <div class="filtro-fecha-reserva-acciones">
+          <button type="button" class="filtro-fecha-aplicar" id="btnAplicarFiltroFechaReserva" onclick="aplicarFiltroFechaReserva()" disabled>Aplicar filtro</button>
+          <button type="button" class="filtro-fecha-limpiar" onclick="limpiarFiltroFechaReserva()">Ver todas</button>
+        </div>
+      </div>
+    </div>
     <div id="alertaAtrasadas"></div>
     <div class="solicitudes-panel" id="panelSolicitudes"></div>
   </div>
@@ -2131,7 +2196,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.38</div>
+<div class="version-tag">v5.39</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -5795,6 +5860,12 @@ function renderHeader(){
 /* ============ RENDER: STATS ============ */
 let filtroEspecialesPorDia = false;
 let filtroEspecialesSolicitudes = false;
+// Filtro adicional por la fecha PARA LA QUE se pidió la reserva. No cambia
+// fechaSolicitudes, que sigue representando el día EN QUE llegó la solicitud.
+let filtroFechaReservaSolicitudes = '';
+let filtroFechaReservaBorrador = '';
+let calFiltroFechaReservaMes = new Date().getMonth();
+let calFiltroFechaReservaAno = new Date().getFullYear();
 
 function reservasDelTurno(){
   const iso = fechaISO(fechaActual);
@@ -6438,6 +6509,142 @@ function seleccionarDiaInline(d){
 function toggleFiltroEspecialesSolicitudes(){
   filtroEspecialesSolicitudes = !filtroEspecialesSolicitudes;
   document.getElementById('btnFiltroEspecialesSol').classList.toggle('activo', filtroEspecialesSolicitudes);
+  renderSolicitudesScreen();
+}
+
+function esRegistroDelFlujoSolicitudes(r){
+  return r.pasoPorSolicitud === true || r.estado==='solicitud' ||
+    r.estado==='pendiente_aprobacion' || r.aprobadaPorCliente !== undefined;
+}
+
+function solicitudesLlegadasEnDiaVisible(){
+  const isoLlegada = fechaISO(fechaSolicitudes);
+  return reservas.filter(r => esRegistroDelFlujoSolicitudes(r) && fechaSolicitudEfectiva(r)===isoLlegada);
+}
+
+function fechaFiltroReservaObj(iso){
+  if(!iso) return null;
+  const partes = iso.split('-').map(Number);
+  if(partes.length!==3 || partes.some(n=>!Number.isFinite(n))) return null;
+  return new Date(partes[0], partes[1]-1, partes[2], 12);
+}
+
+function etiquetaFechaFiltroReserva(iso){
+  const d = fechaFiltroReservaObj(iso);
+  if(!d || isNaN(d.getTime())) return '';
+  return `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
+}
+
+function actualizarBotonFiltroFechaReserva(){
+  const btn = document.getElementById('btnFiltroFechaReserva');
+  const texto = document.getElementById('textoFiltroFechaReserva');
+  if(!btn || !texto) return;
+  btn.classList.toggle('activo', Boolean(filtroFechaReservaSolicitudes));
+  texto.textContent = filtroFechaReservaSolicitudes
+    ? `Fecha de reserva: ${etiquetaFechaFiltroReserva(filtroFechaReservaSolicitudes)}`
+    : 'Filtrar por fecha de reserva';
+}
+
+function togglePanelFiltroFechaReserva(){
+  const panel = document.getElementById('panelFiltroFechaReserva');
+  const btn = document.getElementById('btnFiltroFechaReserva');
+  if(!panel || !btn) return;
+  const abrir = !panel.classList.contains('abierto');
+  panel.classList.toggle('abierto', abrir);
+  btn.classList.toggle('abierto', abrir);
+  if(!abrir) return;
+
+  filtroFechaReservaBorrador = filtroFechaReservaSolicitudes;
+  const primeraFechaDisponible = solicitudesLlegadasEnDiaVisible()
+    .map(r=>r.fecha).filter(Boolean).sort()[0];
+  const base = fechaFiltroReservaObj(filtroFechaReservaSolicitudes || primeraFechaDisponible) || fechaSolicitudes;
+  calFiltroFechaReservaMes = base.getMonth();
+  calFiltroFechaReservaAno = base.getFullYear();
+  renderCalendarioFiltroFechaReserva();
+}
+
+function cambiarMesFiltroFechaReserva(delta){
+  calFiltroFechaReservaMes += delta;
+  if(calFiltroFechaReservaMes<0){calFiltroFechaReservaMes=11; calFiltroFechaReservaAno--;}
+  if(calFiltroFechaReservaMes>11){calFiltroFechaReservaMes=0; calFiltroFechaReservaAno++;}
+  renderCalendarioFiltroFechaReserva();
+}
+
+function renderCalendarioFiltroFechaReserva(){
+  const titulo = document.getElementById('tituloCalFiltroFechaReserva');
+  const diasEl = document.getElementById('diasCalFiltroFechaReserva');
+  if(!titulo || !diasEl) return;
+  titulo.textContent = `${MESES[calFiltroFechaReservaMes]} ${calFiltroFechaReservaAno}`;
+
+  // Los contadores del calendario corresponden solo a las solicitudes que
+  // llegaron en el día actualmente abierto en la pestaña Solicitudes.
+  const conteoPorFechaReserva = {};
+  solicitudesLlegadasEnDiaVisible().forEach(r=>{
+    if(r.fecha) conteoPorFechaReserva[r.fecha] = (conteoPorFechaReserva[r.fecha] || 0) + 1;
+  });
+
+  const primerDia = new Date(calFiltroFechaReservaAno, calFiltroFechaReservaMes, 1);
+  const offset = primerDia.getDay();
+  const diasEnMes = new Date(calFiltroFechaReservaAno, calFiltroFechaReservaMes+1, 0).getDate();
+  const hoyISO = fechaISO(new Date());
+  let html = '';
+  const diasMesAnterior = new Date(calFiltroFechaReservaAno, calFiltroFechaReservaMes, 0).getDate();
+  for(let i=offset-1; i>=0; i--) html += `<div class="cal-day muted">${diasMesAnterior-i}</div>`;
+  for(let d=1; d<=diasEnMes; d++){
+    const iso = fechaISO(new Date(calFiltroFechaReservaAno, calFiltroFechaReservaMes, d, 12));
+    let cls = 'cal-day';
+    if(iso===hoyISO) cls += ' today';
+    if(iso===filtroFechaReservaBorrador) cls += ' selected';
+    const cantidad = conteoPorFechaReserva[iso] || 0;
+    const marca = cantidad ? `<div class="cal-day-marcas"><span class="cal-day-count">${cantidad}</span></div>` : '<div class="cal-day-marcas"></div>';
+    html += `<div class="${cls}" onclick="seleccionarFechaFiltroReserva(${d})">${d}${marca}</div>`;
+  }
+  const totalCeldas = offset + diasEnMes;
+  const restante = (7 - (totalCeldas % 7)) % 7;
+  for(let d=1; d<=restante; d++) html += `<div class="cal-day muted">${d}</div>`;
+  diasEl.innerHTML = html;
+  actualizarResumenFiltroFechaReserva(conteoPorFechaReserva);
+}
+
+function seleccionarFechaFiltroReserva(d){
+  filtroFechaReservaBorrador = fechaISO(new Date(calFiltroFechaReservaAno, calFiltroFechaReservaMes, d, 12));
+  renderCalendarioFiltroFechaReserva();
+}
+
+function actualizarResumenFiltroFechaReserva(conteoOpcional){
+  const resumen = document.getElementById('resumenFiltroFechaReserva');
+  const aplicar = document.getElementById('btnAplicarFiltroFechaReserva');
+  if(!resumen || !aplicar) return;
+  aplicar.disabled = !filtroFechaReservaBorrador;
+  if(!filtroFechaReservaBorrador){
+    resumen.textContent = 'Selecciona una fecha';
+    return;
+  }
+  const conteo = conteoOpcional || solicitudesLlegadasEnDiaVisible().reduce((acc,r)=>{
+    if(r.fecha) acc[r.fecha] = (acc[r.fecha] || 0) + 1;
+    return acc;
+  },{});
+  const cantidad = conteo[filtroFechaReservaBorrador] || 0;
+  resumen.textContent = `${etiquetaFechaFiltroReserva(filtroFechaReservaBorrador)} · ${cantidad} solicitud${cantidad===1?'':'es'}`;
+}
+
+function aplicarFiltroFechaReserva(){
+  if(!filtroFechaReservaBorrador) return;
+  filtroFechaReservaSolicitudes = filtroFechaReservaBorrador;
+  const panel = document.getElementById('panelFiltroFechaReserva');
+  const btn = document.getElementById('btnFiltroFechaReserva');
+  if(panel) panel.classList.remove('abierto');
+  if(btn) btn.classList.remove('abierto');
+  renderSolicitudesScreen();
+}
+
+function limpiarFiltroFechaReserva(){
+  filtroFechaReservaSolicitudes = '';
+  filtroFechaReservaBorrador = '';
+  const panel = document.getElementById('panelFiltroFechaReserva');
+  const btn = document.getElementById('btnFiltroFechaReserva');
+  if(panel) panel.classList.remove('abierto');
+  if(btn) btn.classList.remove('abierto');
   renderSolicitudesScreen();
 }
 
@@ -8260,6 +8467,7 @@ function renderSolicitudesScreen(){
   const badge = document.getElementById('solicitudesBadge');
   badge.textContent = activas.length;
   badge.classList.toggle('zero', activas.length===0);
+  actualizarBotonFiltroFechaReserva();
 
   // Encabezado de fecha de esta pantalla (por defecto: hoy)
   const iso = fechaISO(fechaSolicitudes);
@@ -8346,13 +8554,24 @@ function renderSolicitudesScreen(){
     delDia = delDiaTotal;
     if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=20);
   }
+  // Se aplica al final para que pueda combinarse tanto con el día de
+  // llegada visible como con una búsqueda por nombre/celular. Solo compara
+  // la fecha pedida para la reserva; no altera el registro original.
+  if(filtroFechaReservaSolicitudes){
+    delDia = delDia.filter(r=>r.fecha===filtroFechaReservaSolicitudes);
+  }
 
   const el = document.getElementById('panelSolicitudes');
   if(delDia.length === 0){
-    el.innerHTML = textoBusquedaSol
-      ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en ninguna fecha.</div>`
-      : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+    if(filtroFechaReservaSolicitudes){
+      el.innerHTML = `<div class="solicitudes-empty">No hay solicitudes para la fecha de reserva <b>${escapeHtml(etiquetaFechaFiltroReserva(filtroFechaReservaSolicitudes))}</b>${textoBusquedaSol ? ` que coincidan con "${escapeHtml(textoBusquedaSol)}"` : ''}.<br>Toca <b>Ver todas</b> en el filtro para quitarlo.</div>`;
+    } else {
+      el.innerHTML = textoBusquedaSol
+        ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en ninguna fecha.</div>`
+        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+    }
     renderCalendarioSolInline();
+    if(document.getElementById('panelFiltroFechaReserva')?.classList.contains('abierto')) renderCalendarioFiltroFechaReserva();
     return;
   }
 
@@ -8467,7 +8686,7 @@ function renderSolicitudesScreen(){
   const generalPax = generalSols.reduce((a,r)=>a+Number(r.pax||0),0);
 
   const resumenHtml = renderResumenDiaV2({
-    fechaObj: fechaSolicitudes,
+    fechaObj: fechaFiltroReservaObj(filtroFechaReservaSolicitudes) || fechaSolicitudes,
     unidadSingular: 'Solicitud',
     unidadPlural: 'Solicitudes',
     totalCount: delDia.length,
@@ -8489,6 +8708,7 @@ function renderSolicitudesScreen(){
   // (mismo cuidado que en "Por día": no reseteamos el mes que se está
   // explorando, solo refrescamos los puntos de colores).
   renderCalendarioSolInline();
+  if(document.getElementById('panelFiltroFechaReserva')?.classList.contains('abierto')) renderCalendarioFiltroFechaReserva();
 }
 
 function irAFechaAtrasada(fechaIso){
