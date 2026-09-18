@@ -2196,7 +2196,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.39</div>
+<div class="version-tag">v5.40</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -9409,7 +9409,11 @@ function guardarReserva(){
   if(!horaNueva){ alert('Selecciona la hora de la reserva.'); return; }
   const horaSalidaNueva = document.getElementById('fHoraSalida').value; // opcional
   const mesaNueva = document.getElementById('fMesa').value;
-  if(!mesaNueva && estadoSeleccionado !== 'cancelada'){ alert('Asigna una mesa en el plano antes de guardar — es indispensable para poder recibir al cliente ese día.'); return; }
+  // La mesa solo es obligatoria para reservas aprobadas/confirmadas — una
+  // reserva "Pendiente" puede estar todavía en gestión (esperando datos,
+  // ya se llamó al cliente, etc.) sin que eso signifique ocupar una mesa
+  // de una vez. La mesa se asigna cuando de verdad se activa/aprueba.
+  if(!mesaNueva && estadoSeleccionado !== 'cancelada' && estadoSeleccionado !== 'pendiente'){ alert('Asigna una mesa en el plano antes de guardar — es indispensable para poder recibir al cliente ese día.'); return; }
   // Ninguna reserva se puede cancelar sin dejar constancia del motivo —
   // así siempre se puede dar seguimiento a por qué se cayó, sin importar
   // desde dónde se esté cancelando (Solicitudes, Por día, etc.).
