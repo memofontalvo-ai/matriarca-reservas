@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.50</div>
+<div class="version-tag">v5.51</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -4457,12 +4457,31 @@ function cambiarEventoSeleccionado(){
 let carruselCache = [];
 let slideImgBase64Temp = null;
 
+// Cada foto del carrusel vive en su PROPIO documento de la colección
+// carruselFotos — así el límite de 1MB de Firestore aplica a cada foto
+// por separado, no a la suma de todas juntas (antes vivían todas en un
+// mismo documento configuracion/carrusel y por eso el carrusel se
+// "llenaba" aunque cada foto individual pesara poco).
+// La primera vez que se abre esta pantalla después de esta actualización,
+// si todavía no hay nada en carruselFotos pero sí había fotos guardadas
+// en el formato viejo, se migran automáticamente una por una — para no
+// perder las que ya se habían subido.
 function cargarCarruselConfig(){
   const el = document.getElementById('listaCarrusel');
   if(!el) return;
-  db.collection('configuracion').doc('carrusel').get().then(doc => {
-    const data = doc.exists ? doc.data() : {};
-    carruselCache = (data.slides || []).slice().sort((a,b) => (a.orden||0)-(b.orden||0));
+  db.collection('carruselFotos').get().then(snap => {
+    if(!snap.empty) return snap;
+    return db.collection('configuracion').doc('carrusel').get().then(oldDoc => {
+      const oldSlides = (oldDoc.exists ? oldDoc.data().slides : []) || [];
+      if(oldSlides.length === 0) return snap;
+      const batch = db.batch();
+      oldSlides.forEach((s, i) => {
+        batch.set(db.collection('carruselFotos').doc(), {img: s.img, orden: i});
+      });
+      return batch.commit().then(() => db.collection('carruselFotos').get());
+    });
+  }).then(snap => {
+    carruselCache = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.orden||0)-(b.orden||0));
     if(carruselCache.length === 0){
       el.innerHTML = '<div class="config-mensaje-sub">Todavía no has subido ninguna foto — la página pública muestra 3 ejemplos genéricos mientras tanto.</div>';
       return;
@@ -4477,6 +4496,9 @@ function cargarCarruselConfig(){
           <button onclick="moverSlide(${i},1)" ${i===carruselCache.length-1?'disabled':''} title="Mover después">Después ▶</button>
         </div>
       </div>`).join('');
+  }).catch(err => {
+    console.error('Error cargando el carrusel:', err);
+    el.innerHTML = '<div class="config-mensaje-sub">No se pudo cargar el carrusel. Revisa tu conexión e intenta de nuevo.</div>';
   });
 }
 
@@ -4493,10 +4515,9 @@ function cerrarModalSlide(){
 
 // Comprime la foto en el navegador antes de guardarla: la reduce a un
 // ancho máximo de 700px y la vuelve JPEG, bajando la calidad varias veces
-// si hace falta hasta quedar bien liviana. Importante porque Firestore no
-// deja guardar más de 1MB por documento, y TODAS las fotos del carrusel
-// viven juntas en el mismo documento — entre más fotos ya guardadas, menos
-// margen queda para la nueva.
+// si hace falta hasta quedar bien liviana. Cada foto vive en su propio
+// documento de Firestore (tope real: 1MB por documento), así que esto
+// solo cuida que ESA foto en particular no sea demasiado pesada.
 function previsualizarSlide(input){
   const file = input.files[0];
   if(!file) return;
@@ -4542,34 +4563,12 @@ function guardarSlide(){
   const btn = document.getElementById('btnGuardarSlide');
   btn.disabled = true; btn.textContent = 'Guardando…';
 
-  // Se vuelve a leer el carrusel real de Firestore justo antes de guardar
-  // (en vez de confiar en carruselCache, que puede haber quedado
-  // desactualizado en el navegador si un borrado anterior falló en
-  // silencio) — así el conteo y el peso que se muestran en el error
-  // siempre reflejan lo que de verdad hay guardado.
-  db.collection('configuracion').doc('carrusel').get().then(doc => {
-    const listaActual = (doc.exists ? doc.data().slides : []) || [];
-    const nuevaLista = listaActual.slice();
-    nuevaLista.push({
-      id: 'slide_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
-      img: slideImgBase64Temp, orden: nuevaLista.length,
-    });
-
-    // Todas las fotos del carrusel viven en el mismo documento de Firestore
-    // (tope real: 1MB). Se revisa el peso total ANTES de intentar guardar,
-    // para poder avisar la causa real si el problema es que ya hay
-    // demasiadas fotos acumuladas — no que esta foto en particular esté mal.
-    const pesoTotalAprox = JSON.stringify({slides: nuevaLista}).length;
-    if(pesoTotalAprox > 900000){
-      errEl.textContent = `El carrusel ya tiene ${listaActual.length} foto(s) guardada(s) y entre todas están muy cerca del límite — por eso no cabe una más. Borra alguna foto antigua del carrusel y vuelve a intentar.`;
-      btn.disabled = false; btn.textContent = 'Guardar';
-      return;
-    }
-
-    return db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(() => {
-      cerrarModalSlide();
-      cargarCarruselConfig();
-    });
+  // Ahora cada foto es su propio documento — se agrega al final del orden
+  // actual. Ya no hace falta revisar el peso de TODAS las fotos juntas,
+  // porque cada una vive por separado en su propio límite de 1MB.
+  db.collection('carruselFotos').add({img: slideImgBase64Temp, orden: carruselCache.length}).then(() => {
+    cerrarModalSlide();
+    cargarCarruselConfig();
   }).catch(err => {
     console.error('Error guardando carrusel:', err);
     errEl.textContent = `No se pudo guardar (${err.code || err.message || 'error desconocido'}). Si el error persiste, prueba con una foto más liviana.`;
@@ -4580,8 +4579,7 @@ function guardarSlide(){
 
 function eliminarSlide(id){
   if(!confirm('¿Borrar esta foto del carrusel de la página pública?')) return;
-  const nuevaLista = carruselCache.filter(s => s.id !== id).map((s, i) => ({...s, orden: i}));
-  db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(cargarCarruselConfig).catch(err => {
+  db.collection('carruselFotos').doc(id).delete().then(cargarCarruselConfig).catch(err => {
     console.error('Error borrando foto del carrusel:', err);
     alert('No se pudo borrar la foto. Revisa tu conexión e intenta de nuevo.');
   });
@@ -4590,10 +4588,14 @@ function eliminarSlide(id){
 function moverSlide(indice, direccion){
   const otro = indice + direccion;
   if(otro < 0 || otro >= carruselCache.length) return;
-  const nuevaLista = carruselCache.slice();
-  [nuevaLista[indice], nuevaLista[otro]] = [nuevaLista[otro], nuevaLista[indice]];
-  nuevaLista.forEach((s, i) => s.orden = i);
-  db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(cargarCarruselConfig);
+  const a = carruselCache[indice], b = carruselCache[otro];
+  const batch = db.batch();
+  batch.update(db.collection('carruselFotos').doc(a.id), {orden: b.orden});
+  batch.update(db.collection('carruselFotos').doc(b.id), {orden: a.orden});
+  batch.commit().then(cargarCarruselConfig).catch(err => {
+    console.error('Error moviendo foto del carrusel:', err);
+    alert('No se pudo mover la foto. Revisa tu conexión e intenta de nuevo.');
+  });
 }
 
 function nombreRol(rol){
