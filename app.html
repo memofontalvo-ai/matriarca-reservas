@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.51</div>
+<div class="version-tag">v5.52</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -4466,21 +4466,28 @@ let slideImgBase64Temp = null;
 // si todavía no hay nada en carruselFotos pero sí había fotos guardadas
 // en el formato viejo, se migran automáticamente una por una — para no
 // perder las que ya se habían subido.
+// La migración desde el formato viejo (todas las fotos juntas en un solo
+// documento) se hace UNA SOLA VEZ de verdad — queda marcada en
+// configuracion/carruselMigrado. Antes se decidía mirando si la
+// colección nueva estaba vacía, pero eso hacía que las fotos volvieran
+// a aparecer solas cada vez que se borraban todas (porque el archivo
+// viejo seguía intacto y el sistema pensaba "todavía no se migró").
 function cargarCarruselConfig(){
   const el = document.getElementById('listaCarrusel');
   if(!el) return;
-  db.collection('carruselFotos').get().then(snap => {
-    if(!snap.empty) return snap;
+  db.collection('configuracion').doc('carruselMigrado').get().then(migDoc => {
+    if(migDoc.exists && migDoc.data().hecho) return null;
     return db.collection('configuracion').doc('carrusel').get().then(oldDoc => {
       const oldSlides = (oldDoc.exists ? oldDoc.data().slides : []) || [];
-      if(oldSlides.length === 0) return snap;
       const batch = db.batch();
       oldSlides.forEach((s, i) => {
         batch.set(db.collection('carruselFotos').doc(), {img: s.img, orden: i});
       });
-      return batch.commit().then(() => db.collection('carruselFotos').get());
+      batch.set(db.collection('configuracion').doc('carrusel'), {slides: []});
+      batch.set(db.collection('configuracion').doc('carruselMigrado'), {hecho: true});
+      return batch.commit();
     });
-  }).then(snap => {
+  }).then(() => db.collection('carruselFotos').get()).then(snap => {
     carruselCache = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.orden||0)-(b.orden||0));
     if(carruselCache.length === 0){
       el.innerHTML = '<div class="config-mensaje-sub">Todavía no has subido ninguna foto — la página pública muestra 3 ejemplos genéricos mientras tanto.</div>';
