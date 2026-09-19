@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.47</div>
+<div class="version-tag">v5.48</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -7248,6 +7248,18 @@ function findMesa(id){
 // las mesas ocupadas de ESE turno, para poder repartirlo al personal de
 // servicio en papel.
 function descargarInformeDia(){
+  // Convierte "HH:MM" a minutos para poder ordenar cronológicamente. Las
+  // horas de madrugada (00:xx a 05:xx) se tratan como si fueran 24:xx a
+  // 29:xx, para que una reserva de cena a la 1:30 am quede DESPUÉS de una
+  // de las 11 pm, no antes — mismo criterio que ya se usa para validar
+  // el turno de cena cuando cruza la medianoche.
+  function minutosParaOrdenHora(hora){
+    const [h,m] = String(hora||'0:0').split(':').map(Number);
+    const hh = isFinite(h) ? h : 0;
+    const mm = isFinite(m) ? m : 0;
+    const hAjustada = hh < 6 ? hh + 24 : hh;
+    return hAjustada * 60 + mm;
+  }
   // El informe es por turno — no tiene sentido imprimir "todo" de una vez
   // (mezclaría desayuno, almuerzo y cena en el mismo reparto de servicio).
   // Hay que elegir un turno puntual arriba antes de poder descargarlo.
@@ -7265,7 +7277,7 @@ function descargarInformeDia(){
   const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
       .filter(r => r.fecha===iso && r.turno===turno && r.estado==='confirmada')
-      .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
+      .sort((a,b) => minutosParaOrdenHora(a.hora) - minutosParaOrdenHora(b.hora));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
     const totalAbonoTurno = rs.reduce((s,r) => s + (Number(r.abono)||0), 0);
     const reservasConCoverTurno = rs.filter(r => Number(r.coverValor) > 0);
