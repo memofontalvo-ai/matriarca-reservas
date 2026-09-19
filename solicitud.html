@@ -58,14 +58,28 @@ button{cursor:pointer}
   font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#737a85
 }
 .subtitle{text-align:center;color:#dfe1e5;font-size:17px;font-weight:700;margin:8px 0 2px}
+.publicidad-carrusel-wrap{margin:0 auto 18px;}
+.publicidad-titulo{
+  display:flex;align-items:center;gap:10px;justify-content:center;
+  color:#fff;font-weight:700;font-size:13px;letter-spacing:1.5px;
+  text-transform:uppercase;margin-bottom:10px;
+}
+.publicidad-titulo span{flex:1;max-width:48px;height:1px;background:var(--gold);}
 .publicidad-carrusel{
   width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;
-  margin:0 auto 14px;background:var(--panel2);
+  background:var(--panel2);border:2px solid var(--gold);
+  box-shadow:0 0 18px 2px rgba(224,173,63,0.55);
 }
 .publicidad-carrusel img{
   width:100%;height:100%;object-fit:cover;display:block;
   transition:opacity .35s ease;
 }
+.publicidad-dots{display:flex;justify-content:center;gap:6px;margin-top:10px;}
+.publicidad-dot{
+  width:7px;height:7px;border-radius:50%;background:#3a3f47;
+  border:none;padding:0;cursor:pointer;
+}
+.publicidad-dot.activo{background:var(--gold);}
 .subtitle-small{text-align:center;color:var(--muted);font-size:12px;margin-bottom:18px}
 .activo-tipo{background:linear-gradient(180deg,var(--gold-bright),var(--gold)) !important; color:#111 !important; border-color:var(--gold-bright) !important;}
 
@@ -203,7 +217,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.27</div>
+<div class="version-tag">v3.28</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -211,8 +225,12 @@ button{cursor:pointer}
     <div class="logo-header-sub">Software de Reservas</div>
   </div>
 
-  <div id="publicidadCarrusel" class="publicidad-carrusel" style="display:none;">
-    <img id="publicidadCarruselImg" src="" alt="Publicidad">
+  <div id="publicidadCarrusel" class="publicidad-carrusel-wrap" style="display:none;">
+    <div class="publicidad-titulo"><span></span>Próximos eventos especiales<span></span></div>
+    <div class="publicidad-carrusel">
+      <img id="publicidadCarruselImg" src="" alt="Publicidad">
+    </div>
+    <div class="publicidad-dots" id="publicidadDots"></div>
   </div>
 
   <div id="formulario">
@@ -434,15 +452,34 @@ const firebaseConfig = {
       if(fotos.length === 0) return;
       const cont = document.getElementById('publicidadCarrusel');
       const img = document.getElementById('publicidadCarruselImg');
+      const dotsWrap = document.getElementById('publicidadDots');
       let i = 0;
+      let intervalo = null;
+
+      function mostrar(n){
+        i = n;
+        img.style.opacity = '0';
+        setTimeout(() => { img.src = fotos[i].img; img.style.opacity = '1'; }, 350);
+        dotsWrap.querySelectorAll('.publicidad-dot').forEach((d, idx) => d.classList.toggle('activo', idx === i));
+      }
+      function reiniciarAuto(){
+        if(intervalo) clearInterval(intervalo);
+        if(fotos.length > 1) intervalo = setInterval(() => mostrar((i + 1) % fotos.length), 5000);
+      }
+
       img.src = fotos[0].img;
       cont.style.display = 'block';
+      dotsWrap.innerHTML = '';
       if(fotos.length > 1){
-        setInterval(() => {
-          i = (i + 1) % fotos.length;
-          img.style.opacity = '0';
-          setTimeout(() => { img.src = fotos[i].img; img.style.opacity = '1'; }, 350);
-        }, 5000);
+        fotos.forEach((_, idx) => {
+          const dot = document.createElement('button');
+          dot.type = 'button';
+          dot.className = 'publicidad-dot' + (idx === 0 ? ' activo' : '');
+          dot.setAttribute('aria-label', 'Ver evento ' + (idx + 1));
+          dot.addEventListener('click', () => { mostrar(idx); reiniciarAuto(); });
+          dotsWrap.appendChild(dot);
+        });
+        reiniciarAuto();
       }
     }).catch(err => console.error('Error cargando el carrusel de fotos:', err));
   }
