@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.49</div>
+<div class="version-tag">v5.50</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -4542,26 +4542,34 @@ function guardarSlide(){
   const btn = document.getElementById('btnGuardarSlide');
   btn.disabled = true; btn.textContent = 'Guardando…';
 
-  const nuevaLista = carruselCache.slice();
-  nuevaLista.push({
-    id: 'slide_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
-    img: slideImgBase64Temp, orden: nuevaLista.length,
-  });
+  // Se vuelve a leer el carrusel real de Firestore justo antes de guardar
+  // (en vez de confiar en carruselCache, que puede haber quedado
+  // desactualizado en el navegador si un borrado anterior falló en
+  // silencio) — así el conteo y el peso que se muestran en el error
+  // siempre reflejan lo que de verdad hay guardado.
+  db.collection('configuracion').doc('carrusel').get().then(doc => {
+    const listaActual = (doc.exists ? doc.data().slides : []) || [];
+    const nuevaLista = listaActual.slice();
+    nuevaLista.push({
+      id: 'slide_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+      img: slideImgBase64Temp, orden: nuevaLista.length,
+    });
 
-  // Todas las fotos del carrusel viven en el mismo documento de Firestore
-  // (tope real: 1MB). Se revisa el peso total ANTES de intentar guardar,
-  // para poder avisar la causa real si el problema es que ya hay
-  // demasiadas fotos acumuladas — no que esta foto en particular esté mal.
-  const pesoTotalAprox = JSON.stringify({slides: nuevaLista}).length;
-  if(pesoTotalAprox > 900000){
-    errEl.textContent = `El carrusel ya tiene ${carruselCache.length} foto(s) guardada(s) y entre todas están muy cerca del límite — por eso no cabe una más. Borra alguna foto antigua del carrusel y vuelve a intentar.`;
-    btn.disabled = false; btn.textContent = 'Guardar';
-    return;
-  }
+    // Todas las fotos del carrusel viven en el mismo documento de Firestore
+    // (tope real: 1MB). Se revisa el peso total ANTES de intentar guardar,
+    // para poder avisar la causa real si el problema es que ya hay
+    // demasiadas fotos acumuladas — no que esta foto en particular esté mal.
+    const pesoTotalAprox = JSON.stringify({slides: nuevaLista}).length;
+    if(pesoTotalAprox > 900000){
+      errEl.textContent = `El carrusel ya tiene ${listaActual.length} foto(s) guardada(s) y entre todas están muy cerca del límite — por eso no cabe una más. Borra alguna foto antigua del carrusel y vuelve a intentar.`;
+      btn.disabled = false; btn.textContent = 'Guardar';
+      return;
+    }
 
-  db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(() => {
-    cerrarModalSlide();
-    cargarCarruselConfig();
+    return db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(() => {
+      cerrarModalSlide();
+      cargarCarruselConfig();
+    });
   }).catch(err => {
     console.error('Error guardando carrusel:', err);
     errEl.textContent = `No se pudo guardar (${err.code || err.message || 'error desconocido'}). Si el error persiste, prueba con una foto más liviana.`;
@@ -4573,7 +4581,10 @@ function guardarSlide(){
 function eliminarSlide(id){
   if(!confirm('¿Borrar esta foto del carrusel de la página pública?')) return;
   const nuevaLista = carruselCache.filter(s => s.id !== id).map((s, i) => ({...s, orden: i}));
-  db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(cargarCarruselConfig);
+  db.collection('configuracion').doc('carrusel').set({slides: nuevaLista}).then(cargarCarruselConfig).catch(err => {
+    console.error('Error borrando foto del carrusel:', err);
+    alert('No se pudo borrar la foto. Revisa tu conexión e intenta de nuevo.');
+  });
 }
 
 function moverSlide(indice, direccion){
