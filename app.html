@@ -2204,7 +2204,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.42</div>
+<div class="version-tag">v5.44</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2463,6 +2463,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <label>Abonos registrados <span class="fecha-solicitud-hint">(cada abono necesita su comprobante — es el soporte del pago)</span></label>
           <div id="abonoPactadoAbonosLista" class="cover-abonos-lista"></div>
           <div id="abonoPactadoResumen"></div>
+          <a href="#" id="btnEnviarAprobacionAbonoPactado" class="btn btn-primary" style="display:none; text-decoration:none; text-align:center; margin-top:8px;" onclick="return enviarAbonoAprobacion(event, 'mesa')">💬 Enviar a aprobación</a>
 
           <div id="nuevoAbonoPactadoForm" class="nuevo-abono-cover-form" style="display:none;">
             <div class="field">
@@ -2499,6 +2500,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <label>Abonos del cover <span class="fecha-solicitud-hint">(cada abono necesita su comprobante — es el soporte del pago)</span></label>
           <div id="coverAbonosLista" class="cover-abonos-lista"></div>
           <div id="coverAbonosResumen"></div>
+          <a href="#" id="btnEnviarAprobacionAbonoCover" class="btn btn-primary" style="display:none; text-decoration:none; text-align:center; margin-top:8px;" onclick="return enviarAbonoAprobacion(event, 'cover')">💬 Enviar a aprobación</a>
 
           <div id="nuevoAbonoCoverForm" class="nuevo-abono-cover-form" style="display:none;">
             <div class="field">
@@ -3849,6 +3851,8 @@ function renderCoverAbonos(){
     resumen.textContent = `Abonado: $${totalAbonado.toLocaleString('es-CO')} — Pendiente: $${pendiente.toLocaleString('es-CO')} de $${totalCover.toLocaleString('es-CO')}`;
     resumen.classList.add('pendiente');
   }
+  const btnEnviarAprobacion = document.getElementById('btnEnviarAprobacionAbonoCover');
+  if(btnEnviarAprobacion) btnEnviarAprobacion.style.display = coverAbonosTemp.length > 0 ? 'block' : 'none';
 }
 // El comprobante es obligatorio en cada abono del cover — es el soporte
 // del pago, tal como el comprobante de abono de consumo. Por eso se pide
@@ -3970,6 +3974,8 @@ function renderAbonoPactadoResumen(){
     resumen.textContent = `Abonado: $${totalAbonado.toLocaleString('es-CO')} — Pendiente: $${pendiente.toLocaleString('es-CO')} de $${totalPactado.toLocaleString('es-CO')}`;
     resumen.classList.add('pendiente');
   }
+  const btnEnviarAprobacion = document.getElementById('btnEnviarAprobacionAbonoPactado');
+  if(btnEnviarAprobacion) btnEnviarAprobacion.style.display = abonoPactadoAbonosTemp.length > 0 ? 'block' : 'none';
 }
 function mostrarFormNuevoAbonoPactado(){
   const totalPactado = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
@@ -4047,6 +4053,78 @@ function valorAbonoParaGuardar(){
     return abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
   }
   return Number(document.getElementById('fAbono').value)||0;
+}
+
+// ===== Envío a aprobación del comprobante de abono (mesa o cover) =====
+// Después de cargar un abono con su comprobante, este botón arma un
+// mensaje con los datos del cliente (mismo orden que ya se usaba antes
+// para reportar pagos) y abre WhatsApp hacia el número fijo de
+// aprobación de abonos. La FOTO del comprobante no se manda desde acá
+// —Guillermo la envía aparte, por su cuenta— este botón solo arma el
+// texto para no tener que escribirlo a mano cada vez.
+const NUMERO_APROBACION_ABONOS = '573218029306';
+// tipo: 'mesa' o 'cover' — decide el título grande y de cuál lista de
+// abonos (abonoPactadoAbonosTemp o coverAbonosTemp) se sacan los montos.
+// "Abona ahora" es el ÚLTIMO abono agregado a esa lista — el que el
+// staff acaba de cargar con su comprobante, justo antes de tocar este
+// botón — para que se pueda comparar ese número contra el voucher.
+function armarMensajeAprobacionAbono(tipo){
+  let tituloTexto, total, totalAbonado, montoAhora;
+  if(tipo === 'cover'){
+    const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+    const pax = Number(document.getElementById('fPax').value) || 0;
+    total = porPersona * pax;
+    totalAbonado = coverAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
+    montoAhora = coverAbonosTemp.length ? Number(coverAbonosTemp[coverAbonosTemp.length - 1].monto || 0) : 0;
+    tituloTexto = '*COVER*';
+  } else {
+    total = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
+    totalAbonado = abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
+    montoAhora = abonoPactadoAbonosTemp.length ? Number(abonoPactadoAbonosTemp[abonoPactadoAbonosTemp.length - 1].monto || 0) : 0;
+    tituloTexto = '*ABONO POR MESA*';
+  }
+  const pendiente = total - totalAbonado;
+  const lineasMonto = [
+    tituloTexto,
+    `Total: $${total.toLocaleString('es-CO')}`,
+    `Abona ahora: $${montoAhora.toLocaleString('es-CO')}`,
+    `Saldo pendiente: $${pendiente.toLocaleString('es-CO')}`,
+  ];
+
+  const nombre = document.getElementById('fNombre').value.trim();
+  const celularCompleto = armarCelularCompleto(document.getElementById('fCelularCod').value, document.getElementById('fCelular').value);
+  const correo = document.getElementById('fCorreo').value.trim();
+  const pax = document.getElementById('fPax').value;
+  const hora = document.getElementById('fHora').value;
+  // Misma lógica que guardarReserva() para saber la fecha real de la
+  // reserva: si el bloque de "Fecha y turno" está visible (solo pasa al
+  // editar), se usa lo que haya ahí; si no, modalFecha (fijo, reserva nueva).
+  let fechaFinal = modalFecha;
+  const fechaReservaEditBlock = document.getElementById('fechaReservaEditBlock');
+  if(fechaReservaEditBlock && fechaReservaEditBlock.style.display !== 'none'){
+    fechaFinal = document.getElementById('fFechaReservaEdit').value || modalFecha;
+  }
+  let fechaTexto = '';
+  if(fechaFinal){
+    const [y,m,d] = fechaFinal.split('-').map(Number);
+    const mesTexto = MESES[m-1] ? MESES[m-1].charAt(0).toUpperCase() + MESES[m-1].slice(1) : '';
+    fechaTexto = `${d}-${mesTexto}-${y}`;
+  }
+  const horaTexto = hora ? formatearHora12(hora) : '';
+  const lineasDatos = [];
+  if(fechaTexto) lineasDatos.push(`Fecha: ${fechaTexto}`);
+  if(horaTexto) lineasDatos.push(`Hora: ${horaTexto}`);
+  if(nombre) lineasDatos.push(`Nombre: ${nombre}`);
+  if(pax) lineasDatos.push(`Número de Personas: ${pax}`);
+  if(celularCompleto) lineasDatos.push(`Teléfono de Contacto: Cel. ${celularCompleto}`);
+  if(correo) lineasDatos.push(`Correo electrónico: ${correo}`);
+
+  return lineasMonto.join('\n') + '\n\n' + lineasDatos.join('\n');
+}
+function enviarAbonoAprobacion(ev, tipo){
+  const mensaje = armarMensajeAprobacionAbono(tipo);
+  const url = `https://wa.me/${NUMERO_APROBACION_ABONOS}?text=${encodeURIComponent(mensaje)}`;
+  return abrirWhatsappForzado(url, ev);
 }
 function previsualizarComprobanteCover(input){
   const file = input.files[0];
