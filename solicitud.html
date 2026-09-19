@@ -195,7 +195,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.25</div>
+<div class="version-tag">v3.26</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -372,13 +372,10 @@ button{cursor:pointer}
 
 <div id="overlayListaEspera" style="display:none; position:fixed; inset:0; background:rgba(8,9,11,0.82); z-index:999; align-items:center; justify-content:center; padding:18px;">
   <div style="background:#171a20; border:1px solid #343942; border-radius:16px; padding:22px; max-width:400px; width:100%;">
-    <h3 style="color:#f2c65d; font-size:18px; margin-bottom:10px;">Fecha sin disponibilidad</h3>
-    <p style="font-size:13.5px; line-height:1.55; color:#f5f5f5;">
-      La fecha seleccionada se encuentra actualmente sin disponibilidad — no tenemos cupo para ese turno.<br><br>
-      Por favor elige otra fecha o turno.
-    </p>
+    <h3 id="bloqueoDuroTitulo" style="color:#f2c65d; font-size:18px; margin-bottom:10px;">Sin disponibilidad</h3>
+    <p id="bloqueoDuroTexto" style="font-size:13.5px; line-height:1.55; color:#f5f5f5;"></p>
     <div style="display:flex; gap:10px; margin-top:18px;">
-      <button type="button" onclick="cancelarListaEspera()" style="flex:1; padding:11px; border-radius:10px; border:none; background:linear-gradient(180deg,#f2c65d,#e0ad3f); color:#111; font-weight:700; font-size:13px;">Elegir otra fecha</button>
+      <button type="button" onclick="cancelarListaEspera()" style="flex:1; padding:11px; border-radius:10px; border:none; background:linear-gradient(180deg,#f2c65d,#e0ad3f); color:#111; font-weight:700; font-size:13px;">Elegir otra fecha u hora</button>
     </div>
   </div>
 </div>
@@ -691,12 +688,11 @@ const firebaseConfig = {
     if(esBloqueoDuro(info)){
       // Bloqueo total: ni "sin disponibilidad" ni "evento privado" dejan
       // seleccionar el turno — no hay lista de espera ni forma de
-      // continuar, solo elegir otro turno u otra fecha.
-      const avisoBloqueo = document.getElementById('avisoFechaBloqueada');
-      avisoBloqueo.style.display = 'block';
-      avisoBloqueo.innerHTML = info.tipo === 'disponibilidad'
-        ? '<strong>Sin disponibilidad</strong><br>No tenemos cupo para este turno. Por favor elige otro turno u otra fecha.'
-        : '<strong>Fecha no disponible</strong><br>Esta fecha no está disponible por un evento privado. Por favor elige otro turno u otra fecha.';
+      // continuar, solo elegir otro turno u otra fecha. Se muestra como
+      // modal de pantalla completa (no como aviso chiquito) para que
+      // quede clarísimo que no es un error del formulario, sino que de
+      // verdad no hay cupo.
+      mostrarModalBloqueoDuro(info);
       return;
     }
     if(info && info.tipo === 'show_especial' && turnoConfirmadoShow !== t){
@@ -712,9 +708,21 @@ const firebaseConfig = {
     validarDuplicadoYDesbloquear();
   }
 
-  // ---- Modal de decisión para "sin disponibilidad" ----
+  // ---- Modal de bloqueo total (sin disponibilidad / evento privado) ----
+  // Reemplaza el aviso chiquito de antes: ahora es pantalla completa,
+  // igual que el que ve el staff por teléfono, para que quede clarísimo
+  // que no es un error del formulario sino que de verdad no hay cupo.
   let turnoPendienteModal = null;
   let reintentarEnvioAlConfirmar = false;
+  function mostrarModalBloqueoDuro(info){
+    document.getElementById('bloqueoDuroTitulo').textContent = info.tipo === 'disponibilidad'
+      ? '🕒 Sin disponibilidad en este turno'
+      : '🔒 Evento privado en este turno';
+    document.getElementById('bloqueoDuroTexto').innerHTML = info.tipo === 'disponibilidad'
+      ? 'Este turno está marcado como sin disponibilidad (cupo lleno). No se puede crear una reserva nueva aquí — elige otra hora o turno.'
+      : `Este turno está bloqueado por un evento privado — el restaurante queda reservado completo.${info.motivo?' '+info.motivo:''} Elige otra hora o turno.`;
+    document.getElementById('overlayListaEspera').style.display = 'flex';
+  }
   function abrirModalListaEspera(t, reintentarEnvio){
     turnoPendienteModal = t;
     reintentarEnvioAlConfirmar = !!reintentarEnvio;
@@ -893,10 +901,7 @@ const firebaseConfig = {
     // modal en vez de mandar la solicitud a ciegas.
     const infoTurnoFinal = infoBloqueoTurno(fecha, turnoSel);
     if(esBloqueoDuro(infoTurnoFinal)){
-      errorMsg.textContent = infoTurnoFinal.tipo === 'disponibilidad'
-        ? 'Este turno está sin disponibilidad — elige otro turno u otra fecha.'
-        : 'Esta fecha no está disponible por un evento privado — elige otro turno u otra fecha.';
-      errorMsg.style.display = 'block';
+      mostrarModalBloqueoDuro(infoTurnoFinal);
       return;
     }
     if(infoTurnoFinal && infoTurnoFinal.tipo === 'show_especial' && turnoConfirmadoShow !== turnoSel){
