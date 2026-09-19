@@ -2204,7 +2204,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.41</div>
+<div class="version-tag">v5.42</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -5191,10 +5191,14 @@ function abrirModalAvisoBloqueoTelefono(fecha, turno, info){
     btnContinuar.style.display = 'inline-flex';
     btnVerHorario.style.display = 'none';
   } else if(tipo === 'disponibilidad'){
+    // "Sin disponibilidad" significa justamente eso: no hay cupo, punto.
+    // No se ofrece "continuar de todas formas" — si se permitiera saltar
+    // esto, se corre el riesgo de meter una reserva que en la práctica
+    // no tiene dónde sentarse, y ese cliente llega y no hay mesa para él.
     titulo.textContent = '🕒 Sin disponibilidad en este turno';
-    texto.textContent = `Este turno está marcado como sin disponibilidad (cupo lleno).${dia.motivo?' '+dia.motivo:''} ¿Confirmas que quieres crear esta reserva de todas formas?`;
+    texto.textContent = `Este turno está marcado como sin disponibilidad (cupo lleno).${dia.motivo?' '+dia.motivo:''} No se puede crear una reserva nueva aquí — elige otra hora o turno.`;
     img.style.display = 'none';
-    btnContinuar.style.display = 'inline-flex';
+    btnContinuar.style.display = 'none';
     btnVerHorario.style.display = 'none';
   } else {
     titulo.textContent = '🎤 Show especial en este turno';
