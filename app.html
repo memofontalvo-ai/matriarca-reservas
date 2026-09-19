@@ -564,6 +564,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .cover-abono-ver:active{background:rgba(214,170,85,0.15);}
 .cover-abono-quitar{color:var(--cancelled);}
 .cover-abono-quitar:active{background:rgba(229,99,106,0.15);}
+.link-quitar-abono-legacy{
+  background:none; border:none; padding:0; font:inherit; font-size:inherit;
+  color:var(--cancelled); text-decoration:underline; cursor:pointer;
+}
 #coverAbonosResumen{font-size:12.5px; font-weight:700; margin-top:8px;}
 #coverAbonosResumen.pendiente{color:#e8a33d;}
 #coverAbonosResumen.completo{color:var(--confirmed);}
@@ -2212,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.46</div>
+<div class="version-tag">v5.47</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -4061,6 +4065,17 @@ function valorAbonoParaGuardar(){
     return abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
   }
   return Number(document.getElementById('fAbono').value)||0;
+}
+// Quita el abono "antiguo" (de antes de que existiera el sistema de
+// abonos pactados/cover actual) que quedó guardado en el campo oculto
+// fAbono. Sin este botón, ese número se seguía regrabando cada vez que
+// se guardaba la reserva — aunque en la tarjeta ya no se viera ningún
+// abono activo — y por eso aparecía en los informes como si todavía
+// tuviera abono. Hay que tocar "Guardar reserva" después de esto para
+// que el cambio quede en Firestore.
+function quitarAbonoLegacy(){
+  document.getElementById('fAbono').value = '0';
+  document.getElementById('abonoLegacyAviso').style.display = 'none';
 }
 
 // ===== Envío a aprobación del comprobante de abono (mesa o cover) =====
@@ -8956,7 +8971,7 @@ function abrirModal(id, mesaId){
     const abonoLegacyAviso = document.getElementById('abonoLegacyAviso');
     if(!tienePactado && Number(r.abono) > 0){
       abonoLegacyAviso.style.display = 'block';
-      abonoLegacyAviso.textContent = `💰 Abono registrado: $${Number(r.abono).toLocaleString('es-CO')} (de antes de este cambio, sin comprobante detallado). Marca la casilla de arriba si quieres agregarle el detalle.`;
+      abonoLegacyAviso.innerHTML = `💰 Abono registrado: $${Number(r.abono).toLocaleString('es-CO')} (de antes de este cambio, sin comprobante detallado). Marca la casilla de arriba si quieres agregarle el detalle, o <button type="button" class="link-quitar-abono-legacy" onclick="quitarAbonoLegacy()">quítalo</button> si ya no aplica (por ejemplo, si esta reserva pasó a ser solo cover).`;
     } else {
       abonoLegacyAviso.style.display = 'none';
     }
