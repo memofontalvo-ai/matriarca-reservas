@@ -608,6 +608,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .estado-conexion.conectado .estado-conexion-dot{background:var(--confirmed); box-shadow:0 0 0 3px rgba(71,184,129,0.2);}
 .estado-conexion.desconectado{color:var(--cancelled);}
 .estado-conexion.desconectado .estado-conexion-dot{background:var(--cancelled); box-shadow:0 0 0 3px rgba(229,99,106,0.2);}
+.btn-forzar-conexion{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 12px; font-size:11.5px; font-weight:600;
+  color:var(--cancelled); background:var(--panel-alt); border:1px solid var(--cancelled);
+  border-radius:999px; flex-shrink:0; cursor:pointer;
+}
+.btn-forzar-conexion:active{opacity:0.7;}
 
 /* ===== USUARIOS EN LÍNEA (solo visible para Administrador) ===== */
 .usuarios-en-linea{
@@ -1761,6 +1768,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <span class="estado-conexion-dot"></span>
       <span id="estadoConexionTexto">Conectando con la base de datos...</span>
     </div>
+    <button type="button" class="btn-forzar-conexion" id="btnForzarConexion" style="display:none;" onclick="forzarReconexion()">🔄 Forzar conexión</button>
     <div class="usuarios-en-linea" id="usuariosEnLineaBox" style="display:none;">
       <span class="usuarios-en-linea-label"><span class="estado-conexion-dot" style="background:var(--confirmed); box-shadow:0 0 0 3px rgba(71,184,129,0.2);"></span>En línea ahora:</span>
       <div class="usuarios-en-linea-lista" id="usuariosEnLineaLista"></div>
@@ -2204,7 +2212,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.44</div>
+<div class="version-tag">v5.45</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -4692,6 +4700,7 @@ const salonesRef = db.collection('salones');
 function actualizarEstadoConexion(conectado){
   const el = document.getElementById('estadoConexion');
   const texto = document.getElementById('estadoConexionTexto');
+  const btnForzar = document.getElementById('btnForzarConexion');
   el.classList.remove('conectado','desconectado');
   if(conectado){
     el.classList.add('conectado');
@@ -4700,6 +4709,16 @@ function actualizarEstadoConexion(conectado){
     el.classList.add('desconectado');
     texto.textContent = 'Sin conexión a la base de datos';
   }
+  // El botón "Forzar conexión" solo se ve mientras está desconectado —
+  // sirve sobre todo cuando se acaba de instalar la app en el teléfono de
+  // un empleado y se queda pegada en "Sin conexión" (a veces pasa por el
+  // orden en que carga la red la primera vez). Recargar desde cero
+  // resuelve eso en casi todos los casos, sin que el staff tenga que
+  // saber qué está pasando.
+  if(btnForzar) btnForzar.style.display = conectado ? 'none' : 'inline-flex';
+}
+function forzarReconexion(){
+  location.reload();
 }
 window.addEventListener('offline', () => actualizarEstadoConexion(false));
 window.addEventListener('online', () => actualizarEstadoConexion(true));
