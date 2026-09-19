@@ -155,19 +155,6 @@ button{cursor:pointer}
 .autorizacion-whatsapp__texto{font-size:12.5px; line-height:1.5; color:#dfe1e5}
 .autorizacion-whatsapp__nota{font-size:11px; color:#9aa0aa; margin-top:10px; line-height:1.4}
 .autorizacion-whatsapp__politica{display:inline-block; font-size:11.5px; color:var(--gold-bright); margin-top:8px; text-decoration:underline}
-.baja-datos-link{text-align:center; margin-top:16px; padding-bottom:6px;}
-.baja-datos-link a{font-size:10.5px; color:var(--text-dim); text-decoration:underline; line-height:1.5;}
-.overlay-baja-datos{position:fixed; inset:0; background:rgba(8,9,11,0.82); z-index:999; display:none; align-items:center; justify-content:center; padding:18px;}
-.overlay-baja-datos.open{display:flex;}
-.overlay-baja-datos .panel{background:#171a20; border:1px solid #343942; border-radius:16px; padding:22px; max-width:400px; width:100%;}
-.overlay-baja-datos h3{color:#f2c65d; font-size:16.5px; margin:0 0 10px;}
-.overlay-baja-datos p{font-size:12.5px; line-height:1.55; color:#d8dae0; margin-bottom:14px;}
-.overlay-baja-datos input{width:100%; padding:11px; border-radius:10px; border:1px solid #343942; background:#14171c; color:#f5f5f5; font-size:14px; margin-bottom:14px;}
-.overlay-baja-datos .btns{display:flex; gap:10px;}
-.overlay-baja-datos button{flex:1; padding:11px; border-radius:10px; border:none; font-weight:700; font-size:13px;}
-.overlay-baja-datos .btn-cancelar{background:#14171c; border:1px solid #343942; color:#e5e7eb;}
-.overlay-baja-datos .btn-confirmar{background:linear-gradient(180deg,#f2c65d,#e0ad3f); color:#111;}
-.overlay-baja-datos .ok{color:#7fd88f; font-size:13px; text-align:center;}
 
 .pax-control{
   display:grid;grid-template-columns:44px 1fr 44px;height:46px;
@@ -190,23 +177,6 @@ button{cursor:pointer}
 }
 .btn-confirmar-hora.confirmada{background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#111;border-color:var(--gold-bright);}
 .error-msg{color:var(--danger);font-size:11.5px;margin-top:8px;display:none}
-
-.aviso-overlay{
-  position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:400;
-  display:none; align-items:center; justify-content:center; padding:20px;
-}
-.aviso-overlay.open{ display:flex; }
-.aviso-modal{
-  background:var(--panel); border:1px solid var(--danger); border-radius:14px;
-  padding:22px 20px; max-width:400px; width:100%; text-align:center;
-}
-.aviso-modal-titulo{ font-size:17px; font-weight:700; color:var(--text); margin-bottom:10px; }
-.aviso-modal-texto{ font-size:14px; color:var(--muted); line-height:1.5; margin-bottom:18px; }
-.aviso-modal-btn{
-  width:100%; padding:13px; border-radius:10px; border:none;
-  background:var(--gold); color:#1a1408; font-size:14.5px; font-weight:700; cursor:pointer;
-}
-.aviso-modal-btn:active{ opacity:.85; }
 .privacy{text-align:center;color:#777e88;font-size:9.5px;margin-top:8px}
 .confirmacion{display:none;text-align:center;padding:50px 10px}
 .confirmacion .check{font-size:48px;margin-bottom:14px;color:var(--gold-bright)}
@@ -225,7 +195,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.33</div>
+<div class="version-tag">v3.25</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -383,7 +353,7 @@ button{cursor:pointer}
         <button type="button" class="vip-opt" data-val="no" onclick="elegirAutorizacionWhatsApp('no')">❌ No autorizo</button>
       </div>
       <div class="autorizacion-whatsapp__nota">Esta autorización es voluntaria y no es necesaria para solicitar una reserva. Los mensajes relacionados directamente con tu solicitud o reserva podrán ser enviados independientemente de esta autorización.</div>
-      <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" onclick="abrirPoliticaDatos();return false;">Consultar Política de Tratamiento de Datos Personales</a>
+      <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" target="_blank" rel="noopener">Consultar Política de Tratamiento de Datos Personales</a>
     </section>
 
     <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">✈ Enviar solicitud de reserva</button>
@@ -391,17 +361,6 @@ button{cursor:pointer}
 
     <div class="error-msg" id="errorMsg"></div>
     <div class="privacy">🔒 Tu información está protegida y solo se usará para tu reserva.</div>
-    <div class="baja-datos-link">
-      <a href="#" onclick="abrirBajaDatos();return false;">¿Deseas que dejemos de enviarte información sobre eventos, promociones y descuentos? Solicítalo aquí</a>
-    </div>
-  </div>
-
-  <div class="aviso-overlay" id="overlayAvisoAutorizacion">
-    <div class="aviso-modal">
-      <div class="aviso-modal-titulo">⚠️ Falta un dato</div>
-      <div class="aviso-modal-texto">Por favor indica si autorizas o no recibir información por WhatsApp — puedes elegir cualquiera de las dos opciones, solo necesitamos que elijas una para poder continuar.</div>
-      <button class="aviso-modal-btn" onclick="cerrarAvisoAutorizacion()">Entendido</button>
-    </div>
   </div>
 
   <div class="confirmacion" id="confirmacion">
@@ -411,40 +370,15 @@ button{cursor:pointer}
   </div>
 </div>
 
-<div class="overlay-baja-datos" id="overlayPoliticaDatos" style="z-index:1000;">
-  <div class="panel" style="max-width:600px; height:88vh; display:flex; flex-direction:column; padding:14px;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-      <h3 style="margin:0; font-size:15px;">Política de Tratamiento de Datos Personales</h3>
-      <button type="button" onclick="cerrarPoliticaDatos()" style="background:#14171c; border:1px solid #343942; color:#e5e7eb; border-radius:8px; padding:6px 12px; font-weight:700; font-size:13px;">✕ Cerrar</button>
-    </div>
-    <div id="contenidoPoliticaDatos" style="flex:1; width:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; border-radius:10px; background:#0e1015;"></div>
-  </div>
-</div>
-
-<div class="overlay-baja-datos" id="overlayBajaDatos">
-  <div class="panel">
-    <h3>Dejar de recibir información</h3>
-    <p id="bajaDatosTexto">Escribe el número de celular con el que has hecho tus reservas. Dejaremos de enviarte información sobre eventos, programación musical, promociones, descuentos y novedades. Esto no afecta tu reserva ni los mensajes relacionados directamente con ella.</p>
-    <input type="tel" id="bajaDatosCelular" placeholder="Ej: 3001234567" maxlength="10">
-    <div class="btns" id="bajaDatosBtns">
-      <button type="button" class="btn-cancelar" onclick="cerrarBajaDatos()">Cancelar</button>
-      <button type="button" class="btn-confirmar" onclick="enviarBajaDatos()">Enviar solicitud</button>
-    </div>
-    <p class="ok" id="bajaDatosOk" style="display:none;">✓ Listo, recibimos tu solicitud. La atenderemos en los próximos días.</p>
-  </div>
-</div>
-
 <div id="overlayListaEspera" style="display:none; position:fixed; inset:0; background:rgba(8,9,11,0.82); z-index:999; align-items:center; justify-content:center; padding:18px;">
   <div style="background:#171a20; border:1px solid #343942; border-radius:16px; padding:22px; max-width:400px; width:100%;">
     <h3 style="color:#f2c65d; font-size:18px; margin-bottom:10px;">Fecha sin disponibilidad</h3>
     <p style="font-size:13.5px; line-height:1.55; color:#f5f5f5;">
-      La fecha seleccionada se encuentra actualmente sin disponibilidad.<br><br>
-      Si deseas continuar, puedes enviar tu solicitud y quedarás registrado en nuestra lista de espera. Si se libera disponibilidad, nos pondremos en contacto contigo para confirmar tu reserva.<br><br>
-      Estar en lista de espera no garantiza la confirmación de la reserva.
+      La fecha seleccionada se encuentra actualmente sin disponibilidad — no tenemos cupo para ese turno.<br><br>
+      Por favor elige otra fecha o turno.
     </p>
     <div style="display:flex; gap:10px; margin-top:18px;">
-      <button type="button" onclick="cancelarListaEspera()" style="flex:1; padding:11px; border-radius:10px; border:1px solid #343942; background:#14171c; color:#e5e7eb; font-weight:700; font-size:13px;">Elegir otra fecha</button>
-      <button type="button" onclick="confirmarListaEspera()" style="flex:1; padding:11px; border-radius:10px; border:none; background:linear-gradient(180deg,#f2c65d,#e0ad3f); color:#111; font-weight:700; font-size:13px;">Continuar</button>
+      <button type="button" onclick="cancelarListaEspera()" style="flex:1; padding:11px; border-radius:10px; border:none; background:linear-gradient(180deg,#f2c65d,#e0ad3f); color:#111; font-weight:700; font-size:13px;">Elegir otra fecha</button>
     </div>
   </div>
 </div>
@@ -468,7 +402,6 @@ button{cursor:pointer}
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script>
 const firebaseConfig = {
     apiKey: "AIzaSyDJCy93GCOhDySnC_OLo6pcV-wK_pC48_A",
@@ -501,78 +434,6 @@ const firebaseConfig = {
     return !!(dia && (dia.desayuno || dia.almuerzo || dia.cena));
   }
 
-  // ============ HORARIO REAL DE ATENCIÓN (día por día, + festivos) ============
-  // Mismo documento que edita el staff en Config → "Horario de atención".
-  // Se usa para avisarle al cliente DE UNA VEZ si la hora que está
-  // pidiendo cae fuera del horario real de ese día — en vez de dejar que
-  // llegue una solicitud para un horario que ni siquiera existe.
-  const HORARIOS_TURNO_LABEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-  const DIAS_SEMANA_ORDEN = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
-  let HORARIOS_REALES = null;
-  const horariosRealesPromesa = db.collection('configuracion').doc('horarios').get()
-    .then(snap => { HORARIOS_REALES = snap.exists ? snap.data() : null; })
-    .catch(err => console.error('Error cargando horarios reales:', err));
-
-  // Fechas festivas (YYYY-MM-DD) que el staff mantiene a mano en Config —
-  // los festivos colombianos cambian de fecha cada año. Si la fecha de la
-  // reserva es festiva, se usa el horario "festivo"; si es un domingo y el
-  // lunes siguiente es festivo, se usa "domingoAntesFestivo".
-  let FESTIVOS = [];
-  const festivosPromesa = db.collection('configuracion').doc('festivos').get()
-    .then(snap => { FESTIVOS = (snap.exists && Array.isArray(snap.data().fechas)) ? snap.data().fechas : []; })
-    .catch(err => console.error('Error cargando festivos:', err));
-
-  function fechaSiguienteIso(fechaIso){
-    const [y,m,d] = fechaIso.split('-').map(Number);
-    const dt = new Date(y, m-1, d, 12);
-    dt.setDate(dt.getDate()+1);
-    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-  }
-
-  function grupoDeFecha(fechaIso){
-    if(FESTIVOS.includes(fechaIso)) return 'festivo';
-    const [y,m,d] = fechaIso.split('-').map(Number);
-    const dow = new Date(y, m-1, d, 12).getDay(); // 0=domingo ... 6=sábado
-    if(dow === 0 && FESTIVOS.includes(fechaSiguienteIso(fechaIso))) return 'domingoAntesFestivo';
-    return DIAS_SEMANA_ORDEN[(dow+6)%7];
-  }
-
-  // Devuelve null si la hora pedida SÍ está dentro del horario real de ese
-  // turno ese día. Si no, devuelve un texto explicando qué turnos SÍ hay
-  // disponibles ese día, para mostrárselo de una vez al cliente.
-  function textoHorariosDelDia(fechaIso){
-    if(!HORARIOS_REALES) return '';
-    const grupo = HORARIOS_REALES[grupoDeFecha(fechaIso)];
-    if(!grupo) return '';
-    const partes = ['desayuno','almuerzo','cena']
-      .filter(t => grupo[t] && grupo[t].activo !== false)
-      .map(t => `${HORARIOS_TURNO_LABEL[t]}: ${grupo[t].inicio} a ${grupo[t].fin}`);
-    if(!partes.length) return 'Ese día no tenemos servicio.';
-    return 'Nuestro horario ese día es — ' + partes.join(' · ');
-  }
-
-  function validarHorarioReal(fechaIso, turno, horaHHMM){
-    if(!HORARIOS_REALES) return null; // si no cargó a tiempo, no se bloquea de más
-    const grupo = HORARIOS_REALES[grupoDeFecha(fechaIso)];
-    if(!grupo) return null;
-    const t = grupo[turno];
-    if(!t || t.activo === false){
-      return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
-    }
-    if(horaHHMM && t.inicio && t.fin){
-      // Turno que cruza la medianoche (ej. Cena 17:30 a 03:00): la hora es
-      // válida si es después de inicio O antes de fin — no "entre los dos".
-      const cruzaMedianoche = t.fin < t.inicio;
-      const dentroDeHorario = cruzaMedianoche
-        ? (horaHHMM >= t.inicio || horaHHMM <= t.fin)
-        : (horaHHMM >= t.inicio && horaHHMM <= t.fin);
-      if(!dentroDeHorario){
-        return `En este horario no tenemos servicio. ${textoHorariosDelDia(fechaIso)}`;
-      }
-    }
-    return null;
-  }
-
   // Mismo generador de código consecutivo que usa el panel de staff — para
   // que TODA reserva, sin importar por dónde entró (teléfono, presencial,
   // o este formulario), termine con un código único (R-000123...).
@@ -595,64 +456,17 @@ const firebaseConfig = {
   // no duplicar ni perder el rastro desde el primer contacto.
   const idExistente = new URLSearchParams(location.search).get('id');
 
-  // URL de la Política de Tratamiento de Datos Personales — el PDF vive en
-  // la raíz del mismo repositorio, junto a los demás archivos del sistema.
-  // En vez de dejar que el navegador del celular decida cómo mostrarlo
-  // (algunos visores nativos no ajustan el ancho y obligan a desplazarse
-  // hacia los lados para leer), lo dibujamos nosotros mismos con PDF.js,
-  // ya escalado exactamente al ancho disponible en pantalla.
-  const URL_POLITICA_DATOS_PERSONALES = 'politica-tratamiento-datos.pdf';
-  if(window.pdfjsLib){
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-  }
-  let politicaDatosCargada = false;
-  function abrirPoliticaDatos(){
-    if(!URL_POLITICA_DATOS_PERSONALES) return;
-    document.getElementById('overlayPoliticaDatos').classList.add('open');
-    if(politicaDatosCargada) return;
-    politicaDatosCargada = true;
-    const cont = document.getElementById('contenidoPoliticaDatos');
-    cont.innerHTML = '<div style="text-align:center; padding:40px 16px; color:#8b93a3; font-size:13px;">Cargando documento...</div>';
-    // Renderizamos a mayor resolución interna (según la densidad de
-    // píxeles real del celular) y luego mostramos el canvas más pequeño
-    // con CSS — así el texto sale nítido en pantallas Retina, en vez de
-    // verse pixelado como cuando se dibuja 1 a 1.
-    const dpr = Math.max(window.devicePixelRatio || 1, 2);
-    pdfjsLib.getDocument(URL_POLITICA_DATOS_PERSONALES).promise.then(pdf => {
-      cont.innerHTML = '';
-      const anchoDisponible = cont.clientWidth - 4;
-      let cadena = Promise.resolve();
-      for(let i = 1; i <= pdf.numPages; i++){
-        cadena = cadena.then(() => pdf.getPage(i)).then(page => {
-          const viewportBase = page.getViewport({scale: 1});
-          const escala = anchoDisponible / viewportBase.width;
-          const viewport = page.getViewport({scale: escala * dpr});
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          canvas.style.width = anchoDisponible + 'px';
-          canvas.style.height = (viewport.height / dpr) + 'px';
-          canvas.style.display = 'block';
-          canvas.style.margin = '0 auto 10px';
-          canvas.style.borderRadius = '8px';
-          cont.appendChild(canvas);
-          return page.render({canvasContext: canvas.getContext('2d'), viewport: viewport}).promise;
-        });
-      }
-      return cadena;
-    }).catch(err => {
-      console.error('Error cargando el PDF de la política de datos:', err);
-      cont.innerHTML = '<div style="text-align:center; padding:40px 16px; color:#e07a7a; font-size:13px;">No se pudo cargar el documento. Intenta de nuevo más tarde.</div>';
-      politicaDatosCargada = false;
-    });
-  }
-  function cerrarPoliticaDatos(){
-    document.getElementById('overlayPoliticaDatos').classList.remove('open');
-  }
+  // URL oficial de la Política de Tratamiento de Datos Personales — TODAVÍA
+  // NO EXISTE. Cuando La Matriarca tenga la política publicada, se pone
+  // aquí y el link se activa solo (mientras tanto, el link queda oculto
+  // para no dejar una dirección rota).
+  const URL_POLITICA_DATOS_PERSONALES = '';
   (function prepararLinkPoliticaDatos(){
     const link = document.getElementById('linkPoliticaDatos');
     if(!link) return;
-    if(!URL_POLITICA_DATOS_PERSONALES){
+    if(URL_POLITICA_DATOS_PERSONALES){
+      link.href = URL_POLITICA_DATOS_PERSONALES;
+    } else {
       link.style.display = 'none';
     }
   })();
@@ -873,30 +687,16 @@ const firebaseConfig = {
   function elegirTurno(t){
     document.getElementById('errorMsg').style.display = 'none';
     const fecha = document.getElementById('fFecha').value;
-    // Primero: ¿este turno siquiera existe ese día de la semana? (por
-    // ejemplo, "Cena" un domingo si ese día no hay servicio de cena).
-    // Esto aplica sin importar si el turno se eligió tocando el botón
-    // directamente o llegó automáticamente desde la rueda de hora.
-    const errorHorario = validarHorarioReal(fecha, t, null);
-    if(errorHorario){
-      const avisoBloqueo = document.getElementById('avisoFechaBloqueada');
-      avisoBloqueo.style.display = 'block';
-      avisoBloqueo.innerHTML = `<strong>Fuera de horario</strong><br>${errorHorario}`;
-      return;
-    }
     const info = infoBloqueoTurno(fecha, t);
-    if(info && (info.tipo === 'evento' || info.tipo === 'evento_privado')){
-      // Bloqueo total: ni se selecciona ni hay opción de lista de espera.
+    if(esBloqueoDuro(info)){
+      // Bloqueo total: ni "sin disponibilidad" ni "evento privado" dejan
+      // seleccionar el turno — no hay lista de espera ni forma de
+      // continuar, solo elegir otro turno u otra fecha.
       const avisoBloqueo = document.getElementById('avisoFechaBloqueada');
       avisoBloqueo.style.display = 'block';
-      avisoBloqueo.innerHTML = '<strong>Fecha no disponible</strong><br>Esta fecha no está disponible por un evento privado. Por favor elige otro turno u otra fecha.';
-      return;
-    }
-    if(info && info.tipo === 'disponibilidad'){
-      // Cupo lleno: se le pregunta explícitamente con el modal, en vez de
-      // seleccionarlo de una vez — el turno solo queda elegido si la
-      // persona toca "Continuar en lista de espera".
-      abrirModalListaEspera(t);
+      avisoBloqueo.innerHTML = info.tipo === 'disponibilidad'
+        ? '<strong>Sin disponibilidad</strong><br>No tenemos cupo para este turno. Por favor elige otro turno u otra fecha.'
+        : '<strong>Fecha no disponible</strong><br>Esta fecha no está disponible por un evento privado. Por favor elige otro turno u otra fecha.';
       return;
     }
     if(info && info.tipo === 'show_especial' && turnoConfirmadoShow !== t){
@@ -910,50 +710,6 @@ const firebaseConfig = {
     document.querySelectorAll('.turno-opt').forEach(b => b.classList.toggle('on', b.dataset.val === t));
     actualizarAvisoBloqueo();
     validarDuplicadoYDesbloquear();
-  }
-
-  // ---- Modal de "dejar de recibir información" (revocar autorización de
-  // WhatsApp/promociones). No borra la tarjeta del cliente ni sus reservas
-  // — solo registra la solicitud para que el staff la atienda desde
-  // app.html y ponga autorizacionWhatsApp en false para ese celular. ----
-  function abrirBajaDatos(){
-    document.getElementById('bajaDatosCelular').value = '';
-    document.getElementById('bajaDatosBtns').style.display = 'flex';
-    document.getElementById('bajaDatosOk').style.display = 'none';
-    document.getElementById('bajaDatosTexto').style.display = 'block';
-    document.getElementById('bajaDatosCelular').style.display = 'block';
-    document.getElementById('overlayBajaDatos').classList.add('open');
-  }
-  function cerrarBajaDatos(){
-    document.getElementById('overlayBajaDatos').classList.remove('open');
-  }
-  function enviarBajaDatos(){
-    const celInput = document.getElementById('bajaDatosCelular');
-    const celular = (celInput.value || '').replace(/\D/g,'');
-    if(celular.length < 7){
-      celInput.style.borderColor = '#e05c5c';
-      return;
-    }
-    celInput.style.borderColor = '';
-    const btns = document.getElementById('bajaDatosBtns');
-    btns.querySelector('.btn-confirmar').textContent = 'Enviando...';
-    btns.querySelector('.btn-confirmar').disabled = true;
-    db.collection('solicitudesEliminacion').add({
-      celular: celular,
-      estado: 'pendiente',
-      fechaSolicitud: firebase.firestore.FieldValue.serverTimestamp(),
-      origen: 'formulario_publico_reservas'
-    }).then(() => {
-      document.getElementById('bajaDatosTexto').style.display = 'none';
-      celInput.style.display = 'none';
-      btns.style.display = 'none';
-      document.getElementById('bajaDatosOk').style.display = 'block';
-    }).catch(err => {
-      console.error('Error registrando solicitud de baja de datos:', err);
-      btns.querySelector('.btn-confirmar').textContent = 'Enviar solicitud';
-      btns.querySelector('.btn-confirmar').disabled = false;
-      celInput.style.borderColor = '#e05c5c';
-    });
   }
 
   // ---- Modal de decisión para "sin disponibilidad" ----
@@ -1067,8 +823,7 @@ const firebaseConfig = {
     const fecha = document.getElementById('fFecha').value;
     document.querySelectorAll('.turno-opt').forEach(b => {
       const info = infoBloqueoTurno(fecha, b.dataset.val);
-      const esDuro = info && (info.tipo === 'evento' || info.tipo === 'evento_privado');
-      b.classList.toggle('bloqueado', esDuro);
+      b.classList.toggle('bloqueado', esBloqueoDuro(info));
     });
     bloquearFormularioPorHoraSinConfirmar();
     actualizarAvisoBloqueo();
@@ -1091,16 +846,6 @@ const firebaseConfig = {
   const hoy = new Date();
   document.getElementById('fFecha').min = hoy.toISOString().slice(0,10);
   document.getElementById('fFecha').value = hoy.toISOString().slice(0,10);
-
-  function abrirAvisoAutorizacion(){
-    document.getElementById('overlayAvisoAutorizacion').classList.add('open');
-  }
-  function cerrarAvisoAutorizacion(){
-    document.getElementById('overlayAvisoAutorizacion').classList.remove('open');
-    // Al cerrar, llevamos la pantalla directo a los botones de "Sí
-    // autorizo / No autorizo" para que el cliente pueda elegir de una vez.
-    document.getElementById('autorizacionOpts').scrollIntoView({behavior:'smooth', block:'center'});
-  }
 
   function enviarSolicitud(){
     const errorMsg = document.getElementById('errorMsg');
@@ -1126,7 +871,10 @@ const firebaseConfig = {
       return;
     }
     if(!autorizacionWhatsAppSel){
-      abrirAvisoAutorizacion();
+      errorMsg.textContent = 'Por favor indica si autorizas o no recibir información por WhatsApp — puedes elegir cualquiera de las dos opciones, solo necesitamos que elijas una para poder continuar.';
+      errorMsg.dataset.motivo = 'autorizacion';
+      errorMsg.style.display = 'block';
+      errorMsg.scrollIntoView({behavior:'smooth', block:'center'});
       return;
     }
     // Refuerzo de seguridad justo antes de guardar: si el turno elegido
@@ -1136,21 +884,29 @@ const firebaseConfig = {
     // correspondiente (por ejemplo, cambió de turno sin que se detectara),
     // se le vuelve a mostrar el modal en vez de mandar la solicitud a
     // ciegas — ambas decisiones siempre tienen que ser explícitas.
+    // Refuerzo de seguridad justo antes de guardar: si el turno elegido
+    // resulta estar bloqueado — por EVENTO PRIVADO o por SIN
+    // DISPONIBILIDAD — no se manda bajo ninguna circunstancia; ambos son
+    // bloqueo total, sin lista de espera. Si tiene un show especial pero
+    // la persona no pasó por el modal correspondiente (por ejemplo,
+    // cambió de turno sin que se detectara), se le vuelve a mostrar el
+    // modal en vez de mandar la solicitud a ciegas.
     const infoTurnoFinal = infoBloqueoTurno(fecha, turnoSel);
-    if(infoTurnoFinal && (infoTurnoFinal.tipo === 'evento' || infoTurnoFinal.tipo === 'evento_privado')){
-      errorMsg.textContent = 'Esta fecha no está disponible por un evento privado — elige otro turno u otra fecha.';
+    if(esBloqueoDuro(infoTurnoFinal)){
+      errorMsg.textContent = infoTurnoFinal.tipo === 'disponibilidad'
+        ? 'Este turno está sin disponibilidad — elige otro turno u otra fecha.'
+        : 'Esta fecha no está disponible por un evento privado — elige otro turno u otra fecha.';
       errorMsg.style.display = 'block';
-      return;
-    }
-    const enListaEspera = !!(infoTurnoFinal && infoTurnoFinal.tipo === 'disponibilidad');
-    if(enListaEspera && turnoConfirmadoListaEspera !== turnoSel){
-      abrirModalListaEspera(turnoSel, true);
       return;
     }
     if(infoTurnoFinal && infoTurnoFinal.tipo === 'show_especial' && turnoConfirmadoShow !== turnoSel){
       abrirModalShowEspecial(turnoSel, infoTurnoFinal, true);
       return;
     }
+    // Ya no existe la lista de espera — "sin disponibilidad" es bloqueo
+    // total (arriba). Esta constante se deja en false para no tener que
+    // tocar cada referencia más abajo que todavía la usa.
+    const enListaEspera = false;
 
     // Validaciones básicas: como este formulario es público (sin login),
     // cualquier persona en internet puede enviarle datos directamente,
@@ -1687,23 +1443,6 @@ const firebaseConfig = {
       if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
       else if(minutosDelDia >= 660 && minutosDelDia < 1080) turnoAuto = 'almuerzo';
       else turnoAuto = 'cena';
-
-      // Antes de seguir, se valida contra el horario REAL configurado por
-      // el staff para ese día de la semana — si la hora pedida cae fuera
-      // de servicio (por ejemplo, domingo a las 7pm y ese día no hay
-      // cena), se avisa de una vez con los horarios correctos, sin dejar
-      // que la solicitud continúe.
-      const fechaActual = document.getElementById('fFecha').value;
-      const horaHHMM = `${String(h24).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
-      const errorHorario = validarHorarioReal(fechaActual, turnoAuto, horaHHMM);
-      if(errorHorario){
-        const aviso = document.getElementById('avisoHoraSinConfirmar');
-        if(aviso){
-          aviso.textContent = `⏰ ${errorHorario}`;
-          aviso.style.display = 'block';
-        }
-        return;
-      }
     }
     ultimoTurnoAutoPreguntado = turnoAuto;
     elegirTurno(turnoAuto);
