@@ -2212,7 +2212,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.45</div>
+<div class="version-tag">v5.46</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -7249,7 +7249,7 @@ function descargarInformeDia(){
 
   const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
-      .filter(r => r.fecha===iso && r.turno===turno && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='cancelada' && r.estado!=='lista_espera')
+      .filter(r => r.fecha===iso && r.turno===turno && r.estado==='confirmada')
       .sort((a,b) => (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
     const totalAbonoTurno = rs.reduce((s,r) => s + (Number(r.abono)||0), 0);
