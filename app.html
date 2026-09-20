@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.52</div>
+<div class="version-tag">v5.53</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -6084,7 +6084,7 @@ function verResumenMes(){
     if(!r.fecha) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && (m-1)===calInlineMes
-      && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera';
+      && r.estado==='confirmada';
   });
   const porTurno = ['desayuno','almuerzo','cena'].map(t=>{
     const rs = rsMes.filter(r=>r.turno===t);
@@ -6145,7 +6145,7 @@ function getMonthlyReservationData(ano, mes){
   });
 }
 function filterValidReservations(rs){
-  return rs.filter(r => r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
+  return rs.filter(r => r.estado==='confirmada');
 }
 // El turno ya viene guardado en cada reserva (r.turno) — no se infiere
 // por hora. Si alguna reserva vieja no lo trae, cae en "sin_clasificar"
@@ -6589,15 +6589,15 @@ function renderCalendarioInline(){
   const hoyISO = fechaISO(new Date());
   const selISO = fechaISO(fechaActual);
 
-  // Reservas reales (no solicitudes, no pendientes de aprobación, no
-  // canceladas) para marcar el mes visible — tiene que ser exactamente el
-  // mismo criterio que usa la lista del día, si no el número del calendario
-  // no va a coincidir con lo que realmente se ve al entrar a ese día.
+  // El número del calendario cuenta SOLO reservas Aprobadas — a propósito
+  // distinto de la lista del día, que sí muestra Pendientes para que el
+  // staff las pueda gestionar. Aquí el número es un total "ya confirmado",
+  // no cuánto hay en trámite.
   // Si hay un turno específico activo (Desayuno/Almuerzo/Cena), el
   // calendario respeta ese filtro y solo suma ese turno — así el número de
   // cada día refleja exactamente lo que se está viendo, no siempre el total.
   const reservasDelMes = reservas.filter(r => {
-    if(r.estado==='solicitud' || r.estado==='pendiente_aprobacion' || r.estado==='cancelada' || r.estado==='lista_espera') return false;
+    if(r.estado!=='confirmada') return false;
     if(turnoActivo !== 'todos' && r.turno !== turnoActivo) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && m===(calInlineMes+1);
@@ -6878,7 +6878,10 @@ function renderLista(){
     return;
   }
 
-  const rsTodas = reservasDelTurno().filter(r=>r.estado!=='cancelada');
+  // Solo Aprobadas para los totales de Abono/Cover/Mesa de este resumen —
+  // las Pendientes se siguen viendo en la lista de abajo para gestionarlas,
+  // pero no deben sumar en estos totales de dinero recaudado/por cobrar.
+  const rsTodas = reservasDelTurno().filter(r=>r.estado==='confirmada');
   // Orden pedido por Memo: las reservas APROBADAS más recientemente van
   // arriba, las más viejas abajo — ya no se ordena por la hora de la
   // mesa. "ultimaEdicionEn" se guarda solo en el momento exacto en que la
@@ -6990,7 +6993,9 @@ function renderResumenTurnoHTML(rsTodas){
   // Almuerzo/Cena). Así, aunque estés viendo solo "Cena", igual ves de un
   // vistazo cuántas reservas hay en cada turno y el total del día completo.
   const iso = fechaISO(fechaActual);
-  const reservasDia = reservas.filter(r=>r.fecha===iso && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
+  // Solo Aprobadas — las Pendientes no cuentan en estos totales, aunque
+  // sigan visibles en la lista del día para que el staff las gestione.
+  const reservasDia = reservas.filter(r=>r.fecha===iso && r.estado==='confirmada');
   // Canceladas de este mismo día — aparte del conteo de arriba (que es
   // solo lo activo), para saber cuánto se perdió/canceló sin tener que
   // ir a buscarlo reserva por reserva.
