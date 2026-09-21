@@ -2227,7 +2227,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.62</div>
+<div class="version-tag">v5.64</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2939,18 +2939,27 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <label>Nivel de acceso</label>
       <div class="rol-opciones">
         <label class="rol-opcion">
-          <input type="radio" name="fUsuRol" value="consulta">
+          <input type="radio" name="fUsuRol" value="consulta" onchange="toggleUsuarioEventoWrap()">
           <div><strong>Consulta</strong><span>Solo puede ver reservas — no crea, edita ni borra nada. Sin acceso a Salones ni Config.</span></div>
         </label>
         <label class="rol-opcion">
-          <input type="radio" name="fUsuRol" value="operativo" checked>
+          <input type="radio" name="fUsuRol" value="operativo" checked onchange="toggleUsuarioEventoWrap()">
           <div><strong>Operativo</strong><span>Crea, edita y gestiona reservas normalmente. Sin acceso a Config.</span></div>
         </label>
         <label class="rol-opcion">
-          <input type="radio" name="fUsuRol" value="admin">
+          <input type="radio" name="fUsuRol" value="admin" onchange="toggleUsuarioEventoWrap()">
           <div><strong>Administrador</strong><span>Acceso completo, incluyendo Config y gestión de usuarios.</span></div>
         </label>
+        <label class="rol-opcion">
+          <input type="radio" name="fUsuRol" value="promotor" onchange="toggleUsuarioEventoWrap()">
+          <div><strong>Promotor de eventos</strong><span>Queda amarrado a UN evento especial — solo ve y gestiona las solicitudes y reservas de ese evento, nada más.</span></div>
+        </label>
       </div>
+    </div>
+    <div class="field" id="fUsuEventoWrap" style="display:none;">
+      <label>Evento al que queda asignado</label>
+      <select id="fUsuEvento"><option value="">Elige un evento…</option></select>
+      <div class="modal-sub" style="margin-top:4px;">Solo se listan los eventos activos y todavía por realizarse.</div>
     </div>
     <div class="field" id="fUsuSonidoWrap">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:400;">
@@ -3354,6 +3363,19 @@ function aplicarRestriccionesRol(){
     if(btnNueva) btnNueva.style.display = '';
     if(rol === 'operativo') document.body.classList.add('rol-operativo');
   }
+  // Un "Promotor de eventos" solo tiene datos de UN día en todo el
+  // sistema (ver recalcularReservasVisibles) — si "Por día" arrancara en
+  // "hoy" como para cualquier otro usuario, muy probablemente le
+  // mostraría un calendario vacío. Se salta directo a la fecha de su
+  // evento para que lo primero que vea ya tenga sus reservas.
+  if(rol === 'promotor' && usuarioActual.eventoAsignado && usuarioActual.eventoAsignado.fecha){
+    const [y,m,d] = usuarioActual.eventoAsignado.fecha.split('-').map(Number);
+    fechaActual = new Date(y, m-1, d);
+    if(usuarioActual.eventoAsignado.turno) turnoActivo = usuarioActual.eventoAsignado.turno;
+    if(typeof calInlineMes !== 'undefined'){ calInlineMes = fechaActual.getMonth(); calInlineAno = fechaActual.getFullYear(); }
+    if(typeof fechaSolicitudes !== 'undefined') fechaSolicitudes = new Date(fechaActual);
+    if(typeof renderAll === 'function') renderAll();
+  }
   // Si por algo la pestaña activa en este momento es una que este nivel ya
   // no puede ver (por ejemplo quedó en Config o Salones y le bajaron el
   // nivel), lo mandamos de vuelta a Solicitudes en vez de dejarlo colgado.
@@ -3390,6 +3412,10 @@ auth.onAuthStateChanged(user => {
         // campo "rol" guardado — a esas las tratamos como admin, para no
         // dejar a nadie fuera de golpe con esta actualización.
         rol: perfil.rol || 'admin',
+        // Solo aplica cuando rol === 'promotor': a qué evento específico
+        // queda amarrado — se guardó tal cual (fecha/turno/nombre) al
+        // crear o editar este usuario, no se vuelve a calcular aquí.
+        eventoAsignado: perfil.eventoAsignado || null,
         // Igual que con el rol: si el campo no existe (cuentas de antes de
         // que existiera esta opción), se trata como activado por defecto.
         sonidoAvisoActivo: perfil.sonidoAvisoActivo !== false,
@@ -3407,6 +3433,8 @@ auth.onAuthStateChanged(user => {
       document.getElementById('loginPass').value = '';
       document.getElementById('loginError').textContent = '';
       aplicarRestriccionesRol();
+      recalcularReservasVisibles();
+      renderAll();
       cargarUsuariosConfig();
       cargarCarruselConfig();
       cargarEventosConfig();
@@ -3539,6 +3567,7 @@ function abrirModalUsuario(){
   const radioOperativo = document.querySelector('input[name="fUsuRol"][value="operativo"]');
   if(radioOperativo) radioOperativo.checked = true;
   document.getElementById('fUsuSonidoAviso').checked = true;
+  document.getElementById('fUsuEventoWrap').style.display = 'none';
   document.getElementById('overlayUsuario').classList.add('open');
 }
 
@@ -3569,12 +3598,31 @@ function abrirModalEditarUsuario(uid){
   // existiera esta opción), se trata como activado — igual que queda
   // activado por defecto para cualquier usuario nuevo.
   document.getElementById('fUsuSonidoAviso').checked = (u.sonidoAvisoActivo !== false);
+  const esPromotorEdit = rol === 'promotor';
+  document.getElementById('fUsuEventoWrap').style.display = esPromotorEdit ? 'block' : 'none';
+  if(esPromotorEdit) poblarSelectorUsuarioEvento(u.eventoAsignado ? u.eventoAsignado.id : '');
   document.getElementById('overlayUsuario').classList.add('open');
 }
 function cerrarModalUsuario(){
   document.getElementById('overlayUsuario').classList.remove('open');
 }
 
+function toggleUsuarioEventoWrap(){
+  const radioMarcado = document.querySelector('input[name="fUsuRol"]:checked');
+  const esPromotor = radioMarcado && radioMarcado.value === 'promotor';
+  document.getElementById('fUsuEventoWrap').style.display = esPromotor ? 'block' : 'none';
+  if(esPromotor) poblarSelectorUsuarioEvento();
+}
+function poblarSelectorUsuarioEvento(seleccionActual){
+  const sel = document.getElementById('fUsuEvento');
+  const hoy = fechaISO(new Date());
+  const opciones = eventosCache
+    .filter(e => e.activo !== false && e.fecha >= hoy)
+    .sort((a,b) => a.fecha.localeCompare(b.fecha))
+    .map(e => `<option value="${e.id}">${escapeHtml(e.nombre)} — ${e.fecha}</option>`).join('');
+  sel.innerHTML = '<option value="">Elige un evento…</option>' + opciones;
+  if(seleccionActual) sel.value = seleccionActual;
+}
 function guardarUsuario(){
   const editId = document.getElementById('fUsuEditId').value;
   if(editId){ guardarEdicionUsuario(editId); return; }
@@ -3589,11 +3637,14 @@ function guardarEdicionUsuario(uid){
   const errEl = document.getElementById('usuarioModalError');
   errEl.textContent = '';
   if(!nombre || !iniciales){ errEl.textContent = 'Completa nombre e iniciales.'; return; }
+  const checkEvento = eventoAsignadoDesdeSelector(rol, errEl);
+  if(!checkEvento.ok) return;
+  const eventoAsignado = checkEvento.valor;
 
   const btn = document.getElementById('btnCrearUsuario');
   btn.disabled = true; btn.textContent = 'Guardando…';
   const sonidoAvisoActivo = document.getElementById('fUsuSonidoAviso').checked;
-  db.collection('usuarios').doc(uid).update({nombre, iniciales, rol, sonidoAvisoActivo}).then(() => {
+  db.collection('usuarios').doc(uid).update({nombre, iniciales, rol, sonidoAvisoActivo, eventoAsignado}).then(() => {
     cerrarModalUsuario();
     cargarUsuariosConfig();
   }).catch(err => {
@@ -3617,6 +3668,19 @@ function eliminarUsuario(uid, nombre){
   });
 }
 
+// Valida y arma el evento asignado a partir del selector — solo aplica
+// (y es obligatorio) cuando el nivel elegido es "promotor". Se guarda
+// como una copia (id/nombre/fecha/turno) en vez de solo el id, para que
+// el filtro de reservas no dependa de una consulta aparte cada vez que
+// el promotor inicia sesión.
+function eventoAsignadoDesdeSelector(rol, errEl){
+  if(rol !== 'promotor') return { ok: true, valor: null };
+  const eventoId = document.getElementById('fUsuEvento').value;
+  if(!eventoId){ errEl.textContent = 'Elige el evento al que va a quedar asignado este promotor.'; return { ok: false }; }
+  const ev = eventosCache.find(e => e.id === eventoId);
+  if(!ev){ errEl.textContent = 'Ese evento ya no existe — elige otro.'; return { ok: false }; }
+  return { ok: true, valor: { id: ev.id, nombre: ev.nombre, fecha: ev.fecha, turno: ev.turno } };
+}
 function crearUsuario(){
   const nombre = document.getElementById('fUsuNombre').value.trim();
   const iniciales = document.getElementById('fUsuIniciales').value.trim().toUpperCase();
@@ -3633,6 +3697,9 @@ function crearUsuario(){
   const esBootstrap = !usuarioActual;
   const radioMarcado = document.querySelector('input[name="fUsuRol"]:checked');
   const rol = esBootstrap ? 'admin' : (radioMarcado ? radioMarcado.value : 'operativo');
+  const checkEvento = eventoAsignadoDesdeSelector(rol, errEl);
+  if(!checkEvento.ok) return;
+  const eventoAsignado = checkEvento.valor;
 
   const btn = document.getElementById('btnCrearUsuario');
   btn.disabled = true; btn.textContent = 'Creando…';
@@ -3642,7 +3709,7 @@ function crearUsuario(){
   authSecundaria.createUserWithEmailAndPassword(emailInterno, pass).then(cred => {
     const uid = cred.user.uid;
     return db.collection('usuarios').doc(uid).set({
-      nombre, iniciales, usuario, email: emailInterno, activo: true, rol, sonidoAvisoActivo, creadoEn: new Date().toISOString(),
+      nombre, iniciales, usuario, email: emailInterno, activo: true, rol, sonidoAvisoActivo, eventoAsignado, creadoEn: new Date().toISOString(),
     }).then(() => authSecundaria.signOut());
   }).then(() => {
     cerrarModalUsuario();
@@ -5859,8 +5926,22 @@ document.addEventListener('visibilitychange', () => {
 
 
 let primerCargaReservas = true;
+let reservasCrudas = []; // todo lo que llega de Firestore, sin filtrar por rol
+// Un "Promotor de eventos" solo debe ver las reservas del evento que
+// tiene asignado — se filtra aquí, en la fuente de datos, para que TODAS
+// las pantallas (Solicitudes, Por día, Resumen, calendario) respeten
+// esto automáticamente sin tener que tocarlas una por una.
+function recalcularReservasVisibles(){
+  if(usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado){
+    const ev = usuarioActual.eventoAsignado;
+    reservas = reservasCrudas.filter(r => r.fecha === ev.fecha && r.turno === ev.turno);
+  } else {
+    reservas = reservasCrudas;
+  }
+}
 reservasRef.onSnapshot(snap => {
-  reservas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  reservasCrudas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  recalcularReservasVisibles();
   actualizarEstadoConexion(true);
   // Ojo: docChanges() con type:'added' incluye TODOS los documentos la
   // primera vez que carga la app (es como Firestore entrega la carga
@@ -9197,7 +9278,11 @@ function abrirModal(id, mesaId){
     const turnosValidos = ['desayuno','almuerzo','cena'];
     const turnoInvalido = r.turno && !turnosValidos.includes(r.turno);
     if(r.fecha){
-      document.getElementById('fechaReservaEditBlock').style.display = 'block';
+      // Un promotor no puede mover su reserva a otra fecha/turno (queda
+      // fijo por diseño — ver guardarReserva) así que ni se le muestra
+      // la opción, para no generar confusión.
+      const esPromotorEditando = usuarioActual && usuarioActual.rol === 'promotor';
+      document.getElementById('fechaReservaEditBlock').style.display = esPromotorEditando ? 'none' : 'block';
       document.getElementById('fFechaReservaEdit').value = r.fecha;
       if(turnoInvalido){
         // Registro dañado de antes de la corrección (turno="todos" guardado
@@ -9328,9 +9413,17 @@ function abrirModal(id, mesaId){
     // es solo para navegar reservas ya existentes, no debe influir en algo
     // que se está creando de cero. Si luego resulta que es para otro día,
     // se mueve editándola (ver fechaReservaEditBlock arriba).
+    // EXCEPCIÓN: un "Promotor de eventos" solo gestiona UN evento — toda
+    // reserva nueva que cree arranca directo en la fecha/turno de ESE
+    // evento, no en hoy.
     const hoyDate = new Date();
-    modalFecha = fechaISO(hoyDate);
-    modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
+    if(usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado){
+      modalFecha = usuarioActual.eventoAsignado.fecha;
+      modalTurno = usuarioActual.eventoAsignado.turno;
+    } else {
+      modalFecha = fechaISO(hoyDate);
+      modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
+    }
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
     document.getElementById('tipoReservaBlock').style.display = 'block';
@@ -9345,7 +9438,9 @@ function abrirModal(id, mesaId){
     whatsappBlock.style.display = 'none';
     elegirCanalNuevo('telefono');
     document.getElementById('modalTitle').textContent = 'Nueva reserva (Teléfono)';
-    document.getElementById('modalSub').textContent = `${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha} (hoy)`;
+    document.getElementById('modalSub').textContent = (usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado)
+      ? `🎤 ${usuarioActual.eventoAsignado.nombre} — ${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha}`
+      : `${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha} (hoy)`;
     document.getElementById('fHora').value = '';
     document.getElementById('fHoraSalida').value = '';
     document.getElementById('fPax').value = '';
@@ -9833,6 +9928,16 @@ function guardarReserva(){
   if(fechaReservaEditBlock.style.display !== 'none'){
     fechaFinal = document.getElementById('fFechaReservaEdit').value || modalFecha;
     turnoFinal = document.getElementById('fTurnoReservaEdit').value || modalTurno;
+  }
+  // Resguardo de datos: un "Promotor de eventos" solo puede crear/editar
+  // reservas de SU evento — sin importar qué haya quedado escrito en los
+  // campos de fecha/turno (por edición manual, un bug de UI, etc.), aquí
+  // se fuerza de vuelta a la fecha/turno del evento asignado. Así nunca
+  // puede quedar, por accidente o a propósito, una reserva suya fuera de
+  // su evento.
+  if(usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado){
+    fechaFinal = usuarioActual.eventoAsignado.fecha;
+    turnoFinal = usuarioActual.eventoAsignado.turno;
   }
   // Si esta reserva cae en un evento especial que exige cover, no se deja
   // marcar como Aprobada sin haber cargado cuánto se cobró (con su
