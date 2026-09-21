@@ -2242,7 +2242,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.66</div>
+<div class="version-tag">v5.67</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -9471,9 +9471,15 @@ function abrirModal(id, mesaId){
     // evento, no en hoy.
     const hoyDate = new Date();
     const esPromotorNueva = usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado;
+    let horaEntradaPromotor = '';
     if(esPromotorNueva){
       modalFecha = usuarioActual.eventoAsignado.fecha;
       modalTurno = usuarioActual.eventoAsignado.turno;
+      // La hora de entrada no siempre viene completa en eventoAsignado
+      // (guardado en el usuario) — se busca en eventosCache, que trae el
+      // documento completo del evento, igual que en elegirEventoTelefono.
+      const evCompletoPromotor = (typeof eventosCache !== 'undefined' ? eventosCache : []).find(e => e.id === usuarioActual.eventoAsignado.id);
+      horaEntradaPromotor = (evCompletoPromotor && evCompletoPromotor.horaEntrada) || usuarioActual.eventoAsignado.horaEntrada || '';
     } else {
       modalFecha = fechaISO(hoyDate);
       modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
@@ -9491,6 +9497,11 @@ function abrirModal(id, mesaId){
       document.getElementById('eventoFechaFijaResumenTexto').textContent =
         `${usuarioActual.eventoAsignado.nombre} — ${modalFecha} · ${TURNO_LABEL_EVENTO[modalTurno] || modalTurno}`;
       document.getElementById('eventoFechaFijaResumen').style.display = 'block';
+      // La hora también viene fija del evento — igual que cuando cualquier
+      // otro rol elige un evento desde la parrilla (elegirEventoTelefono),
+      // se oculta la rueda de hora para que no se pueda mover y se deja el
+      // campo de hora ya cargado con la hora de entrada del evento.
+      document.getElementById('horaWheelBlock').style.display = 'none';
     } else {
       document.getElementById('tipoReservaBlock').style.display = 'block';
       elegirTipoReserva('normal');
@@ -9508,7 +9519,11 @@ function abrirModal(id, mesaId){
     document.getElementById('modalSub').textContent = (usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado)
       ? `🎤 ${usuarioActual.eventoAsignado.nombre} — ${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha}`
       : `${modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1)} · ${modalFecha} (hoy)`;
-    document.getElementById('fHora').value = '';
+    // El reset de arriba deja fHora vacío para cualquier reserva nueva —
+    // pero si es un promotor, la hora YA viene fija del evento (no hay
+    // rueda visible para que la ponga a mano), así que se rellena aquí,
+    // después del reset, para que no se vuelva a borrar.
+    document.getElementById('fHora').value = esPromotorNueva ? horaEntradaPromotor : '';
     document.getElementById('fHoraSalida').value = '';
     document.getElementById('fPax').value = '';
     document.getElementById('fNombre').value = '';
