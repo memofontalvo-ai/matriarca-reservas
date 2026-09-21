@@ -2227,7 +2227,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.60</div>
+<div class="version-tag">v5.62</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2480,7 +2480,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div id="abonoPactadoFieldsBlock" style="display:none;">
         <div class="field">
           <label>Valor del abono pactado ($)</label>
-          <input type="number" id="fAbonoPactadoValor" placeholder="0" class="input-compacto" oninput="renderAbonoPactadoResumen()">
+          <input type="text" inputmode="numeric" id="fAbonoPactadoValor" placeholder="0" class="input-compacto" oninput="formatearMilesInput(this); renderAbonoPactadoResumen();">
         </div>
         <div class="field" id="abonoPactadoAbonosBlock">
           <label>Abonos registrados <span class="fecha-solicitud-hint">(cada abono necesita su comprobante — es el soporte del pago)</span></label>
@@ -2491,7 +2491,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <div id="nuevoAbonoPactadoForm" class="nuevo-abono-cover-form" style="display:none;">
             <div class="field">
               <label>Monto abonado ahora ($)</label>
-              <input type="number" id="fNuevoAbonoPactadoMonto" placeholder="0" class="input-compacto">
+              <input type="text" inputmode="numeric" id="fNuevoAbonoPactadoMonto" placeholder="0" class="input-compacto" oninput="formatearMilesInput(this)">
             </div>
             <div class="field">
               <label>Comprobante de este abono</label>
@@ -2516,7 +2516,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <div id="coverFieldsBlock" style="display:none;">
         <div class="field">
           <label>Valor del cover por persona ($)</label>
-          <input type="number" id="fCoverValor" placeholder="0" class="input-compacto" oninput="actualizarTotalCover()">
+          <input type="text" inputmode="numeric" id="fCoverValor" placeholder="0" class="input-compacto" oninput="formatearMilesInput(this); actualizarTotalCover();">
           <div id="coverTotalDisplay" style="font-size:12.5px; color:var(--text-dim); margin-top:4px;"></div>
         </div>
         <div class="field" id="coverAbonosBlock">
@@ -2528,7 +2528,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           <div id="nuevoAbonoCoverForm" class="nuevo-abono-cover-form" style="display:none;">
             <div class="field">
               <label>Monto abonado ahora ($)</label>
-              <input type="number" id="fNuevoAbonoCoverMonto" placeholder="0" class="input-compacto">
+              <input type="text" inputmode="numeric" id="fNuevoAbonoCoverMonto" placeholder="0" class="input-compacto" oninput="formatearMilesInput(this)">
             </div>
             <div class="field">
               <label>Comprobante de este abono</label>
@@ -2911,7 +2911,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       </label>
       <div class="modal-sub" style="margin-top:4px;">Si lo marcas, ninguna reserva de este evento se va a poder Aprobar hasta que se cargue cuánto se cobró y su comprobante. El valor de cada mesa ya sale del plano asignado arriba — no hace falta ponerlo aquí.</div>
     </div>
-    <div class="field" id="fEventoValorWrap"><label>Valor de entrada (opcional — solo si este evento NO usa un plano propio)</label><input type="number" id="fEventoValor" placeholder="Déjalo vacío si no aplica"></div>
+    <div class="field" id="fEventoValorWrap"><label>Valor de entrada (opcional — solo si este evento NO usa un plano propio)</label><input type="text" inputmode="numeric" id="fEventoValor" placeholder="Déjalo vacío si no aplica" oninput="formatearMilesInput(this)"></div>
     <div class="field">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:400;">
         <input type="checkbox" id="fEventoActivo" checked style="width:auto;"> Visible para el público en eventos.html
@@ -2980,6 +2980,16 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 // Firestore (leer/editar/borrar TODAS las reservas). escapeHtml() convierte
 // los caracteres especiales de HTML en entidades seguras antes de
 // insertarlos en el DOM.
+// Separadores de miles al escribir un valor en pesos — el campo guarda
+// el texto con puntos (ej. "1.700.000") para que sea fácil de leer, y
+// numCampo() lo vuelve a convertir en número quitando los puntos cuando
+// hace falta calcular con él.
+function soloDigitos(v){ return String(v||'').replace(/[^0-9]/g,''); }
+function numCampo(id){ return Number(soloDigitos(document.getElementById(id).value)) || 0; }
+function formatearMilesInput(el){
+  const digits = soloDigitos(el.value);
+  el.value = digits ? Number(digits).toLocaleString('es-CO') : '';
+}
 function escapeHtml(str){
   if(str === undefined || str === null) return '';
   return String(str)
@@ -3837,7 +3847,7 @@ function textoCoverBadge(r){
 function actualizarTotalCover(){
   const el = document.getElementById('coverTotalDisplay');
   if(!el) return;
-  const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+  const porPersona = numCampo('fCoverValor') || 0;
   const pax = Number(document.getElementById('fPax').value) || 0;
   if(porPersona <= 0 || pax <= 0){
     el.textContent = '';
@@ -3870,7 +3880,7 @@ function renderCoverAbonos(){
         </div>
       </div>`).join('');
   }
-  const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+  const porPersona = numCampo('fCoverValor') || 0;
   const pax = Number(document.getElementById('fPax').value) || 0;
   const totalCover = porPersona * pax;
   const totalAbonado = coverAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
@@ -3894,7 +3904,7 @@ function renderCoverAbonos(){
 // texto, que no podría pedir una imagen.
 let nuevoAbonoCoverComprobanteTemp = null;
 function mostrarFormNuevoAbonoCover(){
-  const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+  const porPersona = numCampo('fCoverValor') || 0;
   const pax = Number(document.getElementById('fPax').value) || 0;
   if(porPersona * pax <= 0){ alert('Primero escribe el valor del cover por persona.'); return; }
   nuevoAbonoCoverComprobanteTemp = null;
@@ -3945,7 +3955,7 @@ function previsualizarNuevoAbonoCoverComprobante(input){
   reader.readAsDataURL(file);
 }
 function confirmarAgregarAbonoCover(){
-  const monto = Number(document.getElementById('fNuevoAbonoCoverMonto').value) || 0;
+  const monto = numCampo('fNuevoAbonoCoverMonto');
   if(monto <= 0){ alert('Escribe cuánto abonó, un valor mayor a 0.'); return; }
   if(!nuevoAbonoCoverComprobanteTemp){ alert('Falta subir el comprobante de este abono — es obligatorio, es el soporte del pago.'); return; }
   coverAbonosTemp.push({ monto, fecha: new Date().toISOString(), comprobante: nuevoAbonoCoverComprobanteTemp });
@@ -3995,7 +4005,7 @@ function renderAbonoPactadoResumen(){
         </div>
       </div>`).join('');
   }
-  const totalPactado = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
+  const totalPactado = numCampo('fAbonoPactadoValor');
   const totalAbonado = abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
   const pendiente = totalPactado - totalAbonado;
   resumen.classList.remove('pendiente','completo');
@@ -4012,7 +4022,7 @@ function renderAbonoPactadoResumen(){
   if(btnEnviarAprobacion) btnEnviarAprobacion.style.display = abonoPactadoAbonosTemp.length > 0 ? 'block' : 'none';
 }
 function mostrarFormNuevoAbonoPactado(){
-  const totalPactado = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
+  const totalPactado = numCampo('fAbonoPactadoValor');
   if(totalPactado <= 0){ alert('Primero escribe el valor del abono pactado.'); return; }
   nuevoAbonoPactadoComprobanteTemp = null;
   document.getElementById('fNuevoAbonoPactadoMonto').value = '';
@@ -4059,7 +4069,7 @@ function previsualizarNuevoAbonoPactadoComprobante(input){
   reader.readAsDataURL(file);
 }
 function confirmarAgregarAbonoPactado(){
-  const monto = Number(document.getElementById('fNuevoAbonoPactadoMonto').value) || 0;
+  const monto = numCampo('fNuevoAbonoPactadoMonto');
   if(monto <= 0){ alert('Escribe cuánto abonó, un valor mayor a 0.'); return; }
   if(!nuevoAbonoPactadoComprobanteTemp){ alert('Falta subir el comprobante de este abono — es obligatorio, es el soporte del pago.'); return; }
   abonoPactadoAbonosTemp.push({ monto, fecha: new Date().toISOString(), comprobante: nuevoAbonoPactadoComprobanteTemp });
@@ -4116,14 +4126,14 @@ const NUMERO_APROBACION_ABONOS = '573218029306';
 function armarMensajeAprobacionAbono(tipo){
   let tituloTexto, total, totalAbonado, montoAhora;
   if(tipo === 'cover'){
-    const porPersona = Number(document.getElementById('fCoverValor').value) || 0;
+    const porPersona = numCampo('fCoverValor') || 0;
     const pax = Number(document.getElementById('fPax').value) || 0;
     total = porPersona * pax;
     totalAbonado = coverAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
     montoAhora = coverAbonosTemp.length ? Number(coverAbonosTemp[coverAbonosTemp.length - 1].monto || 0) : 0;
     tituloTexto = '*COVER*';
   } else {
-    total = Number(document.getElementById('fAbonoPactadoValor').value) || 0;
+    total = numCampo('fAbonoPactadoValor');
     totalAbonado = abonoPactadoAbonosTemp.reduce((s,a) => s + Number(a.monto||0), 0);
     montoAhora = abonoPactadoAbonosTemp.length ? Number(abonoPactadoAbonosTemp[abonoPactadoAbonosTemp.length - 1].monto || 0) : 0;
     tituloTexto = '*ABONO POR MESA*';
@@ -4297,7 +4307,7 @@ function editarEvento(id){
   document.getElementById('fEventoFecha').value = ev.fecha || '';
   document.getElementById('fEventoHoraEntrada').value = ev.horaEntrada || '';
   document.getElementById('fEventoDescripcion').value = ev.descripcion || '';
-  document.getElementById('fEventoValor').value = ev.valorEntrada || '';
+  document.getElementById('fEventoValor').value = ev.valorEntrada ? Number(ev.valorEntrada).toLocaleString('es-CO') : '';
   document.getElementById('fEventoAplicaCover').checked = ev.aplicaCover === true;
   document.getElementById('fEventoActivo').checked = ev.activo !== false;
   document.getElementById('fEventoImagenArchivo').value = '';
@@ -4321,8 +4331,7 @@ function guardarEvento(){
   const horaEntrada = document.getElementById('fEventoHoraEntrada').value;
   const turno = document.getElementById('fEventoTurno').value;
   const descripcion = document.getElementById('fEventoDescripcion').value.trim();
-  const valorRaw = document.getElementById('fEventoValor').value;
-  const valorEntrada = valorRaw ? Number(valorRaw) : null;
+  const valorEntrada = numCampo('fEventoValor') || null;
   const activo = document.getElementById('fEventoActivo').checked;
   const aplicaCover = document.getElementById('fEventoAplicaCover').checked;
   const planoId = document.getElementById('fEventoPlano').value || null;
@@ -4477,7 +4486,7 @@ function elegirEventoTelefono(id){
   // el total cambia según cuántas personas paguen entrada.
   if(ev.valorEntrada){
     document.getElementById('fTieneCover').checked = true;
-    document.getElementById('fCoverValor').value = ev.valorEntrada;
+    document.getElementById('fCoverValor').value = Number(ev.valorEntrada).toLocaleString('es-CO');
     toggleCoverFields();
   }
 }
@@ -8377,6 +8386,20 @@ function confirmarSelectorMesa(){
       document.getElementById('fPax').value = totalPersonas;
       actualizarTotalCover();
     }
+    // Si además esas mesas tienen precio (categoría de precio asignada en
+    // el plano del evento), se usa ESE valor para el cover — no hace
+    // falta que el staff lo vuelva a escribir a mano.
+    const totalPrecio = mesaSeleccionTemp.reduce((sum, ref) => {
+      const m = mesasPorRef[ref];
+      const cat = (m && m.categoria && PLANO_EVENTO_ACTUAL.categorias) ? PLANO_EVENTO_ACTUAL.categorias[m.categoria] : null;
+      return sum + (cat ? Number(cat.precio || 0) : 0);
+    }, 0);
+    if(totalPrecio > 0 && totalPersonas > 0){
+      document.getElementById('fTieneCover').checked = true;
+      document.getElementById('fCoverValor').value = Math.round(totalPrecio / totalPersonas).toLocaleString('es-CO');
+      toggleCoverFields();
+      actualizarTotalCover();
+    }
   }
   document.getElementById('mesaPickerOverlay').classList.remove('open');
   mesaSeleccionTemp = [];
@@ -9214,7 +9237,7 @@ function abrirModal(id, mesaId){
     // más detalle (comprobantes, pagos parciales) marcan la casilla.
     const tienePactado = Number(r.abonoPactado) > 0 || (Array.isArray(r.abonoAbonos) && r.abonoAbonos.length > 0);
     document.getElementById('fTieneAbonoPactado').checked = tienePactado;
-    document.getElementById('fAbonoPactadoValor').value = r.abonoPactado || '';
+    document.getElementById('fAbonoPactadoValor').value = r.abonoPactado ? Number(r.abonoPactado).toLocaleString('es-CO') : '';
     abonoPactadoAbonosTemp = Array.isArray(r.abonoAbonos) ? [...r.abonoAbonos] : [];
     cancelarAgregarAbonoPactado();
     toggleAbonoPactadoFields();
@@ -9276,7 +9299,7 @@ function abrirModal(id, mesaId){
     const coverPersonaGuardado = r.coverValorPersona != null
       ? r.coverValorPersona
       : (Number(r.coverValor) > 0 && Number(r.pax) > 0 ? Math.round(Number(r.coverValor) / Number(r.pax)) : '');
-    document.getElementById('fCoverValor').value = coverPersonaGuardado || '';
+    document.getElementById('fCoverValor').value = coverPersonaGuardado ? Number(coverPersonaGuardado).toLocaleString('es-CO') : '';
     coverAbonosTemp = Array.isArray(r.coverAbonos) ? [...r.coverAbonos] : [];
     cancelarAgregarAbonoCover();
     toggleCoverFields();
@@ -9838,16 +9861,16 @@ function guardarReserva(){
     mesa: document.getElementById('fMesa').value,
     canal: document.getElementById('fCanal').value,
     abono: valorAbonoParaGuardar(),
-    abonoPactado: document.getElementById('fTieneAbonoPactado').checked ? (Number(document.getElementById('fAbonoPactadoValor').value)||0) : 0,
+    abonoPactado: document.getElementById('fTieneAbonoPactado').checked ? (numCampo('fAbonoPactadoValor')) : 0,
     abonoAbonos: document.getElementById('fTieneAbonoPactado').checked ? abonoPactadoAbonosTemp : [],
     menu: document.getElementById('fMenu').value,
     obs: document.getElementById('fObs').value.trim(),
     estado: estadoSeleccionado,
-    coverValorPersona: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
+    coverValorPersona: document.getElementById('fTieneCover').checked ? (numCampo('fCoverValor')||0) : 0,
     // coverValor se guarda como TOTAL (por persona × pax) — así el badge
     // de la tarjeta y el mensaje de WhatsApp pueden seguir mostrando el
     // total sin tener que recalcularlo cada vez.
-    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) * (Number(document.getElementById('fPax').value)||1) : 0,
+    coverValor: document.getElementById('fTieneCover').checked ? (numCampo('fCoverValor')||0) * (Number(document.getElementById('fPax').value)||1) : 0,
     // Abonos parciales del cover (fecha + monto de cada pago) — separado
     // del abono de consumo. Se guarda vacío si no tiene cover.
     coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
@@ -10009,18 +10032,18 @@ function enviarParaAprobacion(){
     mesa,
     canal: document.getElementById('fCanal').value,
     abono: valorAbonoParaGuardar(),
-    abonoPactado: document.getElementById('fTieneAbonoPactado').checked ? (Number(document.getElementById('fAbonoPactadoValor').value)||0) : 0,
+    abonoPactado: document.getElementById('fTieneAbonoPactado').checked ? (numCampo('fAbonoPactadoValor')) : 0,
     abonoAbonos: document.getElementById('fTieneAbonoPactado').checked ? abonoPactadoAbonosTemp : [],
     menu: document.getElementById('fMenu').value,
     obs: document.getElementById('fObs').value.trim(),
     estado: 'pendiente_aprobacion',
     aprobadaPorCliente: false,
     pasoPorSolicitud: true,
-    coverValorPersona: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) : 0,
+    coverValorPersona: document.getElementById('fTieneCover').checked ? (numCampo('fCoverValor')||0) : 0,
     // coverValor se guarda como TOTAL (por persona × pax) — así el badge
     // de la tarjeta y el mensaje de WhatsApp pueden seguir mostrando el
     // total sin tener que recalcularlo cada vez.
-    coverValor: document.getElementById('fTieneCover').checked ? (Number(document.getElementById('fCoverValor').value)||0) * (Number(document.getElementById('fPax').value)||1) : 0,
+    coverValor: document.getElementById('fTieneCover').checked ? (numCampo('fCoverValor')||0) * (Number(document.getElementById('fPax').value)||1) : 0,
     coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
   };
   if(coverComprobanteBase64Temp){
