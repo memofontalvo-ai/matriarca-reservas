@@ -2227,7 +2227,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.59</div>
+<div class="version-tag">v5.60</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2905,7 +2905,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
       <img id="fEventoImagenPreview" style="display:none; width:100%; margin-top:10px; border-radius:10px; max-height:220px; object-fit:cover;">
     </div>
     <div class="field"><label>Descripción</label><textarea id="fEventoDescripcion" rows="3" placeholder="Show en vivo, música, artista invitado..."></textarea></div>
-    <div class="field"><label>Valor de entrada (opcional)</label><input type="number" id="fEventoValor" placeholder="Déjalo vacío si no aplica"></div>
+    <div class="field">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:400;">
+        <input type="checkbox" id="fEventoAplicaCover" style="width:auto;"> Este evento aplica cover (cobro de entrada)
+      </label>
+      <div class="modal-sub" style="margin-top:4px;">Si lo marcas, ninguna reserva de este evento se va a poder Aprobar hasta que se cargue cuánto se cobró y su comprobante. El valor de cada mesa ya sale del plano asignado arriba — no hace falta ponerlo aquí.</div>
+    </div>
+    <div class="field" id="fEventoValorWrap"><label>Valor de entrada (opcional — solo si este evento NO usa un plano propio)</label><input type="number" id="fEventoValor" placeholder="Déjalo vacío si no aplica"></div>
     <div class="field">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:400;">
         <input type="checkbox" id="fEventoActivo" checked style="width:auto;"> Visible para el público en eventos.html
@@ -4272,6 +4278,7 @@ function abrirModalEvento(){
   document.getElementById('fEventoHoraEntrada').value = '';
   document.getElementById('fEventoDescripcion').value = '';
   document.getElementById('fEventoValor').value = '';
+  document.getElementById('fEventoAplicaCover').checked = false;
   document.getElementById('fEventoActivo').checked = true;
   document.getElementById('fEventoImagenArchivo').value = '';
   document.getElementById('fEventoImagenPreview').style.display = 'none';
@@ -4291,6 +4298,7 @@ function editarEvento(id){
   document.getElementById('fEventoHoraEntrada').value = ev.horaEntrada || '';
   document.getElementById('fEventoDescripcion').value = ev.descripcion || '';
   document.getElementById('fEventoValor').value = ev.valorEntrada || '';
+  document.getElementById('fEventoAplicaCover').checked = ev.aplicaCover === true;
   document.getElementById('fEventoActivo').checked = ev.activo !== false;
   document.getElementById('fEventoImagenArchivo').value = '';
   eventoImagenBase64Temp = ev.imagen || null;
@@ -4316,10 +4324,11 @@ function guardarEvento(){
   const valorRaw = document.getElementById('fEventoValor').value;
   const valorEntrada = valorRaw ? Number(valorRaw) : null;
   const activo = document.getElementById('fEventoActivo').checked;
+  const aplicaCover = document.getElementById('fEventoAplicaCover').checked;
   const planoId = document.getElementById('fEventoPlano').value || null;
   if(!nombre || !fecha || !horaEntrada){ errEl.textContent = 'El nombre, la fecha y la hora de entrada son obligatorios.'; return; }
   const editId = document.getElementById('fEventoEditId').value;
-  const data = {nombre, fecha, horaEntrada, turno, descripcion, valorEntrada, activo, imagen: eventoImagenBase64Temp || null, planoId};
+  const data = {nombre, fecha, horaEntrada, turno, descripcion, valorEntrada, activo, imagen: eventoImagenBase64Temp || null, planoId, aplicaCover};
   const btn = document.getElementById('btnGuardarEvento');
   btn.disabled = true; btn.textContent = 'Guardando…';
   const promesa = editId ? eventosRef.doc(editId).update(data) : eventosRef.add(data);
@@ -9801,6 +9810,20 @@ function guardarReserva(){
   if(fechaReservaEditBlock.style.display !== 'none'){
     fechaFinal = document.getElementById('fFechaReservaEdit').value || modalFecha;
     turnoFinal = document.getElementById('fTurnoReservaEdit').value || modalTurno;
+  }
+  // Si esta reserva cae en un evento especial que exige cover, no se deja
+  // marcar como Aprobada sin haber cargado cuánto se cobró (con su
+  // comprobante) — se queda en Pendiente hasta que eso esté completo.
+  if(estadoSeleccionado === 'confirmada'){
+    const evConCover = eventosCache.find(e => e.fecha === fechaFinal && e.turno === turnoFinal && e.aplicaCover);
+    if(evConCover){
+      const tieneCover = document.getElementById('fTieneCover').checked;
+      const hayAbonoConComprobante = tieneCover && coverAbonosTemp.some(a => a.comprobante);
+      if(!hayAbonoConComprobante){
+        alert(`Este evento ("${evConCover.nombre}") exige cover — antes de poder aprobar esta reserva, marca "Esta reserva tiene cover", carga cuánto se cobró y su comprobante.`);
+        return;
+      }
+    }
   }
   const data = {
     fecha: fechaFinal,
