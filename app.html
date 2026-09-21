@@ -2242,7 +2242,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.67</div>
+<div class="version-tag">v5.68</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2340,9 +2340,15 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
           </div>
         </div>
       </div>
-      <div id="eventoFechaFijaResumen" style="display:none; margin:10px 0; padding:12px 14px; border-radius:10px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); text-align:center;">
-        <div style="font-size:11px; letter-spacing:1px; color:var(--gold-bright); text-transform:uppercase; margin-bottom:4px;">🎤 Fecha y hora fijas al evento</div>
-        <div id="eventoFechaFijaResumenTexto" style="font-size:14px; font-weight:700;"></div>
+      <div id="eventoFechaFijaResumen" style="display:none; margin:10px 0; padding:14px; border-radius:12px; background:rgba(201,161,90,0.12); border:1px solid var(--gold);">
+        <div style="font-size:11px; letter-spacing:1px; color:var(--gold-bright); text-transform:uppercase; margin-bottom:10px; text-align:center;">🎤 Fecha y hora fijas al evento</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <img id="eventoFechaFijaResumenImg" src="" alt="" style="display:none; width:54px; height:54px; object-fit:cover; border-radius:10px; flex-shrink:0; border:1px solid var(--gold);">
+          <div style="flex:1; min-width:0;">
+            <div id="eventoFechaFijaResumenNombre" style="font-size:15.5px; font-weight:800; margin-bottom:5px; line-height:1.25;"></div>
+            <div id="eventoFechaFijaResumenTexto" style="font-size:14.5px; font-weight:700; line-height:1.45;"></div>
+          </div>
+        </div>
       </div>
       <div class="field phone-date-section" id="fechaReservaEditBlock" style="display:none;">
         <div id="horaFechaLockBanner" class="hora-fecha-lock-banner" style="display:none;">
@@ -4569,6 +4575,39 @@ function renderParrillaEventosTelefono(){
     </div>`).join('');
 }
 
+// Pinta el resumen grande de "fecha y hora fijas al evento" — nombre en
+// grande, fecha larga bien legible, turno y hora de entrada, más la misma
+// foto de publicidad del evento (chiquita, si la tiene) para que se
+// reconozca de un vistazo. La usan tanto el flujo normal (elegirEventoTelefono,
+// abajo) como el de "Promotor de eventos" (ver abrirModal), para que las dos
+// pantallas se vean exactamente igual y no se vuelvan a desincronizar.
+const TURNO_LABEL_TEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+function mostrarEventoFechaFija(nombre, imagen, fecha, turno, horaEntrada){
+  const imgEl = document.getElementById('eventoFechaFijaResumenImg');
+  if(imagen){ imgEl.src = imagen; imgEl.style.display = 'block'; }
+  else { imgEl.style.display = 'none'; imgEl.removeAttribute('src'); }
+  document.getElementById('eventoFechaFijaResumenNombre').textContent = nombre || '';
+  const fechaLarga = (() => {
+    try{
+      const d = parseISO(fecha);
+      const txt = new Intl.DateTimeFormat('es-CO',{weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d);
+      return txt.charAt(0).toUpperCase()+txt.slice(1);
+    }catch(e){ return fecha; }
+  })();
+  const horaLegible = horaEntrada ? formatearHora12(horaEntrada) : '';
+  document.getElementById('eventoFechaFijaResumenTexto').innerHTML =
+    `${escapeHtml(fechaLarga)}<br>${escapeHtml(TURNO_LABEL_TEL[turno]||turno||'')}${horaLegible ? ' · Hora de entrada: '+escapeHtml(horaLegible) : ''}`;
+  document.getElementById('eventoFechaFijaResumen').style.display = 'block';
+}
+// Único lugar donde se decide si, en este momento, la fecha/turno/hora
+// están fijas por un evento — lo usan elegirCanalNuevo y
+// autoSeleccionarTurnoPorHoraTelefono para NO pisar ese bloqueo (ver notas
+// ahí abajo). Basta con mirar si el resumen de arriba está visible.
+function hayEventoConFechaFija(){
+  const el = document.getElementById('eventoFechaFijaResumen');
+  return !!(el && el.style.display === 'block');
+}
+
 function elegirEventoTelefono(id){
   const ev = eventosActivosCache.find(e => e.id === id);
   if(!ev) return;
@@ -4585,9 +4624,7 @@ function elegirEventoTelefono(id){
   // configurado al crear el evento.
   document.getElementById('fechaReservaEditBlock').style.display = 'none';
   document.getElementById('horaWheelBlock').style.display = 'none';
-  const TURNO_LABEL_TEL = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-  document.getElementById('eventoFechaFijaResumenTexto').textContent = `${ev.fecha} · ${TURNO_LABEL_TEL[ev.turno]||ev.turno} · Hora de entrada ${ev.horaEntrada}`;
-  document.getElementById('eventoFechaFijaResumen').style.display = 'block';
+  mostrarEventoFechaFija(ev.nombre, ev.imagen, ev.fecha, ev.turno, ev.horaEntrada);
   document.getElementById('parrillaEventosTelefono').style.display = 'none';
   document.getElementById('eventoSeleccionadoResumenTexto').textContent = `🎤 ${ev.nombre} — ${ev.fecha} · Hora de entrada: ${ev.horaEntrada}`;
   document.getElementById('eventoSeleccionadoResumen').style.display = 'block';
@@ -9472,13 +9509,15 @@ function abrirModal(id, mesaId){
     const hoyDate = new Date();
     const esPromotorNueva = usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado;
     let horaEntradaPromotor = '';
+    let evCompletoPromotor = null;
     if(esPromotorNueva){
       modalFecha = usuarioActual.eventoAsignado.fecha;
       modalTurno = usuarioActual.eventoAsignado.turno;
-      // La hora de entrada no siempre viene completa en eventoAsignado
-      // (guardado en el usuario) — se busca en eventosCache, que trae el
-      // documento completo del evento, igual que en elegirEventoTelefono.
-      const evCompletoPromotor = (typeof eventosCache !== 'undefined' ? eventosCache : []).find(e => e.id === usuarioActual.eventoAsignado.id);
+      // La hora de entrada (y la imagen de publicidad) no siempre vienen
+      // completas en eventoAsignado (guardado en el usuario) — se buscan en
+      // eventosCache, que trae el documento completo del evento, igual que
+      // en elegirEventoTelefono.
+      evCompletoPromotor = (typeof eventosCache !== 'undefined' ? eventosCache : []).find(e => e.id === usuarioActual.eventoAsignado.id);
       horaEntradaPromotor = (evCompletoPromotor && evCompletoPromotor.horaEntrada) || usuarioActual.eventoAsignado.horaEntrada || '';
     } else {
       modalFecha = fechaISO(hoyDate);
@@ -9494,9 +9533,11 @@ function abrirModal(id, mesaId){
       // tocarlo, el mismo aviso "fecha y hora fijas al evento" que usa
       // cualquier reserva ya amarrada a un evento.
       document.getElementById('tipoReservaBlock').style.display = 'none';
-      document.getElementById('eventoFechaFijaResumenTexto').textContent =
-        `${usuarioActual.eventoAsignado.nombre} — ${modalFecha} · ${TURNO_LABEL_EVENTO[modalTurno] || modalTurno}`;
-      document.getElementById('eventoFechaFijaResumen').style.display = 'block';
+      mostrarEventoFechaFija(
+        usuarioActual.eventoAsignado.nombre,
+        evCompletoPromotor ? evCompletoPromotor.imagen : null,
+        modalFecha, modalTurno, horaEntradaPromotor
+      );
       // La hora también viene fija del evento — igual que cuando cualquier
       // otro rol elige un evento desde la parrilla (elegirEventoTelefono),
       // se oculta la rueda de hora para que no se pueda mover y se deja el
@@ -9657,7 +9698,12 @@ function elegirCanalNuevo(tipo){
     // viene, etc.) — no se puede asumir "hoy" a la fuerza. El día en que se
     // ORIGINÓ la llamada (fechaSolicitud) se sigue guardando aparte y
     // siempre como hoy, automático, sin que esto lo afecte.
-    document.getElementById('fechaReservaEditBlock').style.display = 'block';
+    // EXCEPCIÓN: si la fecha/hora ya están fijas por un evento especial
+    // (Promotor de eventos, o cualquiera que ya haya elegido un evento de
+    // la parrilla), este bloque NO se vuelve a mostrar — antes esta línea
+    // lo reactivaba sin condición y así se colaba el calendario editable
+    // encima del aviso de "fecha y hora fijas al evento".
+    if(!hayEventoConFechaFija()) document.getElementById('fechaReservaEditBlock').style.display = 'block';
     document.getElementById('fFechaReservaEdit').value = modalFecha;
     document.getElementById('fTurnoReservaEdit').value = modalTurno;
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
@@ -10739,6 +10785,11 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   // seleccionado de antes sin que coincida con la hora actual.
   function autoSeleccionarTurnoPorHoraTelefono(h24, min){
     if(editandoId) return;
+    // El turno de un evento con fecha fija ya viene decidido al crear el
+    // evento — no se debe "corregir" solo porque la rueda de hora (oculta
+    // en este caso, pero igual se posiciona internamente) no coincide con
+    // el rango horario típico de ese turno.
+    if(hayEventoConFechaFija()) return;
     const minutosDelDia = h24*60 + min;
     let turnoAuto;
     if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
