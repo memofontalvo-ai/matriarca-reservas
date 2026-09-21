@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.53</div>
+<div class="version-tag">v5.54</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -2882,6 +2882,11 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
         <button type="button" class="btn btn-ghost" data-turno="cena" onclick="elegirTurnoEvento('cena')">🌙 Cena</button>
       </div>
       <input type="hidden" id="fEventoTurno" value="cena">
+    </div>
+    <div class="field">
+      <label>Plano de mesas para este evento</label>
+      <select id="fEventoPlano"><option value="">General (el de todos los días)</option></select>
+      <div class="modal-sub" style="margin-top:4px;">Si eliges un plano de evento, cualquier reserva de esta fecha y turno usará esas mesas (con sus precios) en vez de las del salón general.</div>
     </div>
     <div class="field">
       <label>Imagen del evento (la que ya usas en redes sociales)</label>
@@ -4227,6 +4232,27 @@ function previsualizarImagenEvento(input){
   reader.readAsDataURL(file);
 }
 
+// Lista de planos de evento (los que se crean desde Salones → "+ Nuevo
+// plano") para poder asignarle uno a un evento especial. Se cachea una
+// vez y se reusa cada vez que se abre el modal de crear/editar evento —
+// no hace falta re-consultar Firestore cada vez.
+let planosEventoCacheParaSelect = null;
+function cargarOpcionesPlanoEvento(seleccionActual){
+  const sel = document.getElementById('fEventoPlano');
+  function pintar(){
+    sel.innerHTML = '<option value="">General (el de todos los días)</option>'
+      + planosEventoCacheParaSelect.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+    sel.value = seleccionActual || '';
+  }
+  if(planosEventoCacheParaSelect){ pintar(); return; }
+  db.collection('planosMesasEventos').get().then(snap => {
+    planosEventoCacheParaSelect = snap.docs.map(d => ({id: d.id, nombre: d.data().nombre || d.id}));
+    pintar();
+  }).catch(err => {
+    console.error('Error cargando la lista de planos de evento:', err);
+    sel.innerHTML = '<option value="">General (el de todos los días)</option>';
+  });
+}
 function abrirModalEvento(){
   document.getElementById('eventoModalTitulo').textContent = 'Crear evento especial';
   document.getElementById('fEventoEditId').value = '';
@@ -4240,6 +4266,7 @@ function abrirModalEvento(){
   document.getElementById('fEventoImagenPreview').style.display = 'none';
   eventoImagenBase64Temp = null;
   elegirTurnoEvento('cena');
+  cargarOpcionesPlanoEvento('');
   document.getElementById('eventoModalError').textContent = '';
   document.getElementById('overlayEvento').classList.add('open');
 }
@@ -4260,6 +4287,7 @@ function editarEvento(id){
   if(ev.imagen){ preview.src = ev.imagen; preview.style.display = 'block'; }
   else { preview.style.display = 'none'; }
   elegirTurnoEvento(ev.turno || 'cena');
+  cargarOpcionesPlanoEvento(ev.planoId || '');
   document.getElementById('eventoModalError').textContent = '';
   document.getElementById('overlayEvento').classList.add('open');
 }
@@ -4277,9 +4305,10 @@ function guardarEvento(){
   const valorRaw = document.getElementById('fEventoValor').value;
   const valorEntrada = valorRaw ? Number(valorRaw) : null;
   const activo = document.getElementById('fEventoActivo').checked;
+  const planoId = document.getElementById('fEventoPlano').value || null;
   if(!nombre || !fecha || !horaEntrada){ errEl.textContent = 'El nombre, la fecha y la hora de entrada son obligatorios.'; return; }
   const editId = document.getElementById('fEventoEditId').value;
-  const data = {nombre, fecha, horaEntrada, turno, descripcion, valorEntrada, activo, imagen: eventoImagenBase64Temp || null};
+  const data = {nombre, fecha, horaEntrada, turno, descripcion, valorEntrada, activo, imagen: eventoImagenBase64Temp || null, planoId};
   const btn = document.getElementById('btnGuardarEvento');
   btn.disabled = true; btn.textContent = 'Guardando…';
   const promesa = editId ? eventosRef.doc(editId).update(data) : eventosRef.add(data);
@@ -4989,6 +5018,16 @@ function renderFestivos(){
 // pestaña "Plano" de Por día para mostrar la ocupación real de cada
 // día/turno sobre la misma distribución visual, no un simple listado.
 let PLANO_MAESTRO = null;
+// Si la fecha/turno de la reserva que se está editando cae en un evento
+// especial con su propio plano asignado, esto guarda ESE plano (ya
+// descargado y listo) — el selector de mesas lo usa en vez del general.
+// null = no aplica, se usa el plano general de siempre.
+let PLANO_EVENTO_ACTUAL = null;
+let planoEventoCacheById = {}; // id de plano -> su json ya descargado, para no reconsultar Firestore cada vez que se abre el selector
+function planoIdParaFechaTurno(fecha, turno){
+  const ev = eventosCache.find(e => e.fecha === fecha && e.turno === turno && e.planoId);
+  return ev ? ev.planoId : null;
+}
 db.collection('configuracion').doc('planoMesas').onSnapshot(snap => {
   if(snap.exists && snap.data().json){
     try { PLANO_MAESTRO = JSON.parse(snap.data().json); }
@@ -7914,8 +7953,11 @@ const ZONES_PLANO = {
 const DISABLED_CELLS_PLANO = new Set(['A-4-6','A-4-7','A-4-8']);
 
 function codeForPlano(m, prefType){
-  const zonaPart = 'M' + (m.zona || '');
   const prefPart = prefType ? ('P' + prefType) : '';
+  // En un plano de evento el código ya viene armado completo en m.num
+  // (ej. "P1") — no se le agrega el prefijo de zona que sí usa General.
+  if (PLANO_EVENTO_ACTUAL) return prefPart + m.num;
+  const zonaPart = 'M' + (m.zona || '');
   return prefPart + zonaPart + m.num;
 }
 function parseKeyPlano(key){
@@ -8114,12 +8156,14 @@ function buildZoneGridPicker(key, cfg, mesas, pref, ocupadasPorOtro){
 }
 
 function renderMesaPickerCanvas(){
-  if(!PLANO_MAESTRO){
+  const usandoPlanoEvento = !!PLANO_EVENTO_ACTUAL;
+  const plano = usandoPlanoEvento ? PLANO_EVENTO_ACTUAL : PLANO_MAESTRO;
+  if(!plano){
     document.getElementById('mesaPickerCanvas').innerHTML = '';
     return;
   }
-  const mesas = PLANO_MAESTRO.mesas || {};
-  const pref = PLANO_MAESTRO.pref || {};
+  const mesas = plano.mesas || {};
+  const pref = plano.pref || {};
   // Mesas ocupadas por OTRAS reservas del mismo día/turno (no cuenta la
   // reserva que se está editando ahora mismo, para no bloquearse a sí misma).
   // Si esa otra reserva SÍ tiene hora de salida registrada, la mesa se
@@ -8148,10 +8192,11 @@ function renderMesaPickerCanvas(){
     else if(ocupadasPorOtro[zid.toLowerCase()]) estadoZonas[zid] = 'ocupada';
   });
 
-  document.getElementById('mesaPickerCanvas').innerHTML =
-    buildBackgroundPlano(true, estadoZonas) +
-    buildZoneGridPicker('A', ZONES_PLANO.A, mesas, pref, ocupadasPorOtro) +
-    buildZoneGridPicker('C', ZONES_PLANO.C, mesas, pref, ocupadasPorOtro);
+  document.getElementById('mesaPickerCanvas').innerHTML = usandoPlanoEvento
+    ? Object.keys(plano.zonas || {}).map(zid => buildZoneGridPicker(zid, plano.zonas[zid], mesas, pref, ocupadasPorOtro)).join('')
+    : buildBackgroundPlano(true, estadoZonas) +
+      buildZoneGridPicker('A', ZONES_PLANO.A, mesas, pref, ocupadasPorOtro) +
+      buildZoneGridPicker('C', ZONES_PLANO.C, mesas, pref, ocupadasPorOtro);
 
   const seleccionEl = document.getElementById('mesaPickerSeleccion');
   seleccionEl.textContent = mesaSeleccionTemp.length
@@ -8175,8 +8220,36 @@ function abrirSelectorMesa(){
   mesaSeleccionTemp = valorActual ? valorActual.split('+') : [];
   document.getElementById('mesaPickerSub').textContent =
     `${modalTurno ? modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1) : ''} · ${modalFecha || ''}`;
-  renderMesaPickerCanvas();
   document.getElementById('mesaPickerOverlay').classList.add('open');
+
+  const planoId = planoIdParaFechaTurno(modalFecha, modalTurno);
+  if(!planoId){
+    PLANO_EVENTO_ACTUAL = null;
+    renderMesaPickerCanvas();
+    return;
+  }
+  if(planoEventoCacheById[planoId]){
+    PLANO_EVENTO_ACTUAL = planoEventoCacheById[planoId];
+    renderMesaPickerCanvas();
+    return;
+  }
+  document.getElementById('mesaPickerCanvas').innerHTML = '<div style="padding:24px; text-align:center; color:var(--text-muted);">Cargando el plano del evento…</div>';
+  db.collection('planosMesasEventos').doc(planoId).get().then(doc => {
+    if(doc.exists && doc.data().json){
+      try {
+        const parsed = JSON.parse(doc.data().json);
+        planoEventoCacheById[planoId] = parsed;
+        PLANO_EVENTO_ACTUAL = parsed;
+      } catch(e){ console.error('Plano de evento con formato inválido:', e); PLANO_EVENTO_ACTUAL = null; }
+    } else {
+      PLANO_EVENTO_ACTUAL = null;
+    }
+    renderMesaPickerCanvas();
+  }).catch(err => {
+    console.error('Error cargando el plano del evento:', err);
+    PLANO_EVENTO_ACTUAL = null;
+    renderMesaPickerCanvas();
+  });
 }
 
 function cerrarSelectorMesa(){
