@@ -1888,9 +1888,9 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   <div id="pantallaPorDia" style="display:none;">
     <header>
       <div class="date-nav">
-        <button onclick="cambiarDia(-1)">‹</button>
+        <button id="btnDiaAnteriorPD" onclick="cambiarDia(-1)">‹</button>
         <div class="date-label" id="dateLabel" onclick="verResumenMes()" title="Toca para ver el resumen de todo el mes"></div>
-        <button onclick="cambiarDia(1)">›</button>
+        <button id="btnDiaSiguientePD" onclick="cambiarDia(1)">›</button>
       </div>
       <div class="dia-acciones-row">
         <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (20+)</span></button>
@@ -1901,9 +1901,9 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
     <div class="calendario-inline-wrap" id="calendarioInlineWrap">
       <div class="cal-head">
-        <button class="cal-nav-btn" onclick="cambiarMesInline(-1)">‹</button>
+        <button class="cal-nav-btn" id="btnMesAnteriorPD" onclick="cambiarMesInline(-1)">‹</button>
         <div class="cal-title" id="calInlineTitle" onclick="verResumenMes()" title="Toca para ver el resumen de todo el mes" style="cursor:pointer;"></div>
-        <button class="cal-nav-btn" onclick="cambiarMesInline(1)">›</button>
+        <button class="cal-nav-btn" id="btnMesSiguientePD" onclick="cambiarMesInline(1)">›</button>
       </div>
       <div class="cal-weekdays">
         <span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span>
@@ -2242,7 +2242,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.65</div>
+<div class="version-tag">v5.66</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -3410,6 +3410,15 @@ function aplicarRestriccionesRol(){
   // solicitudes y reservas. eventosCache ya trae la imagen guardada al
   // crear el evento (la misma que se sube a eventos.html).
   actualizarBannerEventoPromotor();
+  // Sin flechas de "otro día" ni calendario para navegar — el promotor
+  // solo puede trabajar la fecha de su evento, sin manera de moverse.
+  const esPromotorNav = rol === 'promotor';
+  ['btnDiaAnteriorPD','btnDiaSiguientePD','btnMesAnteriorPD','btnMesSiguientePD'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn) btn.style.visibility = esPromotorNav ? 'hidden' : 'visible';
+  });
+  const calWrap = document.getElementById('calendarioInlineWrap');
+  if(calWrap) calWrap.style.display = esPromotorNav ? 'none' : '';
   // Si por algo la pestaña activa en este momento es una que este nivel ya
   // no puede ver (por ejemplo quedó en Config o Salones y le bajaron el
   // nivel), lo mandamos de vuelta a Solicitudes en vez de dejarlo colgado.
@@ -6251,6 +6260,9 @@ function toggleCalendarioPorDia(){
 }
 
 function cambiarMesInline(delta){
+  // El promotor no puede navegar el calendario — solo trabaja la fecha
+  // de su evento, fija.
+  if(usuarioActual && usuarioActual.rol === 'promotor') return;
   calInlineMes += delta;
   if(calInlineMes<0){calInlineMes=11; calInlineAno--;}
   if(calInlineMes>11){calInlineMes=0; calInlineAno++;}
@@ -6848,6 +6860,9 @@ function renderCalendarioInline(){
 }
 
 function seleccionarDiaInline(d){
+  // El promotor no puede navegar a otro día — solo trabaja la fecha de
+  // su evento, fija.
+  if(usuarioActual && usuarioActual.rol === 'promotor') return;
   fechaActual = new Date(calInlineAno, calInlineMes, d, 12);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
   if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
@@ -8572,6 +8587,9 @@ function cambiarVista(v){
 
 function setTurno(t){ turnoActivo = t; renderAll(); }
 function cambiarDia(delta){
+  // El promotor no puede navegar a otro día — solo trabaja la fecha de
+  // su evento, fija.
+  if(usuarioActual && usuarioActual.rol === 'promotor') return;
   fechaActual.setDate(fechaActual.getDate()+delta);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
   if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
@@ -9452,7 +9470,8 @@ function abrirModal(id, mesaId){
     // reserva nueva que cree arranca directo en la fecha/turno de ESE
     // evento, no en hoy.
     const hoyDate = new Date();
-    if(usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado){
+    const esPromotorNueva = usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado;
+    if(esPromotorNueva){
       modalFecha = usuarioActual.eventoAsignado.fecha;
       modalTurno = usuarioActual.eventoAsignado.turno;
     } else {
@@ -9461,9 +9480,22 @@ function abrirModal(id, mesaId){
     }
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
-    document.getElementById('tipoReservaBlock').style.display = 'block';
-    elegirTipoReserva('normal');
-    cargarEventosActivosParaSelector();
+    if(esPromotorNueva){
+      // Un promotor no elige tipo de reserva ni evento — ese paso entero
+      // (con la parrilla de TODOS los eventos activos) se salta, porque
+      // ahí es donde se podía colar y terminar reservando para un evento
+      // o una fecha distinta a la suya. Se le deja ver, fijo y sin poder
+      // tocarlo, el mismo aviso "fecha y hora fijas al evento" que usa
+      // cualquier reserva ya amarrada a un evento.
+      document.getElementById('tipoReservaBlock').style.display = 'none';
+      document.getElementById('eventoFechaFijaResumenTexto').textContent =
+        `${usuarioActual.eventoAsignado.nombre} — ${modalFecha} · ${TURNO_LABEL_EVENTO[modalTurno] || modalTurno}`;
+      document.getElementById('eventoFechaFijaResumen').style.display = 'block';
+    } else {
+      document.getElementById('tipoReservaBlock').style.display = 'block';
+      elegirTipoReserva('normal');
+      cargarEventosActivosParaSelector();
+    }
     bloquearFormularioTelefonoPorHoraSinConfirmar();
     // Se simplificó: ya no se pregunta "¿por teléfono o por WhatsApp?" —
     // toda reserva nueva entra directo al formulario de teléfono. El
