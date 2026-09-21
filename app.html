@@ -2226,7 +2226,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.57</div>
+<div class="version-tag">v5.58</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -8349,6 +8349,25 @@ function cerrarSelectorMesa(){
 function confirmarSelectorMesa(){
   document.getElementById('fMesa').value = mesaSeleccionTemp.join('+');
   actualizarBotonMesa();
+  // En un plano de evento cada mesa ya trae su cantidad de personas fija
+  // (ej. Deluxe = 10, VIP = 6) — se usa esa cifra para llenar el campo
+  // de Personas solo, en vez de que el staff tenga que volver a
+  // escribirla a mano.
+  if(PLANO_EVENTO_ACTUAL && mesaSeleccionTemp.length){
+    const mesasPorRef = {};
+    Object.values(PLANO_EVENTO_ACTUAL.mesas || {}).forEach(m => {
+      const ref = (m.ref && m.ref.trim()) ? m.ref.trim() : m.num;
+      mesasPorRef[ref] = m;
+    });
+    const totalPersonas = mesaSeleccionTemp.reduce((sum, ref) => {
+      const m = mesasPorRef[ref];
+      return sum + (m && m.cap ? Number(m.cap) : 0);
+    }, 0);
+    if(totalPersonas > 0){
+      document.getElementById('fPax').value = totalPersonas;
+      actualizarTotalCover();
+    }
+  }
   document.getElementById('mesaPickerOverlay').classList.remove('open');
   mesaSeleccionTemp = [];
 }
