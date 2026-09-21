@@ -2216,7 +2216,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.54</div>
+<div class="version-tag">v5.55</div>
 <script>
   // Copia el número de versión de arriba (.version-tag, única fuente del
   // texto — sigue siendo lo único que hay que editar al subir versión)
@@ -8062,7 +8062,33 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef){
 }
 
 function renderPlano(){
-  if(!PLANO_MAESTRO){
+  const fechaVista = fechaISO(fechaActual);
+  const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
+  const planoIdEvento = evConPlano ? evConPlano.planoId : null;
+
+  // Si el día que se está viendo cae en un evento con plano propio y
+  // todavía no se ha descargado, se descarga una sola vez (se cachea) y
+  // se vuelve a llamar renderPlano() cuando esté listo.
+  if (planoIdEvento && !planoEventoCacheById.hasOwnProperty(planoIdEvento)){
+    document.getElementById('panelPlano').innerHTML = '<div class="plano-vacio">Cargando el plano del evento…</div>';
+    db.collection('planosMesasEventos').doc(planoIdEvento).get().then(doc => {
+      let parsed = null;
+      if (doc.exists && doc.data().json){
+        try { parsed = JSON.parse(doc.data().json); } catch(e){ console.error('Plano de evento con formato inválido:', e); }
+      }
+      planoEventoCacheById[planoIdEvento] = parsed;
+      renderPlano();
+    }).catch(err => {
+      console.error('Error cargando el plano del evento:', err);
+      planoEventoCacheById[planoIdEvento] = null;
+      renderPlano();
+    });
+    return;
+  }
+
+  const usandoPlanoEvento = !!(planoIdEvento && planoEventoCacheById[planoIdEvento]);
+  const planoUsado = usandoPlanoEvento ? planoEventoCacheById[planoIdEvento] : PLANO_MAESTRO;
+  if(!planoUsado){
     document.getElementById('panelPlano').innerHTML = `
       <div class="plano-vacio">
         Todavía no hay un plano maestro configurado.<br>
@@ -8084,13 +8110,21 @@ function renderPlano(){
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
   </div>`;
 
-  const mesas = PLANO_MAESTRO.mesas || {};
-  const pref = PLANO_MAESTRO.pref || {};
-  const canvasHtml = `<div class="plano-canvas-app">
-    ${buildBackgroundPlano(false, null, porMesaRef)}
-    ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
-    ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
-  </div>`;
+  const mesas = planoUsado.mesas || {};
+  const pref = planoUsado.pref || {};
+  // codeForPlano() decide el formato del código mirando esta variable
+  // global — se deja en el estado que corresponde a lo que se está
+  // pintando aquí (se sobreescribe otra vez cada vez que se abre el
+  // selector de mesas de una reserva, así que no hay conflicto entre
+  // las dos pantallas).
+  PLANO_EVENTO_ACTUAL = usandoPlanoEvento ? planoUsado : null;
+  const canvasHtml = usandoPlanoEvento
+    ? `<div class="plano-canvas-app">${Object.keys(planoUsado.zonas||{}).map(zid => buildZoneGridPlano(zid, planoUsado.zonas[zid], mesas, pref, porMesaRef)).join('')}</div>`
+    : `<div class="plano-canvas-app">
+        ${buildBackgroundPlano(false, null, porMesaRef)}
+        ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
+        ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
+      </div>`;
 
   document.getElementById('panelPlano').innerHTML = legend + canvasHtml;
 }
