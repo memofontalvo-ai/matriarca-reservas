@@ -535,6 +535,12 @@ auth.onAuthStateChanged(user => {
       document.getElementById('loginPass').value = '';
       document.getElementById('loginError').textContent = '';
       aplicarRestriccionesRol();
+      // Recién ahora se sabe el rol de quien inició sesión — por eso el
+      // listener de reservas arranca aquí y no antes: si arrancara al
+      // cargar el script (como antes), un Promotor recibiría de entrada
+      // TODA la colección sin filtrar, antes de que hubiera forma de saber
+      // que había que limitarla a su evento.
+      iniciarListenerReservas();
       recalcularReservasVisibles();
       renderAll();
       cargarUsuariosConfig();
@@ -545,6 +551,14 @@ auth.onAuthStateChanged(user => {
     });
   } else {
     usuarioActual = null;
+    // Se cierra el listener anterior (si había uno) para no dejarlo colgado
+    // esperando datos que ya no debería recibir, y se limpia lo que había
+    // en memoria — así, si entra otra persona con otro rol en este mismo
+    // navegador, arranca de cero y no arrastra nada de la sesión anterior.
+    if(unsubscribeReservas){ unsubscribeReservas(); unsubscribeReservas = null; }
+    reservasCrudas = [];
+    reservas = [];
+    primerCargaReservas = true;
     detenerPresencia();
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('appRoot').style.display = 'none';
@@ -3060,50 +3074,67 @@ document.addEventListener('visibilitychange', () => {
 
 
 let primerCargaReservas = true;
-let reservasCrudas = []; // todo lo que llega de Firestore, sin filtrar por rol
+let reservasCrudas = []; // lo que llega de Firestore para este usuario
 // Un "Promotor de eventos" solo debe ver las reservas del evento que
-// tiene asignado — se filtra aquí, en la fuente de datos, para que TODAS
-// las pantallas (Solicitudes, Por día, Resumen, calendario) respeten
-// esto automáticamente sin tener que tocarlas una por una.
+// tiene asignado. Antes esto se filtraba SOLO aquí, del lado del cliente,
+// después de traer TODA la colección — cualquiera con las herramientas de
+// desarrollador podía ver el resto igual. Ahora la consulta misma
+// (iniciarListenerReservas, más abajo) ya viene limitada por Firestore a
+// solo su evento, así que este filtro queda como una segunda capa de
+// seguridad visual, no la única.
 function recalcularReservasVisibles(){
   if(usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado){
-    const ev = usuarioActual.eventoAsignado;
-    reservas = reservasCrudas.filter(r => r.fecha === ev.fecha && r.turno === ev.turno);
+    reservas = reservasCrudas.filter(r => r.eventoId === usuarioActual.eventoAsignado.id);
   } else {
     reservas = reservasCrudas;
   }
 }
-reservasRef.onSnapshot(snap => {
-  reservasCrudas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  recalcularReservasVisibles();
-  actualizarEstadoConexion(true);
-  // Ojo: docChanges() con type:'added' incluye TODOS los documentos la
-  // primera vez que carga la app (es como Firestore entrega la carga
-  // inicial) — por eso solo se activa el sonido desde la SEGUNDA vez que
-  // llega este evento en adelante, para no sonar de golpe con todas las
-  // solicitudes que ya existían al abrir la app.
-  if(primerCargaReservas){
-    primerCargaReservas = false;
-  } else {
-    const solicitudesNuevas = snap.docChanges().filter(ch =>
-      ch.type === 'added' && ['solicitud','lista_espera'].includes(ch.doc.data().estado)
-    );
-    if(solicitudesNuevas.length > 0 && usuarioActual && usuarioActual.sonidoAvisoActivo !== false){
-      sonarAvisoNuevaSolicitud();
-      avisarVisualmenteNuevaSolicitud();
+
+// Arranca (o reinicia) el listener de reservas según el rol de quien
+// inició sesión — se llama desde auth.onAuthStateChanged, una vez que ya
+// se sabe el rol, nunca antes. Un Promotor recibe de Firestore SOLO los
+// documentos de su propio evento (.where('eventoId','==',...)) — la regla
+// de seguridad exige exactamente ese filtro, así que si algún día se
+// quita de aquí, Firestore simplemente rechaza la consulta completa en
+// vez de devolver de más.
+let unsubscribeReservas = null;
+function iniciarListenerReservas(){
+  if(unsubscribeReservas){ unsubscribeReservas(); unsubscribeReservas = null; }
+  const query = (usuarioActual && usuarioActual.rol === 'promotor' && usuarioActual.eventoAsignado)
+    ? reservasRef.where('eventoId', '==', usuarioActual.eventoAsignado.id)
+    : reservasRef;
+  unsubscribeReservas = query.onSnapshot(snap => {
+    reservasCrudas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    recalcularReservasVisibles();
+    actualizarEstadoConexion(true);
+    // Ojo: docChanges() con type:'added' incluye TODOS los documentos la
+    // primera vez que carga la app (es como Firestore entrega la carga
+    // inicial) — por eso solo se activa el sonido desde la SEGUNDA vez que
+    // llega este evento en adelante, para no sonar de golpe con todas las
+    // solicitudes que ya existían al abrir la app.
+    if(primerCargaReservas){
+      primerCargaReservas = false;
+    } else {
+      const solicitudesNuevas = snap.docChanges().filter(ch =>
+        ch.type === 'added' && ['solicitud','lista_espera'].includes(ch.doc.data().estado)
+      );
+      if(solicitudesNuevas.length > 0 && usuarioActual && usuarioActual.sonidoAvisoActivo !== false){
+        sonarAvisoNuevaSolicitud();
+        avisarVisualmenteNuevaSolicitud();
+      }
+      if(solicitudesNuevas.length > 0 && usuarioActual){
+        mostrarToastNuevaSolicitud(solicitudesNuevas.length);
+      }
     }
-    if(solicitudesNuevas.length > 0 && usuarioActual){
-      mostrarToastNuevaSolicitud(solicitudesNuevas.length);
-    }
-  }
-  vencerSolicitudesAtrasadas();
-  renderAll();
-}, err => {
-  console.error('Error de conexión en reservas:', err);
-  actualizarEstadoConexion(false);
-  document.getElementById('panelLista').innerHTML =
-    '<div class="empty-state">No se pudo conectar con la base de datos.<br>Revisa tu conexión e intenta de nuevo.</div>';
-});
+    vencerSolicitudesAtrasadas();
+    renderAll();
+  }, err => {
+    console.error('Error de conexión en reservas:', err);
+    actualizarEstadoConexion(false);
+    document.getElementById('panelLista').innerHTML =
+      '<div class="empty-state">No se pudo conectar con la base de datos.<br>Revisa tu conexión e intenta de nuevo.</div>';
+  });
+}
 
 // Base de datos de clientes: se va armando sola cada vez que llega una
 // solicitud (desde solicitud.html o desde acá por teléfono), identificando
@@ -6586,6 +6617,14 @@ function abrirModal(id, mesaId){
       // tocarlo, el mismo aviso "fecha y hora fijas al evento" que usa
       // cualquier reserva ya amarrada a un evento.
       document.getElementById('tipoReservaBlock').style.display = 'none';
+      // Igual que cuando cualquier otro rol elige un evento de la parrilla
+      // (elegirEventoTelefono) — se marca tipoReservaActual/eventoSeleccionado
+      // ParaReserva para que guardarReserva() y enviarParaAprobacion() etiqueten
+      // esta reserva con el eventoId real. Antes esto no pasaba para un
+      // Promotor: sus reservas se guardaban SIN eventoId, lo que años después
+      // (regla de seguridad de Firestore) le habría impedido hasta verlas.
+      tipoReservaActual = 'evento';
+      eventoSeleccionadoParaReserva = { id: usuarioActual.eventoAsignado.id, nombre: usuarioActual.eventoAsignado.nombre };
       mostrarEventoFechaFija(
         usuarioActual.eventoAsignado.nombre,
         evCompletoPromotor ? evCompletoPromotor.imagen : null,
