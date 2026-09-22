@@ -4213,7 +4213,10 @@ function renderLista(){
   // del sistema, igual sube cerca del tope en vez de irse hasta el final.
   // Solo si ninguna de las dos existe se cae al último respaldo: la hora
   // de la mesa.
-  const rs = reservasDelTurno().sort((a,b) => {
+  // Las canceladas ya no se muestran como tarjeta en este módulo — si el
+  // staff necesita revisar una cancelación, eso vive en Resumen/informes,
+  // no aquí en la lista del día a día.
+  const rs = reservasDelTurno().filter(r => r.estado !== 'cancelada').sort((a,b) => {
     const claveA = a.ultimaEdicionEn || a.horaSolicitud || '';
     const claveB = b.ultimaEdicionEn || b.horaSolicitud || '';
     if(claveA || claveB) return claveB.localeCompare(claveA);
