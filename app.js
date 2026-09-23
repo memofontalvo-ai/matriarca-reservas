@@ -4915,9 +4915,13 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
     r.pasoPorSolicitud === true && fechaClave(r) && fechaClave(r).startsWith(yearMonth)
   );
   const totalSolicitudes = todasDelMes.length;
+  const sumaPax = arr => arr.reduce((s,r) => s + (Number(r.pax)||0), 0);
+  const totalPax = sumaPax(todasDelMes);
   const canceladas = todasDelMes.filter(r => r.estado === 'cancelada');
+  const canceladasPax = sumaPax(canceladas);
   const pctCanceladas = totalSolicitudes>0 ? (canceladas.length/totalSolicitudes*100) : 0;
   const noCanceladas = totalSolicitudes - canceladas.length;
+  const noCanceladasPax = totalPax - canceladasPax;
   const pctNoCanceladas = totalSolicitudes>0 ? (noCanceladas/totalSolicitudes*100) : 0;
 
   // Gestión de reservas ESPECIALES (20+ personas) — medición totalmente
@@ -4927,9 +4931,12 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   // las solicitudes del mes.
   const especialesDelMes = todasDelMes.filter(r => Number(r.pax) >= 20);
   const totalEspeciales = especialesDelMes.length;
+  const especialesPax = sumaPax(especialesDelMes);
   const especialesCanceladas = especialesDelMes.filter(r => r.estado === 'cancelada');
+  const especialesCanceladasPax = sumaPax(especialesCanceladas);
   const pctCancelEspecial = totalEspeciales>0 ? (especialesCanceladas.length/totalEspeciales*100) : 0;
   const especialesNoCanceladas = totalEspeciales - especialesCanceladas.length;
+  const especialesNoCanceladasPax = especialesPax - especialesCanceladasPax;
   const pctNoCancelEspecial = totalEspeciales>0 ? (especialesNoCanceladas/totalEspeciales*100) : 0;
   // Dato complementario: qué parte de TODAS las cancelaciones del mes
   // fueron especiales — no es el indicador principal, solo contexto.
@@ -4950,11 +4957,13 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   // Por día de la semana en que llegó la solicitud.
   const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const porDiaSemana = new Array(7).fill(0);
+  const porDiaSemanaPax = new Array(7).fill(0);
   todasDelMes.forEach(r => {
     const f = fechaClave(r);
     const [y,m,d] = f.split('-').map(Number);
     const fecha = new Date(y, m-1, d, 12);
     porDiaSemana[fecha.getDay()]++;
+    porDiaSemanaPax[fecha.getDay()] += Number(r.pax)||0;
   });
   let diaMax = 0, diaMin = 0;
   for(let i=1;i<7;i++){
@@ -4966,10 +4975,10 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   // Por rango de horario en que llegó la solicitud (según horaSolicitud,
   // la hora exacta de llegada — no la hora de la reserva pedida).
   const rangos = [
-    {label:'Antes de las 8:00 am', min:0, max:8, count:0},
-    {label:'8:00 am – 12:00 pm', min:8, max:12, count:0},
-    {label:'12:00 pm – 6:00 pm', min:12, max:18, count:0},
-    {label:'6:00 pm en adelante', min:18, max:24, count:0},
+    {label:'Antes de las 8:00 am', min:0, max:8, count:0, pax:0},
+    {label:'8:00 am – 12:00 pm', min:8, max:12, count:0, pax:0},
+    {label:'12:00 pm – 6:00 pm', min:12, max:18, count:0, pax:0},
+    {label:'6:00 pm en adelante', min:18, max:24, count:0, pax:0},
   ];
   let conHora = 0;
   todasDelMes.forEach(r => {
@@ -4979,20 +4988,20 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
     conHora++;
     const h = d.getHours();
     const rango = rangos.find(rg => h >= rg.min && h < rg.max);
-    if(rango) rango.count++;
+    if(rango){ rango.count++; rango.pax += Number(r.pax)||0; }
   });
   const rangoMax = conHora>0 ? rangos.reduce((a,b) => b.count>a.count?b:a, rangos[0]) : null;
 
   const filasDia = DIAS_SEMANA.map((nombre,i) => `
     <tr>
       <td>${nombre}${hayDatosDia && i===diaMax ? ' 🔺 <b>el que más recibe</b>' : ''}${hayDatosDia && i===diaMin && diaMin!==diaMax ? ' 🔻 <b>el que menos recibe</b>' : ''}</td>
-      <td style="text-align:center;">${porDiaSemana[i]}</td>
+      <td style="text-align:center;">${porDiaSemana[i]} · ${porDiaSemanaPax[i]} pax</td>
     </tr>`).join('');
 
   const filasRango = rangos.map(rg => `
     <tr>
       <td>${rg.label}${rangoMax===rg && rg.count>0 ? ' 🔺 <b>el rango con más</b>' : ''}</td>
-      <td style="text-align:center;">${rg.count}</td>
+      <td style="text-align:center;">${rg.count} · ${rg.pax} pax</td>
     </tr>`).join('');
 
   document.getElementById('informeContenido').innerHTML = `
@@ -5003,38 +5012,38 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
       <div class="informe-subtitulo">Todas las solicitudes recibidas (web y teléfono)</div>
     </div>
     <div class="ie-total-card">
-      <div class="ie-total-num">${totalSolicitudes}</div>
+      <div class="ie-total-num">${totalSolicitudes} · ${totalPax} pax</div>
       <div class="ie-total-label">TOTAL DE SOLICITUDES RECIBIDAS</div>
     </div>
     <div class="informe-turno">
       <h2>📅 Por día de la semana</h2>
       ${totalSolicitudes===0 ? `<div style="font-size:12.5px; color:#777;">No hubo solicitudes en ${mesLabel}.</div>` : `<table>
-        <thead><tr><th>Día</th><th>Solicitudes</th></tr></thead>
+        <thead><tr><th>Día</th><th>Solicitudes · Pax</th></tr></thead>
         <tbody>${filasDia}</tbody>
       </table>`}
     </div>
     <div class="informe-turno">
       <h2>🕐 Por rango de horario de llegada</h2>
       ${conHora===0 ? `<div style="font-size:12.5px; color:#777;">No hay solicitudes con hora de llegada registrada en ${mesLabel}.</div>` : `<table>
-        <thead><tr><th>Rango</th><th>Solicitudes</th></tr></thead>
+        <thead><tr><th>Rango</th><th>Solicitudes · Pax</th></tr></thead>
         <tbody>${filasRango}</tbody>
       </table>`}
       ${(conHora < totalSolicitudes && totalSolicitudes>0) ? `<div style="margin-top:6px; font-size:11.5px; color:#777;">${totalSolicitudes-conHora} solicitud${totalSolicitudes-conHora===1?'':'es'} sin hora de llegada registrada (de antes de que se guardara este dato) no entra${totalSolicitudes-conHora===1?'':'n'} en este desglose.</div>` : ''}
     </div>
     <div class="ie-bloque-gestion ie-bloque-general">
       <h2 style="background:none; color:#a33; padding:0; margin-bottom:10px;">🚫 GESTIÓN GENERAL DE RESERVAS</h2>
-      <div class="ie-fila-metrica"><span>Total de solicitudes recibidas:</span><b>${totalSolicitudes}</b></div>
-      <div class="ie-fila-metrica"><span>Total de solicitudes canceladas:</span><b>${canceladas.length}</b></div>
+      <div class="ie-fila-metrica"><span>Total de solicitudes recibidas:</span><b>${totalSolicitudes} · ${totalPax} pax</b></div>
+      <div class="ie-fila-metrica"><span>Total de solicitudes canceladas:</span><b>${canceladas.length} · ${canceladasPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Tasa general de cancelación:</span><b style="color:#a33;">${pctCanceladas.toFixed(1)}%</b></div>
-      <div class="ie-fila-metrica"><span>Total de solicitudes no canceladas:</span><b>${noCanceladas}</b></div>
+      <div class="ie-fila-metrica"><span>Total de solicitudes no canceladas:</span><b>${noCanceladas} · ${noCanceladasPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Tasa de solicitudes no canceladas:</span><b>${pctNoCanceladas.toFixed(1)}%</b></div>
       <div class="ie-formula">${canceladas.length} ÷ ${totalSolicitudes||0} × 100</div>
     </div>
     <div class="ie-bloque-gestion ie-bloque-especial">
       <h2 style="background:none; color:#a17a1c; padding:0; margin-bottom:10px;">👥 GESTIÓN DE RESERVAS ESPECIALES · 20+ PERSONAS</h2>
-      <div class="ie-fila-metrica"><span>Total de solicitudes especiales recibidas:</span><b>${totalEspeciales}</b></div>
-      <div class="ie-fila-metrica"><span>Especiales canceladas:</span><b>${especialesCanceladas.length}</b></div>
-      <div class="ie-fila-metrica"><span>Especiales no canceladas:</span><b>${especialesNoCanceladas}</b></div>
+      <div class="ie-fila-metrica"><span>Total de solicitudes especiales recibidas:</span><b>${totalEspeciales} · ${especialesPax} pax</b></div>
+      <div class="ie-fila-metrica"><span>Especiales canceladas:</span><b>${especialesCanceladas.length} · ${especialesCanceladasPax} pax</b></div>
+      <div class="ie-fila-metrica"><span>Especiales no canceladas:</span><b>${especialesNoCanceladas} · ${especialesNoCanceladasPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Tasa de cancelación especial:</span><b style="color:#a33;">${pctCancelEspecial.toFixed(1)}%</b></div>
       <div class="ie-fila-metrica"><span>Tasa de no cancelación especial:</span><b>${pctNoCancelEspecial.toFixed(1)}%</b></div>
       <div class="ie-formula">${especialesCanceladas.length} ÷ ${totalEspeciales||0} × 100</div>
