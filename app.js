@@ -92,13 +92,18 @@ function colorTextoContraste(hex, oscurecidoPorOcupada){
 // tienen una rotación guardada (como el ángulo de Tarima), se respeta tal
 // cual. Si no la tienen pero el bloque es angosto y alto, el texto se pone
 // en vertical solo — así uno nuevo que se agregue en Salones con esa forma
-// (como "Cava de Amanecida") no necesita que nadie le configure nada a
-// mano para verse bien.
+// no necesita que nadie le configure nada a mano para verse bien. Y, para
+// no depender de que ese cálculo por proporción adivine bien, "Cava de
+// Amanecida" puntualmente siempre queda vertical — se reconoce por su
+// propio texto, sin importar qué ancho/alto tenga guardado.
 function estiloTextoZoneblock(b){
+  const textoNorm = (b.texto||'').trim().toUpperCase();
+  const esCavaAmanecida = textoNorm.includes('CAVA') && textoNorm.includes('AMANECID');
+  if(esCavaAmanecida) return 'writing-mode:vertical-rl; letter-spacing:1px;';
   if(b.rotacion) return `transform:rotate(${b.rotacion}deg);`;
   const anchoPx = (Number(b.width)||0) / 100 * 880;
   const altoPx = (Number(b.height)||0) / 100 * 640;
-  if(altoPx > anchoPx * 1.3) return 'writing-mode:vertical-rl; letter-spacing:1px;';
+  if(altoPx > anchoPx * 1.15) return 'writing-mode:vertical-rl; letter-spacing:1px;';
   return '';
 }
 function escapeHtml(str){
@@ -5490,17 +5495,19 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
 }
 
 // El plano de evento se dibuja siempre a su tamaño de diseño fijo
-// (880×640, el mismo que usa el editor de Salones) y esto lo encoge con
-// CSS hasta que quepa completo en el ancho real de la pantalla — así se
-// ve idéntico en Salones, en "Por día → Plano" y en el selector de mesas
-// al armar una reserva, sin importar qué tan angosto sea el celular.
+// (880×640, el mismo que usa el editor de Salones) y esto lo ajusta con
+// CSS al ancho real disponible — lo encoge si el espacio es más chico
+// (celular angosto) y lo AGRANDA si sobra espacio (como en el informe
+// para imprimir, que es más ancho que un celular) — así llena la hoja en
+// vez de quedar pequeño con espacio vacío al lado. Se ve igual en
+// Salones, "Por día → Plano", el selector de mesas y el informe.
 function ajustarEscalaPlanoApp(wrapSelector, innerSelector){
   const wrap = document.querySelector(wrapSelector);
   const inner = document.querySelector(innerSelector);
   if(!wrap || !inner || !inner.classList.contains('evento')) return;
   const designWidth = 880, designHeight = 640;
   const availW = wrap.clientWidth || designWidth;
-  const scale = Math.min(1, availW / designWidth);
+  const scale = availW / designWidth;
   inner.style.transform = 'scale(' + scale + ')';
   inner.style.transformOrigin = 'top left';
   wrap.style.height = Math.round(designHeight * scale) + 'px';
