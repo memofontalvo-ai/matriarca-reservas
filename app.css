@@ -1103,8 +1103,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   font-size:6px; font-weight:800; color:#fff; cursor:pointer; overflow:hidden;
 }
 .plano-mesa-core.p-libre{background:#0a2f31; border-color:#444;}
-.plano-mesa-core.p-ocupada{background:var(--confirmed); color:#0c2417; border-color:var(--confirmed);}
-.plano-mesa-core.p-pendiente{background:var(--pending); color:#062a33; border-color:var(--pending);}
+/* En un plano de evento el fondo de la mesa toma el color de su zona
+   (ver colorMesa en buildZoneGridPlano) — ahí, un reborde del mismo
+   verde/celeste de siempre quedaba invisible sobre esos colores. Con
+   negro y un poco más grueso, una mesa ocupada se distingue de un
+   vistazo sin importar el color de la zona en la que esté. */
+.plano-mesa-core.p-ocupada{background:var(--confirmed); color:#0c2417; border-color:#111; border-width:2px;}
+.plano-mesa-core.p-pendiente{background:var(--pending); color:#062a33; border-color:#111; border-width:2px;}
 .plano-mesa-core.p-sinvincular{background:#555; opacity:.5; cursor:default;}
 .plano-guest{font-size:5px; font-weight:600; margin-top:1px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
