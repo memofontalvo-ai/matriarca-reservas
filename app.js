@@ -5380,10 +5380,13 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
         const clickJs = reserva ? `abrirModal(${JSON.stringify(reserva.id)})` : `abrirModal(null,${JSON.stringify(idMesa)})`;
         // En un plano de evento el color de fondo es el de su zona (igual
         // que en Salones) — quién tiene la mesa se sigue viendo por el
-        // nombre superpuesto, no por el color, para no perder de vista el
-        // diseño real armado en Salones.
+        // nombre superpuesto. Cuando está ocupada, además se oscurece con
+        // una sombra interna por encima de ese mismo color de zona (en vez
+        // de cambiarlo por otro fijo) — así se nota a simple vista que está
+        // tomada sin perder de vista de qué zona/categoría es.
         const colorMesa = categorias ? colorZona : null;
-        const estiloColor = colorMesa ? `style="background:${colorMesa};"` : '';
+        const oscurecer = reserva ? 'box-shadow:inset 0 0 0 999px rgba(0,0,0,0.32);' : '';
+        const estiloColor = colorMesa ? `style="background:${colorMesa}; ${oscurecer}"` : '';
         const capHtml = (categorias && m.cap) ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
         const precioHtml = (categorias && m.categoria && categorias[m.categoria]) ? `<div class="plano-mesa-precio">$${Number(categorias[m.categoria].precio).toLocaleString('es-CO')}</div>` : '';
         inner = `<div class="plano-mesa-core ${estadoCls}" ${estiloColor} onclick='${clickJs}' title="${escapeHtml(idMesa)}${m.cap?' · cap '+m.cap:''}">${codigo}${capHtml}${precioHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
