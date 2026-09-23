@@ -1020,6 +1020,10 @@ function toggleCoverFields(){
   document.getElementById('coverFieldsBlock').style.display = marcado ? 'block' : 'none';
   if(marcado) actualizarTotalCover();
 }
+function toggleSolicitudMusicoFields(){
+  const marcado = document.getElementById('fSolicitudMusico').checked;
+  document.getElementById('solicitudMusicoBlock').style.display = marcado ? 'block' : 'none';
+}
 // El valor que escribe el staff en "Valor del cover" es POR PERSONA — el
 // total (lo que hay que cobrar/mostrarle al cliente) sale de
 // multiplicarlo por el número de personas de la reserva. Se recalcula
@@ -4240,6 +4244,14 @@ function renderStats(){
 function coincideBusquedaCliente(r, texto){
   if(!texto) return true;
   const t = texto.trim().toLowerCase();
+  // Atajo: escribir "musico"/"música" en el mismo buscador de siempre
+  // muestra solo las reservas con la solicitud especial de músicos
+  // marcada — así se puede dar seguimiento sin tener que abrir cada
+  // reserva una por una.
+  const tNormAtajo = t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(tNormAtajo === 'musico' || tNormAtajo === 'musicos' || tNormAtajo === 'musica'){
+    return !!r.solicitudMusico;
+  }
   const nombreNorm = (r.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const tNorm = t.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(nombreNorm.includes(tNorm)) return true;
@@ -4342,6 +4354,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
   return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
     ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
+    ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}</div>` : ''}
     <div class="res-top">
       <div>
         <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}</div>
@@ -6489,6 +6502,7 @@ function renderSolicitudesScreen(){
     return `
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
+      ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}</div>` : ''}
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
@@ -6769,6 +6783,9 @@ function abrirModal(id, mesaId){
     // nuevo — solo se sube uno nuevo si el staff lo hace en este momento.
     coverComprobanteBase64Temp = null;
     document.getElementById('fTieneCover').checked = Number(r.coverValor) > 0;
+    document.getElementById('fSolicitudMusico').checked = !!r.solicitudMusico;
+    document.getElementById('fObsMusico').value = r.obsMusico || '';
+    toggleSolicitudMusicoFields();
     // coverValorPersona es el campo nuevo (lo que escribe el staff, por
     // persona). Reservas viejas solo tienen coverValor (el total plano de
     // antes) — para esas, se calcula el valor por persona dividiendo entre
@@ -6906,6 +6923,9 @@ function abrirModal(id, mesaId){
     cancelarAgregarAbonoCover();
     document.getElementById('coverComprobanteLegacyBlock').style.display = 'none';
     toggleCoverFields();
+    document.getElementById('fSolicitudMusico').checked = false;
+    document.getElementById('fObsMusico').value = '';
+    toggleSolicitudMusicoFields();
     document.getElementById('fMenu').value = '';
     document.getElementById('fObs').value = '';
     document.getElementById('fWhatsTelefonoCod').value = '57';
@@ -7426,6 +7446,10 @@ function guardarReserva(){
     // Abonos parciales del cover (fecha + monto de cada pago) — separado
     // del abono de consumo. Se guarda vacío si no tiene cover.
     coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
+    // Marca visible en la tarjeta para que el staff sepa, sin abrir la
+    // reserva, que esta gestión necesita coordinar músicos/show aparte.
+    solicitudMusico: document.getElementById('fSolicitudMusico').checked,
+    obsMusico: document.getElementById('fSolicitudMusico').checked ? document.getElementById('fObsMusico').value.trim() : '',
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
@@ -7597,6 +7621,8 @@ function enviarParaAprobacion(){
     // total sin tener que recalcularlo cada vez.
     coverValor: document.getElementById('fTieneCover').checked ? (numCampo('fCoverValor')||0) * (Number(document.getElementById('fPax').value)||1) : 0,
     coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
+    solicitudMusico: document.getElementById('fSolicitudMusico').checked,
+    obsMusico: document.getElementById('fSolicitudMusico').checked ? document.getElementById('fObsMusico').value.trim() : '',
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;

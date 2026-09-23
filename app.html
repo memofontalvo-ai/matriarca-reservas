@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=5.94">
+<link rel="stylesheet" href="app.css?v=5.95">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -523,7 +523,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v5.94</div>
+<div class="version-tag">v5.95</div>
 
 
 <div class="overlay" id="overlay">
@@ -846,6 +846,16 @@
         <div class="field" id="coverComprobanteLegacyBlock" style="display:none;">
           <label>Comprobante antiguo del cover <span class="fecha-solicitud-hint">(de antes de que cada abono llevara el suyo — ábrelo para revisarlo, ya no se puede reemplazar aquí)</span></label>
           <button type="button" class="btn-elegir-mesa phone-mesa-btn" id="btnVerComprobanteCoverLegacy" style="display:block; text-align:center; cursor:pointer;">🧾 Ver comprobante</button>
+        </div>
+      </div>
+
+      <div class="field-check-cover">
+        <label class="checkbox-label"><input type="checkbox" id="fSolicitudMusico" onchange="toggleSolicitudMusicoFields()"> 🎵 Solicitud especial de músicos</label>
+      </div>
+      <div id="solicitudMusicoBlock" style="display:none;">
+        <div class="field">
+          <label>Detalles de la solicitud de músicos</label>
+          <textarea id="fObsMusico" placeholder="Ej: cantante para serenata, show en vivo, canción específica..."></textarea>
         </div>
       </div>
 
@@ -1277,6 +1287,6 @@
 </div>
 
 
-<script src="app.js?v=5.94"></script>
+<script src="app.js?v=5.95"></script>
 </body>
 </html>
