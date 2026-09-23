@@ -7485,9 +7485,22 @@ function guardarReserva(){
     data.comprobanteCover = firebase.firestore.FieldValue.delete();
     data.comprobanteCoverSubidoEn = firebase.firestore.FieldValue.delete();
   }
-  if(!editandoId && evCorrespondiente){
+  // Se revisa SIEMPRE, tanto al crear como al editar — no solo al crear —
+  // porque si a una reserva le cambian la fecha/turno después (se
+  // reprograma para otro día), la etiqueta del evento tiene que
+  // actualizarse con ella: quitarse si ya no coincide con ningún evento,
+  // o cambiar al que corresponda a la nueva fecha. Antes solo se
+  // calculaba al crear, y una reserva reprogramada se quedaba con el
+  // nombre del evento viejo pegado para siempre.
+  // OJO: FieldValue.delete() solo es válido en update() — una reserva
+  // NUEVA se crea con set() sin merge, así que ahí simplemente se omiten
+  // los campos (nunca se llegan a escribir) en vez de "borrarlos".
+  if(evCorrespondiente){
     data.eventoId = evCorrespondiente.id;
     data.eventoNombre = evCorrespondiente.nombre;
+  } else if(editandoId){
+    data.eventoId = firebase.firestore.FieldValue.delete();
+    data.eventoNombre = firebase.firestore.FieldValue.delete();
   }
   // Para el seguimiento de canceladas en los informes: guarda el motivo, y
   // si esta reserva YA estaba aprobada (confirmada/pendiente/walk-in)
@@ -7657,11 +7670,19 @@ function enviarParaAprobacion(){
   }
   // Misma regla que en guardarReserva(): si la fecha/turno de esta reserva
   // coincide con un evento especial activo, pertenece a ese evento —
-  // aunque se haya armado como reserva "normal".
+  // aunque se haya armado como reserva "normal". Se revisa siempre, no
+  // solo al crear, para que una reserva reprogramada nunca se quede con
+  // la etiqueta de un evento que ya no le corresponde.
   const evCorrespondienteAprob = eventosCache.find(e => e.fecha === modalFecha && e.turno === modalTurno && e.activo !== false);
-  if(!editandoId && evCorrespondienteAprob){
+  // OJO: FieldValue.delete() solo es válido en update() — igual que en
+  // guardarReserva(), una reserva nueva se crea con set() sin merge, así
+  // que ahí se omiten los campos en vez de "borrarlos".
+  if(evCorrespondienteAprob){
     data.eventoId = evCorrespondienteAprob.id;
     data.eventoNombre = evCorrespondienteAprob.nombre;
+  } else if(editandoId){
+    data.eventoId = firebase.firestore.FieldValue.delete();
+    data.eventoNombre = firebase.firestore.FieldValue.delete();
   }
 
   // La fecha de "solicitud" (cuándo entró al flujo de aprobación) no se
