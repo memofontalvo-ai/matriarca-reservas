@@ -4697,10 +4697,23 @@ function descargarInformeDia(){
   const fechaLarga = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
   const turnosAIncluir = [turnoActivo];
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-  const mesas = PLANO_MAESTRO ? (PLANO_MAESTRO.mesas || {}) : {};
-  const pref = PLANO_MAESTRO ? (PLANO_MAESTRO.pref || {}) : {};
 
-  const seccionesHtml = turnosAIncluir.map(turno => {
+  // Igual que en renderPlano(): si este día/turno coincide con un evento
+  // especial que tiene su propio plano, el informe debe mostrar ESE plano
+  // (zonas, colores, mesas reales del evento) — no el plano General. Antes
+  // esto no se revisaba aquí y el informe siempre mostraba el plano
+  // General, aunque la pantalla de "Plano" ya mostrara correctamente el
+  // del evento.
+  const evConPlanoInforme = eventosCache.find(e => e.fecha === iso && e.turno === turnoActivo && e.planoId && e.activo !== false);
+  const planoIdEventoInforme = evConPlanoInforme ? evConPlanoInforme.planoId : null;
+
+  function seguirConPlano(planoEventoUsado){
+    const usandoPlanoEventoInforme = !!planoEventoUsado;
+    const planoBase = usandoPlanoEventoInforme ? planoEventoUsado : PLANO_MAESTRO;
+    const mesas = planoBase ? (planoBase.mesas || {}) : {};
+    const pref = planoBase ? (planoBase.pref || {}) : {};
+
+    const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
       .filter(r => r.fecha===iso && r.turno===turno && r.estado==='confirmada')
       .sort((a,b) => minutosParaOrdenHora(a.hora) - minutosParaOrdenHora(b.hora));
@@ -4732,12 +4745,30 @@ function descargarInformeDia(){
 
     const porMesaRef = {};
     rs.forEach(r => { if(r.mesa) r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; }); });
-    const planoHtml = PLANO_MAESTRO ? `
+    const planoHtml = usandoPlanoEventoInforme
+      ? `
+      <div class="plano-canvas-app evento" style="max-width:640px; margin:14px auto 0;">
+        ${Object.keys(planoBase.bloques||{}).map(bid => {
+            const b = planoBase.bloques[bid];
+            return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${b.rotacion?'transform:rotate('+b.rotacion+'deg);':''}">${escapeHtml(b.texto)}</div>`;
+          }).join('')}
+        ${Object.keys(planoBase.zonas||{}).map(zid => {
+            const z = planoBase.zonas[zid];
+            let etiqueta = '';
+            if(z.labelSide === 'left'){
+              etiqueta = `<div class="plano-zona-label-lateral flip" style="left:${Math.max(0,z.left-8)}%; top:${z.top}%; width:7%; height:${z.height}%; color:${z.color||'#0a2f31'};">${escapeHtml(z.label)}</div>`;
+            } else if(z.labelSide === 'right'){
+              etiqueta = `<div class="plano-zona-label-lateral" style="left:${z.left+z.width}%; top:${z.top}%; width:6%; height:${z.height}%; color:${z.color||'#0a2f31'};">${escapeHtml(z.label)}</div>`;
+            }
+            return etiqueta + buildZoneGridPlano(zid, z, mesas, pref, porMesaRef, planoBase.categorias||{}, z.color);
+          }).join('')}
+      </div>`
+      : (PLANO_MAESTRO ? `
       <div class="plano-canvas-app" style="max-width:640px; margin:14px auto 0;">
         ${buildBackgroundPlano(false, null, porMesaRef)}
         ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
         ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
-      </div>` : '';
+      </div>` : '');
 
     return `
       <div class="informe-turno">
@@ -4754,22 +4785,44 @@ function descargarInformeDia(){
         </div>
         ${planoHtml}
       </div>`;
-  }).join('');
+    }).join('');
 
-  // Se muestra DENTRO de la misma app, en un overlay a pantalla completa —
-  // abrir una pestaña/ventana nueva con window.open() sacaba a la persona
-  // de la aplicación en iPhone (a veces cerrar esa pestaña cerraba todo el
-  // programa en vez de solo el informe). Así se queda siempre adentro, y
-  // "Cerrar" solo cierra el informe, nunca la app. Para imprimir o guardar
-  // como PDF, se usa window.print() con un estilo que oculta todo lo demás
-  // de la pantalla y solo imprime este contenido.
-  document.getElementById('informeContenido').innerHTML = `
-    <div class="informe-header">
-      <h1>La Matriarca Barranquilla — Informe de reservas</h1>
-      <div class="informe-subtitulo">${fechaLarga} · ${turnoLabels[turnoActivo]}</div>
-    </div>
-    ${seccionesHtml}`;
-  document.getElementById('overlayInforme').classList.add('open');
+    // Se muestra DENTRO de la misma app, en un overlay a pantalla completa —
+    // abrir una pestaña/ventana nueva con window.open() sacaba a la persona
+    // de la aplicación en iPhone (a veces cerrar esa pestaña cerraba todo el
+    // programa en vez de solo el informe). Así se queda siempre adentro, y
+    // "Cerrar" solo cierra el informe, nunca la app. Para imprimir o guardar
+    // como PDF, se usa window.print() con un estilo que oculta todo lo demás
+    // de la pantalla y solo imprime este contenido.
+    document.getElementById('informeContenido').innerHTML = `
+      <div class="informe-header">
+        <h1>La Matriarca Barranquilla — Informe de reservas</h1>
+        <div class="informe-subtitulo">${fechaLarga} · ${turnoLabels[turnoActivo]}</div>
+      </div>
+      ${seccionesHtml}`;
+    document.getElementById('overlayInforme').classList.add('open');
+  }
+
+  if(!planoIdEventoInforme){
+    seguirConPlano(null);
+  } else if(planoEventoCacheById.hasOwnProperty(planoIdEventoInforme)){
+    seguirConPlano(planoEventoCacheById[planoIdEventoInforme]);
+  } else {
+    // Todavía no se había cargado este plano de evento en esta sesión (por
+    // ejemplo, si se descarga el informe sin haber entrado antes a la
+    // pestaña "Plano") — se descarga una sola vez antes de armar el informe.
+    db.collection('planosMesasEventos').doc(planoIdEventoInforme).get().then(doc => {
+      let parsed = null;
+      if(doc.exists && doc.data().json){
+        try { parsed = JSON.parse(doc.data().json); } catch(e){ console.error('Plano de evento con formato inválido:', e); }
+      }
+      planoEventoCacheById[planoIdEventoInforme] = parsed;
+      seguirConPlano(parsed);
+    }).catch(err => {
+      console.error('Error cargando el plano del evento para el informe:', err);
+      seguirConPlano(null);
+    });
+  }
 }
 function cerrarInforme(){
   document.getElementById('overlayInforme').classList.remove('open');
