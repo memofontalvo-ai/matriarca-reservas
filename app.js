@@ -284,6 +284,40 @@ async function migrarClientesDesdeReservas(){
   }
 }
 
+async function etiquetarReservasViejasConEvento(){
+  // Misma regla que guardarReserva()/enviarParaAprobacion(): una reserva
+  // pertenece al evento cuya fecha y turno coincidan con los suyos. Aquí
+  // se aplica en reversa, sobre lo que ya existe, para las que se crearon
+  // antes de que esta regla existiera (o como reserva "normal" sin pasar
+  // por el selector de evento).
+  const eventos = eventosCache.filter(e => e.activo !== false);
+  if(eventos.length === 0){ alert('No hay ningún evento especial cargado todavía.'); return; }
+  const pendientes = reservas.filter(r => !r.eventoId
+    && eventos.some(e => e.fecha === r.fecha && e.turno === r.turno));
+  if(pendientes.length === 0){ alert('No se encontró ninguna reserva sin etiquetar que coincida con un evento — todo está al día.'); return; }
+  if(!confirm(`Se encontraron ${pendientes.length} reserva(s) que coinciden con la fecha/turno de un evento especial pero no tienen su etiqueta. Se les va a agregar el nombre del evento correspondiente. ¿Continuar?`)) return;
+
+  const btn = document.getElementById('btnEtiquetarReservasEvento');
+  const textoOriginal = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Procesando…'; }
+
+  try{
+    let etiquetadas = 0;
+    for(const r of pendientes){
+      const ev = eventos.find(e => e.fecha === r.fecha && e.turno === r.turno);
+      if(!ev) continue;
+      await reservasRef.doc(r.id).update({ eventoId: ev.id, eventoNombre: ev.nombre });
+      etiquetadas++;
+    }
+    alert(`Listo. Se etiquetaron ${etiquetadas} reserva(s) con su evento correspondiente.`);
+  } catch(err){
+    console.error('Error etiquetando reservas con evento:', err);
+    alert('Ocurrió un error durante el proceso. Revisa tu conexión e intenta de nuevo — no se perdió nada de lo ya procesado.');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = textoOriginal; }
+  }
+}
+
 
 // el código de país del número local. Los celulares guardados ANTES de
 // este cambio no tienen "+" al inicio — a esos se les asume 57 (Colombia),
@@ -1581,7 +1615,11 @@ function actualizarAvisoEventoNormalTelefono(){
   const ev = eventosCache.find(e => e.fecha === fecha && e.turno === turno && e.activo !== false);
   if(!ev){ el.style.display = 'none'; return; }
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-  el.innerHTML = `🎤 Este turno (${turnoLabels[turno]||turno}) tiene el evento especial <b>"${escapeHtml(ev.nombre)}"</b> — esta reserva va a quedar marcada con ese evento automáticamente${ev.aplicaCover ? ', y exige cover antes de poder aprobarla' : ''}.`;
+  const imgEl = document.getElementById('avisoEventoNormalTelefonoImg');
+  if(ev.imagen){ imgEl.src = ev.imagen; imgEl.style.display = 'block'; }
+  else { imgEl.style.display = 'none'; imgEl.removeAttribute('src'); }
+  document.getElementById('avisoEventoNormalTelefonoTexto').innerHTML =
+    `🎤 Este turno (${turnoLabels[turno]||turno}) tiene el evento especial <b>"${escapeHtml(ev.nombre)}"</b> — esta reserva va a quedar marcada con ese evento automáticamente${ev.aplicaCover ? ', y exige cover antes de poder aprobarla' : ''}.`;
   el.style.display = 'block';
 }
 
@@ -6681,6 +6719,11 @@ function abrirModal(id, mesaId){
     // rueda visible para que la ponga a mano), así que se rellena aquí,
     // después del reset, para que no se vuelva a borrar.
     document.getElementById('fHora').value = esPromotorNueva ? horaEntradaPromotor : '';
+    // elegirCanalNuevo() (arriba) acaba de reescribir fFechaReservaEdit/
+    // fTurnoReservaEdit directamente por .value, sin disparar 'change' —
+    // por eso el aviso de "este turno tiene evento" se quedaba con la
+    // fecha de la sesión anterior si no se refresca aquí a mano.
+    actualizarAvisoEventoNormalTelefono();
     document.getElementById('fHoraSalida').value = '';
     document.getElementById('fPax').value = '';
     document.getElementById('fNombre').value = '';
