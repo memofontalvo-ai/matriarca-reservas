@@ -4747,7 +4747,8 @@ function descargarInformeDia(){
     rs.forEach(r => { if(r.mesa) r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; }); });
     const planoHtml = usandoPlanoEventoInforme
       ? `
-      <div class="plano-canvas-app evento" style="max-width:640px; margin:14px auto 0;">
+      <div class="plano-canvas-scroll-wrap" id="informePlanoScrollWrap" style="max-width:640px; margin:14px auto 0;">
+      <div class="plano-canvas-app evento">
         ${Object.keys(planoBase.bloques||{}).map(bid => {
             const b = planoBase.bloques[bid];
             return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${b.rotacion?'transform:rotate('+b.rotacion+'deg);':''}">${escapeHtml(b.texto)}</div>`;
@@ -4762,6 +4763,7 @@ function descargarInformeDia(){
             }
             return etiqueta + buildZoneGridPlano(zid, z, mesas, pref, porMesaRef, planoBase.categorias||{}, z.color);
           }).join('')}
+      </div>
       </div>`
       : (PLANO_MAESTRO ? `
       <div class="plano-canvas-app" style="max-width:640px; margin:14px auto 0;">
@@ -4801,6 +4803,11 @@ function descargarInformeDia(){
       </div>
       ${seccionesHtml}`;
     document.getElementById('overlayInforme').classList.add('open');
+    if(usandoPlanoEventoInforme){
+      requestAnimationFrame(() => requestAnimationFrame(() =>
+        ajustarEscalaPlanoApp('#informePlanoScrollWrap', '#informePlanoScrollWrap .plano-canvas-app')
+      ));
+    }
   }
 
   if(!planoIdEventoInforme){
