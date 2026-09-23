@@ -1564,9 +1564,29 @@ let tipoReservaActual = 'normal';
 let eventosActivosCache = [];
 let eventoSeleccionadoParaReserva = null;
 
+// Aviso (no bloquea nada) para cuando el staff arma una reserva "normal"
+// justo en la fecha/turno de un evento especial activo — igual que
+// guardarReserva()/enviarParaAprobacion() ya la van a marcar con ese
+// evento automáticamente (ver evCorrespondiente ahí), esto se lo avisa
+// ANTES de guardar, para que no se sorprenda después ni se le olvide
+// revisar si ese evento exige cover.
+function actualizarAvisoEventoNormalTelefono(){
+  const el = document.getElementById('avisoEventoNormalTelefono');
+  if(!el) return;
+  if(tipoReservaActual !== 'normal'){ el.style.display = 'none'; return; }
+  const fFecha = document.getElementById('fFechaReservaEdit');
+  const fTurno = document.getElementById('fTurnoReservaEdit');
+  const fecha = (fFecha && fFecha.value) || modalFecha;
+  const turno = (fTurno && fTurno.value) || modalTurno;
+  const ev = eventosCache.find(e => e.fecha === fecha && e.turno === turno && e.activo !== false);
+  if(!ev){ el.style.display = 'none'; return; }
+  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  el.innerHTML = `🎤 Este turno (${turnoLabels[turno]||turno}) tiene el evento especial <b>"${escapeHtml(ev.nombre)}"</b> — esta reserva va a quedar marcada con ese evento automáticamente${ev.aplicaCover ? ', y exige cover antes de poder aprobarla' : ''}.`;
+  el.style.display = 'block';
+}
+
 function elegirTipoReserva(tipo){
-  tipoReservaActual = tipo;
-  const btnN = document.getElementById('btnTipoNormal');
+  tipoReservaActual = tipo;  const btnN = document.getElementById('btnTipoNormal');
   const btnE = document.getElementById('btnTipoEvento');
   if(btnN){ btnN.style.background = tipo==='normal' ? 'var(--gold)' : ''; btnN.style.color = tipo==='normal' ? '#1a1a1a' : ''; }
   if(btnE){ btnE.style.background = tipo==='evento' ? 'var(--gold)' : ''; btnE.style.color = tipo==='evento' ? '#1a1a1a' : ''; }
@@ -1600,6 +1620,7 @@ function elegirTipoReserva(tipo){
     // no dejarla oculta.
     document.getElementById('fechaReservaEditBlock').style.display = 'block';
   }
+  actualizarAvisoEventoNormalTelefono();
 }
 
 function cargarEventosActivosParaSelector(){
@@ -7162,18 +7183,22 @@ function guardarReserva(){
     fechaFinal = usuarioActual.eventoAsignado.fecha;
     turnoFinal = usuarioActual.eventoAsignado.turno;
   }
+  // Si esta fecha/turno coincide con un evento especial activo, esta
+  // reserva pertenece a ese evento — sin importar si el staff la armó
+  // explícitamente por "Evento especial" o como reserva normal (la mesa y
+  // el cover ya se calculaban así, por fecha/turno; ahora el eventoId
+  // sigue exactamente la misma regla, para que nunca vuelvan a
+  // desincronizarse entre sí).
+  const evCorrespondiente = eventosCache.find(e => e.fecha === fechaFinal && e.turno === turnoFinal && e.activo !== false);
   // Si esta reserva cae en un evento especial que exige cover, no se deja
   // marcar como Aprobada sin haber cargado cuánto se cobró (con su
   // comprobante) — se queda en Pendiente hasta que eso esté completo.
-  if(estadoSeleccionado === 'confirmada'){
-    const evConCover = eventosCache.find(e => e.fecha === fechaFinal && e.turno === turnoFinal && e.aplicaCover);
-    if(evConCover){
-      const tieneCover = document.getElementById('fTieneCover').checked;
-      const hayAbonoConComprobante = tieneCover && coverAbonosTemp.some(a => a.comprobante);
-      if(!hayAbonoConComprobante){
-        alert(`Este evento ("${evConCover.nombre}") exige cover — antes de poder aprobar esta reserva, marca "Esta reserva tiene cover", carga cuánto se cobró y su comprobante.`);
-        return;
-      }
+  if(estadoSeleccionado === 'confirmada' && evCorrespondiente && evCorrespondiente.aplicaCover){
+    const tieneCover = document.getElementById('fTieneCover').checked;
+    const hayAbonoConComprobante = tieneCover && coverAbonosTemp.some(a => a.comprobante);
+    if(!hayAbonoConComprobante){
+      alert(`Este evento ("${evCorrespondiente.nombre}") exige cover — antes de poder aprobar esta reserva, marca "Esta reserva tiene cover", carga cuánto se cobró y su comprobante.`);
+      return;
     }
   }
   const data = {
@@ -7214,9 +7239,9 @@ function guardarReserva(){
     data.comprobanteCover = firebase.firestore.FieldValue.delete();
     data.comprobanteCoverSubidoEn = firebase.firestore.FieldValue.delete();
   }
-  if(!editandoId && tipoReservaActual === 'evento' && eventoSeleccionadoParaReserva){
-    data.eventoId = eventoSeleccionadoParaReserva.id;
-    data.eventoNombre = eventoSeleccionadoParaReserva.nombre;
+  if(!editandoId && evCorrespondiente){
+    data.eventoId = evCorrespondiente.id;
+    data.eventoNombre = evCorrespondiente.nombre;
   }
   // Para el seguimiento de canceladas en los informes: guarda el motivo, y
   // si esta reserva YA estaba aprobada (confirmada/pendiente/walk-in)
@@ -7381,9 +7406,13 @@ function enviarParaAprobacion(){
     data.comprobanteCover = firebase.firestore.FieldValue.delete();
     data.comprobanteCoverSubidoEn = firebase.firestore.FieldValue.delete();
   }
-  if(!editandoId && tipoReservaActual === 'evento' && eventoSeleccionadoParaReserva){
-    data.eventoId = eventoSeleccionadoParaReserva.id;
-    data.eventoNombre = eventoSeleccionadoParaReserva.nombre;
+  // Misma regla que en guardarReserva(): si la fecha/turno de esta reserva
+  // coincide con un evento especial activo, pertenece a ese evento —
+  // aunque se haya armado como reserva "normal".
+  const evCorrespondienteAprob = eventosCache.find(e => e.fecha === modalFecha && e.turno === modalTurno && e.activo !== false);
+  if(!editandoId && evCorrespondienteAprob){
+    data.eventoId = evCorrespondienteAprob.id;
+    data.eventoNombre = evCorrespondienteAprob.nombre;
   }
 
   // La fecha de "solicitud" (cuándo entró al flujo de aprobación) no se
@@ -8060,8 +8089,8 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     requestAnimationFrame(()=>{ if(document.getElementById('formCompletoBlock').style.display!=='none') initPhoneUI(); });
   };
 
-  document.getElementById('fFechaReservaEdit').addEventListener('change',()=>{renderPhoneDates(); bloquearFormularioTelefonoPorHoraSinConfirmar(); revisarDuplicadoEnModalTelefono();});
-  document.getElementById('fTurnoReservaEdit').addEventListener('change',()=>{renderTurnButtons(); revisarDuplicadoEnModalTelefono();});
+  document.getElementById('fFechaReservaEdit').addEventListener('change',()=>{renderPhoneDates(); bloquearFormularioTelefonoPorHoraSinConfirmar(); revisarDuplicadoEnModalTelefono(); actualizarAvisoEventoNormalTelefono();});
+  document.getElementById('fTurnoReservaEdit').addEventListener('change',()=>{renderTurnButtons(); revisarDuplicadoEnModalTelefono(); actualizarAvisoEventoNormalTelefono();});
 
   // Calendario completo del primer cuadrito.
   const calOverlay=document.getElementById('phoneCalendarOverlay');
