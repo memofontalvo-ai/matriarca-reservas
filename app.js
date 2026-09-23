@@ -1024,6 +1024,19 @@ function toggleSolicitudMusicoFields(){
   const marcado = document.getElementById('fSolicitudMusico').checked;
   document.getElementById('solicitudMusicoBlock').style.display = marcado ? 'block' : 'none';
 }
+// La fecha de "cuándo se pidió la solicitud de músicos" es automática —
+// no un campo que el staff pueda tocar — y queda fija desde la primera
+// vez que se marca, aunque la reserva se edite después en otro día. Si
+// ya estaba marcada antes (se está editando), se respeta la fecha que ya
+// tenía; solo se pone "hoy" la primera vez que se marca de verdad.
+function fechaSolicitudMusicoParaGuardar(){
+  if(!document.getElementById('fSolicitudMusico').checked) return '';
+  const reservaActual = editandoId ? reservas.find(r => r.id === editandoId) : null;
+  if(reservaActual && reservaActual.solicitudMusico && reservaActual.fechaSolicitudMusico){
+    return reservaActual.fechaSolicitudMusico;
+  }
+  return fechaISO(new Date());
+}
 // El valor que escribe el staff en "Valor del cover" es POR PERSONA — el
 // total (lo que hay que cobrar/mostrarle al cliente) sale de
 // multiplicarlo por el número de personas de la reserva. Se recalcula
@@ -4354,7 +4367,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
   return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
     ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
-    ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}</div>` : ''}
+    ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px; line-height:1.4;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}${r.fechaSolicitudMusico ? `<br><span style="font-weight:600; font-size:10px; opacity:.85;">Pedido el ${escapeHtml(formatearFechaCorta(r.fechaSolicitudMusico))}</span>` : ''}</div>` : ''}
     <div class="res-top">
       <div>
         <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}</div>
@@ -6502,7 +6515,7 @@ function renderSolicitudesScreen(){
     return `
     <div class="solicitud-card-global ${claseColor}" onclick='abrirModal(${JSON.stringify(r.id)})'>
       ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
-      ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}</div>` : ''}
+      ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px; line-height:1.4;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}${r.fechaSolicitudMusico ? `<br><span style="font-weight:600; font-size:10px; opacity:.85;">Pedido el ${escapeHtml(formatearFechaCorta(r.fechaSolicitudMusico))}</span>` : ''}</div>` : ''}
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
@@ -7420,6 +7433,15 @@ function guardarReserva(){
       return;
     }
   }
+  // La fecha de la solicitud de músicos es automática y de una sola vez:
+  // se fija el día en que se marca el check por primera vez, y aunque la
+  // reserva se vuelva a editar después (a veces días distintos), esa
+  // fecha ya no se mueve — es un registro de cuándo se pidió, no de
+  // cuándo se editó la reserva por última vez.
+  const reservaExistenteParaMusico = editandoId ? reservas.find(r => r.id === editandoId) : null;
+  const fechaSolicitudMusicoFinal = document.getElementById('fSolicitudMusico').checked
+    ? ((reservaExistenteParaMusico && reservaExistenteParaMusico.fechaSolicitudMusico) || fechaISO(new Date()))
+    : '';
   const data = {
     fecha: fechaFinal,
     turno: turnoFinal,
@@ -7450,6 +7472,7 @@ function guardarReserva(){
     // reserva, que esta gestión necesita coordinar músicos/show aparte.
     solicitudMusico: document.getElementById('fSolicitudMusico').checked,
     obsMusico: document.getElementById('fSolicitudMusico').checked ? document.getElementById('fObsMusico').value.trim() : '',
+    fechaSolicitudMusico: fechaSolicitudMusicoParaGuardar(),
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
@@ -7623,6 +7646,7 @@ function enviarParaAprobacion(){
     coverAbonos: document.getElementById('fTieneCover').checked ? coverAbonosTemp : [],
     solicitudMusico: document.getElementById('fSolicitudMusico').checked,
     obsMusico: document.getElementById('fSolicitudMusico').checked ? document.getElementById('fObsMusico').value.trim() : '',
+    fechaSolicitudMusico: fechaSolicitudMusicoParaGuardar(),
   };
   if(coverComprobanteBase64Temp){
     data.comprobanteCover = coverComprobanteBase64Temp;
