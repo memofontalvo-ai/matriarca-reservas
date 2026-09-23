@@ -4743,8 +4743,20 @@ function descargarInformeDia(){
 
     const filasHtml = rs.length ? rs.map(r => {
       const coverPersona = Number(r.coverValorPersona) || (Number(r.coverValor)>0 && Number(r.pax)>0 ? Math.round(Number(r.coverValor)/Number(r.pax)) : 0);
+      // Mismo desglose que ya se ve en la tarjeta de la reserva (ver
+      // textoCoverBadge): total, cuánto se abonó, y si queda pendiente o
+      // ya está pago completo — para saber de un vistazo si ese cliente
+      // está al día sin tener que abrir cada reserva por separado.
       const coverTexto = Number(r.coverValor) > 0
-        ? `$${Number(r.coverValor).toLocaleString('es-CO')} (${r.pax} × $${coverPersona.toLocaleString('es-CO')})`
+        ? (() => {
+            const pendiente = pendienteCover(r);
+            const abonado = abonadoCover(r);
+            const base = `$${Number(r.coverValor).toLocaleString('es-CO')} (${r.pax} × $${coverPersona.toLocaleString('es-CO')})`;
+            const estadoCover = pendiente > 0
+              ? `Abono $${abonado.toLocaleString('es-CO')} — Pendiente $${pendiente.toLocaleString('es-CO')}`
+              : `Abono $${abonado.toLocaleString('es-CO')} — Pagado`;
+            return `${base}<br>${estadoCover}`;
+          })()
         : '—';
       return `
       <tr>
