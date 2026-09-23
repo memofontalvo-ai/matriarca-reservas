@@ -384,6 +384,9 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    Esto es lo que evita tener que abrir una pestaña/ventana nueva: ya no
    hay que salir de la app para imprimir, y "Cerrar" solo cierra el
    informe sin afectar nada más. */
+/* Al imprimir el informe con el plano de un evento adentro, la hoja
+   queda mucho mejor en horizontal — el plano es más ancho que alto. */
+@page{ size: landscape; margin: 10mm; }
 @media print{
   /* OJO: antes esto usaba visibility:hidden en todo body *, lo cual deja
      el resto de la app (con sus imágenes enormes en base64: logo, fotos

@@ -88,6 +88,19 @@ function colorTextoContraste(hex, oscurecidoPorOcupada){
   const luminancia = (0.299*r + 0.587*g + 0.114*b) / 255;
   return luminancia > 0.55 ? '#0c1a12' : '#ffffff';
 }
+// Bloques decorativos (Tarima, Entrada, Barra, Cava de Amanecida...) — si
+// tienen una rotación guardada (como el ángulo de Tarima), se respeta tal
+// cual. Si no la tienen pero el bloque es angosto y alto, el texto se pone
+// en vertical solo — así uno nuevo que se agregue en Salones con esa forma
+// (como "Cava de Amanecida") no necesita que nadie le configure nada a
+// mano para verse bien.
+function estiloTextoZoneblock(b){
+  if(b.rotacion) return `transform:rotate(${b.rotacion}deg);`;
+  const anchoPx = (Number(b.width)||0) / 100 * 880;
+  const altoPx = (Number(b.height)||0) / 100 * 640;
+  if(altoPx > anchoPx * 1.3) return 'writing-mode:vertical-rl; letter-spacing:1px;';
+  return '';
+}
 function escapeHtml(str){
   if(str === undefined || str === null) return '';
   return String(str)
@@ -4747,11 +4760,11 @@ function descargarInformeDia(){
     rs.forEach(r => { if(r.mesa) r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; }); });
     const planoHtml = usandoPlanoEventoInforme
       ? `
-      <div class="plano-canvas-scroll-wrap" id="informePlanoScrollWrap" style="max-width:640px; margin:14px auto 0;">
+      <div class="plano-canvas-scroll-wrap" id="informePlanoScrollWrap" style="margin:14px auto 0;">
       <div class="plano-canvas-app evento">
         ${Object.keys(planoBase.bloques||{}).map(bid => {
             const b = planoBase.bloques[bid];
-            return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${b.rotacion?'transform:rotate('+b.rotacion+'deg);':''}">${escapeHtml(b.texto)}</div>`;
+            return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${estiloTextoZoneblock(b)}">${escapeHtml(b.texto)}</div>`;
           }).join('')}
         ${Object.keys(planoBase.zonas||{}).map(zid => {
             const z = planoBase.zonas[zid];
@@ -5558,7 +5571,7 @@ function renderPlano(){
     ? `<div class="plano-canvas-app evento">
         ${Object.keys(planoUsado.bloques||{}).map(bid => {
             const b = planoUsado.bloques[bid];
-            return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${b.rotacion?'transform:rotate('+b.rotacion+'deg);':''}">${escapeHtml(b.texto)}</div>`;
+            return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${estiloTextoZoneblock(b)}">${escapeHtml(b.texto)}</div>`;
           }).join('')}
         ${Object.keys(planoUsado.zonas||{}).map(zid => {
             const z = planoUsado.zonas[zid];
@@ -5697,7 +5710,7 @@ function renderMesaPickerCanvas(){
   document.getElementById('mesaPickerCanvas').innerHTML = usandoPlanoEvento
     ? Object.keys(plano.bloques||{}).map(bid => {
         const b = plano.bloques[bid];
-        return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${b.rotacion?'transform:rotate('+b.rotacion+'deg);':''}">${escapeHtml(b.texto)}</div>`;
+        return `<div class="plano-zoneblock" style="left:${b.left}%; top:${b.top}%; width:${b.width}%; height:${b.height}%; background:${b.color||'#6b6b6b'}; color:#fff; ${estiloTextoZoneblock(b)}">${escapeHtml(b.texto)}</div>`;
       }).join('')
       + Object.keys(plano.zonas||{}).map(zid => {
         const z = plano.zonas[zid];
