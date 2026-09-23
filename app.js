@@ -73,6 +73,21 @@ function formatearMilesInput(el){
   const digits = soloDigitos(el.value);
   el.value = digits ? Number(digits).toLocaleString('es-CO') : '';
 }
+// Decide si el texto sobre un color de fondo debe ser blanco o negro,
+// según qué tan oscuro se vea ese color EN LA PANTALLA — no el color de
+// zona tal cual, sino ya oscurecido por la sombra de "mesa ocupada"
+// (ver oscurecer/rgba(0,0,0,0.32) en buildZoneGridPlano), para que
+// coincida con lo que el ojo realmente ve, no con el color original.
+function colorTextoContraste(hex, oscurecidoPorOcupada){
+  const limpio = (hex||'').replace('#','');
+  if(limpio.length !== 6) return '#0c2417';
+  const factor = oscurecidoPorOcupada ? 0.68 : 1; // 1 - 0.32 de la sombra
+  const r = parseInt(limpio.slice(0,2),16) * factor;
+  const g = parseInt(limpio.slice(2,4),16) * factor;
+  const b = parseInt(limpio.slice(4,6),16) * factor;
+  const luminancia = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return luminancia > 0.55 ? '#0c1a12' : '#ffffff';
+}
 function escapeHtml(str){
   if(str === undefined || str === null) return '';
   return String(str)
@@ -5383,10 +5398,14 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
         // nombre superpuesto. Cuando está ocupada, además se oscurece con
         // una sombra interna por encima de ese mismo color de zona (en vez
         // de cambiarlo por otro fijo) — así se nota a simple vista que está
-        // tomada sin perder de vista de qué zona/categoría es.
+        // tomada sin perder de vista de qué zona/categoría es. El color del
+        // texto se recalcula según qué tan oscuro quede ESE resultado (no
+        // el color de zona original) para que nunca se pierda, sea cual
+        // sea el color que le hayan puesto a la zona en Salones.
         const colorMesa = categorias ? colorZona : null;
         const oscurecer = reserva ? 'box-shadow:inset 0 0 0 999px rgba(0,0,0,0.32);' : '';
-        const estiloColor = colorMesa ? `style="background:${colorMesa}; ${oscurecer}"` : '';
+        const colorTexto = (colorMesa && reserva) ? `color:${colorTextoContraste(colorMesa, true)};` : '';
+        const estiloColor = colorMesa ? `style="background:${colorMesa}; ${oscurecer} ${colorTexto}"` : '';
         const capHtml = (categorias && m.cap) ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
         const precioHtml = (categorias && m.categoria && categorias[m.categoria]) ? `<div class="plano-mesa-precio">$${Number(categorias[m.categoria].precio).toLocaleString('es-CO')}</div>` : '';
         inner = `<div class="plano-mesa-core ${estadoCls}" ${estiloColor} onclick='${clickJs}' title="${escapeHtml(idMesa)}${m.cap?' · cap '+m.cap:''}">${codigo}${capHtml}${precioHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
