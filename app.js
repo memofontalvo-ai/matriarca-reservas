@@ -1022,10 +1022,26 @@ function pendienteCover(r){
   const abonado = r.coverAbonos.reduce((s,a) => s + Number(a.monto||0), 0);
   return Number(r.coverValor) - abonado;
 }
+// Mismo criterio que pendienteCover() — se calcula en espejo (nunca por
+// resta contra el pendiente) para que las dos funciones no se puedan
+// desincronizar entre sí si algún día se ajusta una de las dos.
+function abonadoCover(r){
+  if(!r || !(Number(r.coverValor) > 0)) return 0;
+  if(!Array.isArray(r.coverAbonos) || r.coverAbonos.length === 0){
+    return r.comprobanteCover ? Number(r.coverValor) : 0;
+  }
+  return r.coverAbonos.reduce((s,a) => s + Number(a.monto||0), 0);
+}
 function textoCoverBadge(r){
   if(!(Number(r.coverValor) > 0)) return '';
   const pendiente = pendienteCover(r);
-  const sufijo = pendiente > 0 ? ` — pendiente $${pendiente.toLocaleString('es-CO')}` : ' — pagado';
+  const abonado = abonadoCover(r);
+  // Guillermo pidió ver los tres montos de una — antes solo se veían el
+  // total y lo pendiente, y había que entrar a la reserva para saber
+  // cuánto se había abonado.
+  const sufijo = pendiente > 0
+    ? ` — Abono $${abonado.toLocaleString('es-CO')} — Pendiente $${pendiente.toLocaleString('es-CO')}`
+    : ` — Abono $${abonado.toLocaleString('es-CO')} — Pagado`;
   return `<span class="vip-tag" style="color:#e8a33d; border-color:#e8a33d;">🎫 Cover $${Number(r.coverValor).toLocaleString('es-CO')}${sufijo}</span>`;
 }
 function actualizarTotalCover(){
