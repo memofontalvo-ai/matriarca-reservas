@@ -5501,16 +5501,33 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
 // para imprimir, que es más ancho que un celular) — así llena la hoja en
 // vez de quedar pequeño con espacio vacío al lado. Se ve igual en
 // Salones, "Por día → Plano", el selector de mesas y el informe.
+// OJO: en vez de calcular el ancho una sola vez justo después de pintar
+// (que puede fallar si el modal/overlay todavía no terminó de acomodarse
+// en pantalla — el hueco vacío que se veía en el informe era justo eso),
+// se usa un ResizeObserver que reaplica la escala cada vez que el
+// contenedor cambia de tamaño de verdad, sin depender de adivinar el
+// momento exacto.
+const _planoAppObservers = new WeakMap();
 function ajustarEscalaPlanoApp(wrapSelector, innerSelector){
   const wrap = document.querySelector(wrapSelector);
   const inner = document.querySelector(innerSelector);
   if(!wrap || !inner || !inner.classList.contains('evento')) return;
   const designWidth = 880, designHeight = 640;
-  const availW = wrap.clientWidth || designWidth;
-  const scale = availW / designWidth;
-  inner.style.transform = 'scale(' + scale + ')';
-  inner.style.transformOrigin = 'top left';
-  wrap.style.height = Math.round(designHeight * scale) + 'px';
+  const aplicar = () => {
+    const availW = wrap.clientWidth || designWidth;
+    const scale = availW / designWidth;
+    inner.style.transform = 'scale(' + scale + ')';
+    inner.style.transformOrigin = 'top left';
+    wrap.style.height = Math.round(designHeight * scale) + 'px';
+  };
+  aplicar();
+  if(window.ResizeObserver && !_planoAppObservers.has(wrap)){
+    const ro = new ResizeObserver(aplicar);
+    ro.observe(wrap);
+    _planoAppObservers.set(wrap, ro);
+  } else if(!window.ResizeObserver){
+    requestAnimationFrame(() => requestAnimationFrame(aplicar));
+  }
 }
 window.addEventListener('resize', () => {
   ajustarEscalaPlanoApp('#planoScrollWrap', '#planoScrollWrap .plano-canvas-app');
