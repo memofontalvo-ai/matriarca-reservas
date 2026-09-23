@@ -634,9 +634,14 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 
 /* ===== Banner del evento (solo para el rol "Promotor de eventos") ===== */
 .evento-promotor-banner{
-  margin:0 16px 12px; border-radius:14px; overflow:hidden;
+  margin:0 auto 12px; border-radius:14px; overflow:hidden;
   border:2px solid var(--gold); box-shadow:0 0 14px 1px rgba(201,161,90,0.35);
   background:var(--panel-alt);
+  /* La única forma de bajarle la altura SIN recortar nada de la
+     publicidad es angostar el contenedor — como la imagen escala
+     manteniendo su proporción real (height:auto, abajo), un ancho menor
+     baja la altura en la misma proporción, completa, solo más chica. */
+  max-width:68%;
 }
 .evento-promotor-banner img{ width:100%; height:auto; display:block; }
 .evento-promotor-banner-texto{
