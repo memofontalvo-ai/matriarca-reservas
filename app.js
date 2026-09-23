@@ -5416,6 +5416,27 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
   return `<div class="plano-gridzone" style="left:${cfg.left}%; top:${cfg.top}%; width:${cfg.width}%; height:${cfg.height}%; grid-template-columns:repeat(${cfg.cols},1fr); grid-template-rows:repeat(${cfg.rows},1fr);">${cells}</div>`;
 }
 
+// El plano de evento se dibuja siempre a su tamaño de diseño fijo
+// (880×640, el mismo que usa el editor de Salones) y esto lo encoge con
+// CSS hasta que quepa completo en el ancho real de la pantalla — así se
+// ve idéntico en Salones, en "Por día → Plano" y en el selector de mesas
+// al armar una reserva, sin importar qué tan angosto sea el celular.
+function ajustarEscalaPlanoApp(wrapSelector, innerSelector){
+  const wrap = document.querySelector(wrapSelector);
+  const inner = document.querySelector(innerSelector);
+  if(!wrap || !inner || !inner.classList.contains('evento')) return;
+  const designWidth = 880, designHeight = 640;
+  const availW = wrap.clientWidth || designWidth;
+  const scale = Math.min(1, availW / designWidth);
+  inner.style.transform = 'scale(' + scale + ')';
+  inner.style.transformOrigin = 'top left';
+  wrap.style.height = Math.round(designHeight * scale) + 'px';
+}
+window.addEventListener('resize', () => {
+  ajustarEscalaPlanoApp('#planoScrollWrap', '#planoScrollWrap .plano-canvas-app');
+  ajustarEscalaPlanoApp('#mesaPickerScrollWrap', '#mesaPickerCanvas');
+});
+
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
   const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
@@ -5496,7 +5517,15 @@ function renderPlano(){
         ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
       </div>`;
 
-  document.getElementById('panelPlano').innerHTML = legend + canvasHtml;
+  const canvasFinal = usandoPlanoEvento
+    ? `<div class="plano-canvas-scroll-wrap" id="planoScrollWrap">${canvasHtml}</div>`
+    : canvasHtml;
+  document.getElementById('panelPlano').innerHTML = legend + canvasFinal;
+  if(usandoPlanoEvento){
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      ajustarEscalaPlanoApp('#planoScrollWrap', '#planoScrollWrap .plano-canvas-app')
+    ));
+  }
 }
 
 /* ============ SELECTOR VISUAL DE MESA (dentro del formulario de reserva) ============ */
@@ -5628,6 +5657,11 @@ function renderMesaPickerCanvas(){
   seleccionEl.textContent = mesaSeleccionTemp.length
     ? `Elegidas: ${mesaSeleccionTemp.join(' + ')}`
     : 'Ninguna mesa elegida';
+  if(usandoPlanoEvento){
+    requestAnimationFrame(() => requestAnimationFrame(() =>
+      ajustarEscalaPlanoApp('#mesaPickerScrollWrap', '#mesaPickerCanvas')
+    ));
+  }
 }
 
 function toggleMesaSeleccion(ref){
