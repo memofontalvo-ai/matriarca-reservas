@@ -6021,7 +6021,7 @@ function toggleConfigGrupo(id){
   const contenido = document.getElementById(id);
   const chevron = document.getElementById('chevron_' + id);
   const yaAbierto = contenido.style.display !== 'none';
-  ['grupoMensajes', 'grupoHorarios', 'grupoCarrusel', 'grupoEventos', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoPeligro'].forEach(otroId => {
+  ['grupoMensajes', 'grupoHorarios', 'grupoCarrusel', 'grupoEventos', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoBajaDatos', 'grupoPeligro'].forEach(otroId => {
     const otroContenido = document.getElementById(otroId);
     const otroChevron = document.getElementById('chevron_' + otroId);
     if(otroContenido) otroContenido.style.display = 'none';
