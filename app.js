@@ -5591,17 +5591,27 @@ window.addEventListener('resize', () => {
 // llegando las reservas del día. Se quita en cuanto se resuelva.
 function dumpDiagnosticoPlano(){
   const pm = window.DIAG_porMesaRef || {};
-  const ms = window.DIAG_mesas || {};
   let out = 'RESERVAS ENCONTRADAS PARA ESTE DÍA/TURNO (' + Object.keys(pm).length + '):\n';
   Object.keys(pm).forEach(k => {
     out += '  "' + k + '" → ' + (pm[k].nombre || '(sin nombre)') + ' [' + pm[k].estado + ']\n';
   });
-  out += '\nMESAS GUARDADAS EN LA ZONA "C" (4 columnas × 5 filas):\n';
+  alert(out);
+}
+function dumpDiagnosticoZonaC(){
+  const ms = window.DIAG_mesas || {};
+  const pf = window.DIAG_pref || {};
+  const pm = window.DIAG_porMesaRef || {};
+  let out = 'ZONA "C" — para cada casilla: código calculado y si encontró reserva:\n\n';
   for(let r=0;r<5;r++){
     for(let c=0;c<4;c++){
       const mkey = 'C-'+r+'-'+c;
       const m = ms[mkey];
-      out += '  ' + mkey + ': ' + (m ? JSON.stringify({zona:m.zona, num:m.num, ref:m.ref||null, span:m.span||null}) : '(vacío)') + '\n';
+      if(!m){ out += mkey+': (vacío)\n'; continue; }
+      const prefType = pf[mkey] || null;
+      const codigo = codeForPlano(m, prefType);
+      const idMesa = (m.ref && m.ref.trim()) ? m.ref.trim() : codigo;
+      const encontro = pm[idMesa.toLowerCase()];
+      out += mkey + ': código="' + codigo + '" idMesa="' + idMesa + '" → ' + (encontro ? ('✅ '+encontro.nombre) : '❌ sin match') + '\n';
     }
   }
   alert(out);
@@ -5658,12 +5668,14 @@ function renderPlano(){
     <div class="legend-item"><span class="legend-dot" style="background:var(--confirmed)"></span>Confirmada</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
-    <button type="button" onclick="dumpDiagnosticoPlano()" style="margin-left:auto; padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Ver diagnóstico</button>
+    <button type="button" onclick="dumpDiagnosticoPlano()" style="margin-left:auto; padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Reservas</button>
+    <button type="button" onclick="dumpDiagnosticoZonaC()" style="padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Mesas zona C</button>
   </div>`;
 
   const mesas = planoUsado.mesas || {};
   window.DIAG_mesas = mesas;
   const pref = planoUsado.pref || {};
+  window.DIAG_pref = pref;
   // codeForPlano() decide el formato del código mirando esta variable
   // global — se deja en el estado que corresponde a lo que se está
   // pintando aquí (se sobreescribe otra vez cada vez que se abre el
