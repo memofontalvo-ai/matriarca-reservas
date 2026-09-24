@@ -5843,9 +5843,23 @@ function renderMesaPickerCanvas(){
   // 8pm no bloquea toda la noche). Si no tiene hora de salida guardada,
   // se sigue bloqueando el turno completo como antes, por seguridad.
   const horaNuevaReserva = document.getElementById('fHora').value;
+  // Cena 1 / Cena 2 (solo viernes/sábado): son "momentos" independientes
+  // para la disponibilidad de mesa, igual que Desayuno/Almuerzo/Cena no
+  // se bloquean entre sí. Una mesa ocupada en Cena 1 NO bloquea Cena 2 y
+  // viceversa. Si la reserva que se está armando todavía no tiene franja
+  // elegida, o la otra reserva existente no tiene franja (nunca pasa
+  // entre semana, solo si el staff no la puso), se sigue bloqueando
+  // contra TODA la noche, por seguridad — igual que siempre.
+  const fFranjaCenaEl = document.getElementById('fFranjaCena');
+  const franjaNuevaReserva = fFranjaCenaEl ? fFranjaCenaEl.value : '';
+  const esCenaFinDeSemanaModal = modalTurno === 'cena' && diaEsFinDeSemanaCena(modalFecha);
   const ocupadasPorOtro = {};
   reservas
     .filter(r => r.fecha===modalFecha && r.turno===modalTurno && r.estado!=='cancelada' && r.id!==editandoId)
+    .filter(r => {
+      if(esCenaFinDeSemanaModal && franjaNuevaReserva && r.franjaCena && r.franjaCena !== franjaNuevaReserva) return false;
+      return true;
+    })
     .filter(r => {
       if(!r.horaSalida || !horaNuevaReserva) return true; // sin datos suficientes: bloquea, por seguridad
       return horaNuevaReserva < r.horaSalida; // ya salió antes de que llegue la nueva → no bloquea
@@ -7351,6 +7365,10 @@ document.getElementById('franjaCenaSelect').addEventListener('click', e=>{
   // el staff todavía no sabe cuál va a pedir el cliente.
   document.getElementById('fFranjaCena').value = (actual === btn.dataset.val) ? '' : btn.dataset.val;
   renderFranjaCenaBlock();
+  // Si el plano de mesas ya está abierto, se refresca para reflejar la
+  // disponibilidad de la franja recién elegida (una mesa puede pasar de
+  // "ocupada" a "libre" o viceversa al cambiar entre Cena 1 y Cena 2).
+  if(typeof renderMesaPickerCanvas === 'function') renderMesaPickerCanvas();
 });
 
 function cerrarModal(){
