@@ -6847,8 +6847,13 @@ function abrirModal(id, mesaId){
     }
     document.getElementById('fHora').value = r.hora;
     document.getElementById('fHoraSalida').value = r.horaSalida || '';
-    document.getElementById('fFranjaCena').value = r.franjaCena || '';
+    document.getElementById('fFranjaCena').value = String(r.franjaCena || '').trim();
     renderFranjaCenaBlock();
+    // Seguro extra: en algunos iPhone el resaltado dorado de Cena 1/Cena 2
+    // no se repinta a tiempo si este render cae en el mismo instante en que
+    // el modal se está mostrando — se repite en el siguiente frame para
+    // garantizar que quede pintado, sin cambiar ningún dato.
+    requestAnimationFrame(renderFranjaCenaBlock);
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
     { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
@@ -7343,7 +7348,7 @@ function renderFranjaCenaBlock(){
   if(!aplica) document.getElementById('fFranjaCena').value = '';
   const valorFranja = document.getElementById('fFranjaCena').value;
   document.querySelectorAll('#franjaCenaSelect .estado-opt').forEach(b=>{
-    b.classList.toggle('on', b.dataset.val === valorFranja);
+    b.classList.toggle('on', String(b.dataset.val).trim() === String(valorFranja).trim());
   });
   const sugerenciaEl = document.getElementById('franjaCenaSugerencia');
   if(sugerenciaEl){
