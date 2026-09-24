@@ -5585,6 +5585,27 @@ window.addEventListener('resize', () => {
   ajustarEscalaPlanoApp('#mesaPickerScrollWrap', '#mesaPickerCanvas');
 });
 
+// DIAGNÓSTICO TEMPORAL (v5.99) — muestra en un mensaje nativo del celular
+// (sin herramientas de desarrollador) qué hay guardado realmente para la
+// zona de mesas que no está mostrando nombres, y con qué claves están
+// llegando las reservas del día. Se quita en cuanto se resuelva.
+function dumpDiagnosticoPlano(){
+  const pm = window.DIAG_porMesaRef || {};
+  const ms = window.DIAG_mesas || {};
+  let out = 'RESERVAS ENCONTRADAS PARA ESTE DÍA/TURNO (' + Object.keys(pm).length + '):\n';
+  Object.keys(pm).forEach(k => {
+    out += '  "' + k + '" → ' + (pm[k].nombre || '(sin nombre)') + ' [' + pm[k].estado + ']\n';
+  });
+  out += '\nMESAS GUARDADAS EN LA ZONA "C" (4 columnas × 5 filas):\n';
+  for(let r=0;r<5;r++){
+    for(let c=0;c<4;c++){
+      const mkey = 'C-'+r+'-'+c;
+      const m = ms[mkey];
+      out += '  ' + mkey + ': ' + (m ? JSON.stringify({zona:m.zona, num:m.num, ref:m.ref||null, span:m.span||null}) : '(vacío)') + '\n';
+    }
+  }
+  alert(out);
+}
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
   const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
@@ -5627,14 +5648,21 @@ function renderPlano(){
     // Una reserva puede tener varias mesas unidas, guardadas como "A+B+C".
     r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; });
   });
+  // DIAGNÓSTICO TEMPORAL (v5.99) — se guardan en variables globales para
+  // que el botón de abajo pueda mostrarlas en pantalla sin herramientas
+  // de desarrollador. Se quita en cuanto se resuelva el problema de las
+  // mesas PAMA/MA sin nombre.
+  window.DIAG_porMesaRef = porMesaRef;
 
   const legend = `<div class="legend">
     <div class="legend-item"><span class="legend-dot" style="background:var(--confirmed)"></span>Confirmada</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
+    <button type="button" onclick="dumpDiagnosticoPlano()" style="margin-left:auto; padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Ver diagnóstico</button>
   </div>`;
 
   const mesas = planoUsado.mesas || {};
+  window.DIAG_mesas = mesas;
   const pref = planoUsado.pref || {};
   // codeForPlano() decide el formato del código mirando esta variable
   // global — se deja en el estado que corresponde a lo que se está
