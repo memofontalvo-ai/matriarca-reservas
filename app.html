@@ -282,6 +282,14 @@
         </div>
 
         <div class="config-mensaje-bloque">
+          <div class="capacidad-turnos-title">Cena 1 (temprano) / Cena 2 (show) — solo viernes y sábado</div>
+          <div class="capacidad-turnos-sub">Hora a partir de la cual se sugiere la Cena 2 (show/rumba). Es solo una referencia para el staff al tomar la reserva — no bloquea ni libera mesas por sí sola; eso lo sigue haciendo la hora de salida de cada reserva.</div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <input type="time" id="fCorteCenaFinde" style="background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:13px; padding:8px;" onchange="actualizarCorteCenaFinDeSemana(this.value)">
+          </div>
+        </div>
+
+        <div class="config-mensaje-bloque">
           <div class="capacidad-turnos-title">Festivos</div>
           <div class="capacidad-turnos-sub">Agrega aquí las fechas festivas del año (los festivos colombianos cambian de fecha cada año, así que se agregan a mano). Ese día se usa el horario "Festivo" de arriba, sin importar qué día de la semana sea.</div>
           <div style="display:flex; gap:8px; margin-bottom:12px;">
@@ -523,7 +531,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.07</div>
+<div class="version-tag">v6.08</div>
 
 
 <div class="overlay" id="overlay">
@@ -647,6 +655,15 @@
           <option value="cena">Cena</option>
         </select>
         <div id="turnoInvalidoAviso" class="turno-invalido-aviso" style="display:none;"></div>
+        <div class="field" id="franjaCenaBlock" style="display:none; margin-top:10px;">
+          <label>Cena 1 (temprano) o Cena 2 (show) <span style="font-weight:400; text-transform:none; color:var(--text-muted);">— solo viernes y sábado</span></label>
+          <div class="estado-select phone-estado-select" id="franjaCenaSelect">
+            <button type="button" class="estado-opt sel-franja" data-val="temprano">🕕 <span>Cena 1 · Temprano</span></button>
+            <button type="button" class="estado-opt sel-franja" data-val="show">🎶 <span>Cena 2 · Show</span></button>
+          </div>
+          <div id="franjaCenaSugerencia" style="display:none; margin-top:8px; font-size:12.5px; color:var(--text-muted); line-height:1.4;"></div>
+        </div>
+        <input type="hidden" id="fFranjaCena">
         <div id="avisoEventoNormalTelefono" style="display:none; margin-top:10px; padding:12px 14px; border-radius:10px; background:rgba(201,161,90,0.12); border:1px solid var(--gold);">
           <div style="display:flex; align-items:center; gap:10px;">
             <img id="avisoEventoNormalTelefonoImg" src="" alt="" style="display:none; width:42px; height:42px; object-fit:cover; border-radius:8px; flex-shrink:0; border:1px solid var(--gold);">

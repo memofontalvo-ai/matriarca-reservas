@@ -2192,10 +2192,16 @@ const HORARIOS_SEED = {
 let HORARIOS = JSON.parse(JSON.stringify(HORARIOS_SEED));
 const horariosConfigRef = db.collection('configuracion').doc('horarios');
 let suprimirRenderHorarios = false;
+// Hora de corte entre "Cena 1" (temprano) y "Cena 2" (show) — SOLO viernes
+// y sábado. Es un dato de referencia para el staff (una sugerencia de hora
+// de salida); NO bloquea mesas por sí solo — la disponibilidad real la
+// sigue manejando el campo horaSalida de cada reserva (ver ocupadasPorOtro
+// en el selector de mesas). Se edita desde Config → Horario de atención.
+let CORTE_CENA_FINDE = '21:00';
 
 horariosConfigRef.get().then(snap => {
   if(!snap.exists){
-    return horariosConfigRef.set(HORARIOS_SEED);
+    return horariosConfigRef.set({...HORARIOS_SEED, corteCenaFinDeSemana: CORTE_CENA_FINDE});
   }
   const data = snap.data();
   // Migración desde la versión anterior (agrupada en "lunjue" / "viesab" /
@@ -2209,6 +2215,7 @@ horariosConfigRef.get().then(snap => {
       domingo: data.domingo || HORARIOS_SEED.domingo,
       festivo: HORARIOS_SEED.festivo,
       domingoAntesFestivo: HORARIOS_SEED.domingoAntesFestivo,
+      corteCenaFinDeSemana: data.corteCenaFinDeSemana || CORTE_CENA_FINDE,
     };
     return horariosConfigRef.set(migrado);
   }
@@ -2216,6 +2223,7 @@ horariosConfigRef.get().then(snap => {
   horariosConfigRef.onSnapshot(snap => {
     if(snap.exists){
       const data = snap.data();
+      CORTE_CENA_FINDE = data.corteCenaFinDeSemana || CORTE_CENA_FINDE;
       // Combinamos con el seed por si falta algún día/turno (por ejemplo,
       // festivo/domingoAntesFestivo en un documento migrado antes de que
       // existieran).
@@ -2233,6 +2241,8 @@ horariosConfigRef.get().then(snap => {
       // de otro lado (otro empleado, u otra pestaña del mismo usuario).
       if(!suprimirRenderHorarios){
         renderCapacidadTurnos();
+        const corteInput = document.getElementById('fCorteCenaFinde');
+        if(corteInput) corteInput.value = CORTE_CENA_FINDE;
       }
       suprimirRenderHorarios = false;
     }
@@ -2451,6 +2461,21 @@ function renderCapacidadTurnos(){
         }).join('')}
       </div>
     </div>`).join('');
+}
+
+// Hora de corte editable entre Cena 1 (temprano) y Cena 2 (show), solo
+// viernes/sábado. Ver nota junto a CORTE_CENA_FINDE más arriba: es un dato
+// de referencia (sugerencia de hora de salida), no altera la disponibilidad
+// de mesas por sí solo.
+function actualizarCorteCenaFinDeSemana(valor){
+  if(!valor) return;
+  CORTE_CENA_FINDE = valor;
+  suprimirRenderHorarios = true;
+  horariosConfigRef.set({ corteCenaFinDeSemana: valor }, { merge: true }).catch(err => {
+    suprimirRenderHorarios = false;
+    alert('No se pudo guardar la hora de corte. Revisa tu conexión e intenta de nuevo.');
+    console.error(err);
+  });
 }
 
 // ============ CONFIGURACIÓN: MENSAJES DE WHATSAPP ============
@@ -4370,7 +4395,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px; line-height:1.4;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}${r.fechaSolicitudMusico ? `<br><span style="font-weight:600; font-size:10px; opacity:.85;">Pedido el ${escapeHtml(formatearFechaCorta(r.fechaSolicitudMusico))}</span>` : ''}</div>` : ''}
     <div class="res-top">
       <div>
-        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}</div>
+        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}${r.franjaCena?` <span class="badge franja-badge">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`:''}</div>
         <div class="res-nombre">${escapeHtml(r.nombre)}</div>
       </div>
       <div class="res-top-right">
@@ -4424,10 +4449,28 @@ function renderResumenTurnoHTML(rsTodas){
   // ir a buscarlo reserva por reserva.
   const canceladasDia = reservas.filter(r=>r.fecha===iso && r.estado==='cancelada');
   const canceladasDiaPax = canceladasDia.reduce((a,r)=>a+Number(r.pax||0),0);
-  const porTurnoDia = ['desayuno','almuerzo','cena'].map(t=>{
+  const porTurnoDia = [];
+  ['desayuno','almuerzo'].forEach(t=>{
     const rs = reservasDia.filter(r=>r.turno===t);
-    return { turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo',cena:'Cena'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) };
+    porTurnoDia.push({ turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) });
   });
+  // Cena: los viernes y sábados se desglosa en Cena 1 (temprano) / Cena 2
+  // (show) según el campo franjaCena de cada reserva — es solo una vista
+  // de reporte, no cambia el conteo total de cena. Entre semana se muestra
+  // igual que siempre, sin desglosar.
+  const rsCenaDia = reservasDia.filter(r=>r.turno==='cena');
+  if(diaEsFinDeSemanaCena(iso)){
+    const rsTemprano = rsCenaDia.filter(r=>r.franjaCena==='temprano');
+    const rsShow = rsCenaDia.filter(r=>r.franjaCena==='show');
+    const rsSinFranja = rsCenaDia.filter(r=>!r.franjaCena);
+    porTurnoDia.push({ turno:'cena', label:'🕕 Cena 1', count:rsTemprano.length, pax:rsTemprano.reduce((a,r)=>a+Number(r.pax||0),0) });
+    porTurnoDia.push({ turno:'cena', label:'🎶 Cena 2', count:rsShow.length, pax:rsShow.reduce((a,r)=>a+Number(r.pax||0),0) });
+    if(rsSinFranja.length > 0){
+      porTurnoDia.push({ turno:'cena', label:'Cena (sin franja)', count:rsSinFranja.length, pax:rsSinFranja.reduce((a,r)=>a+Number(r.pax||0),0) });
+    }
+  } else {
+    porTurnoDia.push({ turno:'cena', label:'Cena', count:rsCenaDia.length, pax:rsCenaDia.reduce((a,r)=>a+Number(r.pax||0),0) });
+  }
   const totalDiaReservas = reservasDia.length;
   const totalDiaPax = reservasDia.reduce((a,r)=>a+Number(r.pax||0),0);
   const resumenDiaHtml = `
@@ -6553,7 +6596,7 @@ function renderSolicitudesScreen(){
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
-          <div class="sc-hora">${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}</div>
+          <div class="sc-hora">${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${r.franjaCena?` <span class="badge franja-badge">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`:''}</div>
           <div class="sc-nombre">${escapeHtml(r.nombre)}</div>
         </div>
         <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
@@ -6755,6 +6798,8 @@ function abrirModal(id, mesaId){
     }
     document.getElementById('fHora').value = r.hora;
     document.getElementById('fHoraSalida').value = r.horaSalida || '';
+    document.getElementById('fFranjaCena').value = r.franjaCena || '';
+    renderFranjaCenaBlock();
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
     { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
@@ -6891,6 +6936,8 @@ function abrirModal(id, mesaId){
     }
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
+    document.getElementById('fFranjaCena').value = '';
+    renderFranjaCenaBlock();
     if(esPromotorNueva){
       // Un promotor no elige tipo de reserva ni evento — ese paso entero
       // (con la parrilla de TODOS los eventos activos) se salta, porque
@@ -7089,6 +7136,7 @@ function elegirCanalNuevo(tipo){
     document.getElementById('fFechaReservaEdit').value = modalFecha;
     document.getElementById('fTurnoReservaEdit').value = modalTurno;
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
+    renderFranjaCenaBlock();
   } else {
     document.getElementById('whatsappBlock').style.display = 'block';
   }
@@ -7216,9 +7264,61 @@ function actualizarSubtituloModalDesdeCampos(){
   const hoyISO = fechaISO(new Date());
   const turnoLabel = turno.charAt(0).toUpperCase()+turno.slice(1);
   document.getElementById('modalSub').textContent = `${turnoLabel} · ${fecha}${fecha===hoyISO ? ' (hoy)' : ''}`;
+  renderFranjaCenaBlock();
 }
 document.getElementById('fFechaReservaEdit').addEventListener('change', actualizarSubtituloModalDesdeCampos);
 document.getElementById('fTurnoReservaEdit').addEventListener('change', actualizarSubtituloModalDesdeCampos);
+
+// ============ CENA 1 (TEMPRANO) / CENA 2 (SHOW) — SOLO VIERNES/SÁBADO ============
+// Es solo una etiqueta de referencia para el staff y para los informes; la
+// disponibilidad real de la mesa la sigue manejando el campo horaSalida de
+// cada reserva (ver ocupadasPorOtro en el selector de mesas), sin tocar esa
+// lógica — así no se duplica ni se puede desincronizar.
+function diaEsFinDeSemanaCena(fechaStr){
+  if(!fechaStr) return false;
+  const dow = new Date(fechaStr+'T12:00:00').getDay(); // 5=viernes, 6=sábado
+  return dow === 5 || dow === 6;
+}
+function renderFranjaCenaBlock(){
+  const bloque = document.getElementById('franjaCenaBlock');
+  if(!bloque) return;
+  const editBlockVisible = document.getElementById('fechaReservaEditBlock').style.display !== 'none';
+  const fecha = editBlockVisible ? document.getElementById('fFechaReservaEdit').value : modalFecha;
+  const turno = editBlockVisible ? document.getElementById('fTurnoReservaEdit').value : modalTurno;
+  const aplica = turno === 'cena' && diaEsFinDeSemanaCena(fecha);
+  bloque.style.display = aplica ? 'block' : 'none';
+  if(!aplica) document.getElementById('fFranjaCena').value = '';
+  const valorFranja = document.getElementById('fFranjaCena').value;
+  document.querySelectorAll('#franjaCenaSelect .estado-opt').forEach(b=>{
+    b.classList.toggle('on', b.dataset.val === valorFranja);
+  });
+  const sugerenciaEl = document.getElementById('franjaCenaSugerencia');
+  if(sugerenciaEl){
+    const yaTieneSalida = !!document.getElementById('fHoraSalida').value;
+    if(aplica && valorFranja === 'temprano' && !yaTieneSalida){
+      sugerenciaEl.style.display = 'block';
+      sugerenciaEl.innerHTML = `💡 Sugerencia: al ser Cena 1 (temprano), puedes asignar la hora de salida sugerida (${formatearHora12(CORTE_CENA_FINDE)}) para que la mesa quede libre a tiempo para Cena 2. <button type="button" class="btn-config-guardar" style="margin-top:6px; padding:4px 10px; font-size:11.5px;" onclick="usarSugerenciaHoraSalida()">Usar ${formatearHora12(CORTE_CENA_FINDE)}</button>`;
+    } else {
+      sugerenciaEl.style.display = 'none';
+      sugerenciaEl.innerHTML = '';
+    }
+  }
+}
+function usarSugerenciaHoraSalida(){
+  const el = document.getElementById('fHoraSalida');
+  if(el) el.value = CORTE_CENA_FINDE;
+  if(window.toggleHoraSalidaBlock) window.toggleHoraSalidaBlock(true);
+  renderFranjaCenaBlock();
+}
+document.getElementById('franjaCenaSelect').addEventListener('click', e=>{
+  const btn = e.target.closest('.estado-opt');
+  if(!btn) return;
+  const actual = document.getElementById('fFranjaCena').value;
+  // Tocar la opción ya elegida la desmarca (queda "sin definir") — por si
+  // el staff todavía no sabe cuál va a pedir el cliente.
+  document.getElementById('fFranjaCena').value = (actual === btn.dataset.val) ? '' : btn.dataset.val;
+  renderFranjaCenaBlock();
+});
 
 function cerrarModal(){
   document.getElementById('overlay').classList.remove('open');
@@ -7481,6 +7581,7 @@ function guardarReserva(){
     turno: turnoFinal,
     hora: document.getElementById('fHora').value || '00:00',
     horaSalida: document.getElementById('fHoraSalida').value || '',
+    franjaCena: (turnoFinal==='cena' && diaEsFinDeSemanaCena(fechaFinal)) ? (document.getElementById('fFranjaCena').value || '') : '',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular: armarCelularCompleto(document.getElementById('fCelularCod').value, document.getElementById('fCelular').value),
@@ -7672,6 +7773,7 @@ function enviarParaAprobacion(){
     turno: modalTurno,
     hora: document.getElementById('fHora').value || '00:00',
     horaSalida: horaSalida || '',
+    franjaCena: (modalTurno==='cena' && diaEsFinDeSemanaCena(modalFecha)) ? (document.getElementById('fFranjaCena').value || '') : '',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular,

@@ -496,6 +496,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .badge.mensaje_enviado{background:rgba(154,163,178,0.16); color:#9aa3b2;}
 .badge.lista_espera{background:rgba(232,163,61,0.16); color:#e8a33d;}
 .badge.turno-badge{background:var(--panel-raised); color:var(--text-dim); border:1px solid var(--border);}
+.badge.franja-badge{background:rgba(201,161,90,0.16); color:var(--gold); border:1px solid var(--gold);}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
   padding:2px 7px; border-radius:999px;
@@ -1388,6 +1389,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .estado-opt.sel-pendiente.on{background:var(--pending-bg); border-color:var(--pending); color:var(--pending);}
 .estado-opt.sel-walkin.on{background:var(--walkin-bg); border-color:var(--walkin); color:var(--walkin);}
 .estado-opt.sel-cancelada.on{background:var(--cancelled-bg); border-color:var(--cancelled); color:var(--cancelled);}
+.estado-opt.sel-franja.on{background:rgba(201,161,90,0.16); border-color:var(--gold); color:var(--gold);}
 .modal-actions{display:flex; gap:10px; margin-top:18px;}
 .canal-nuevo-opts{display:flex; flex-direction:column; gap:10px;}
 .canal-nuevo-btn{
