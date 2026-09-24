@@ -5843,13 +5843,19 @@ function renderMesaPickerCanvas(){
   // 8pm no bloquea toda la noche). Si no tiene hora de salida guardada,
   // se sigue bloqueando el turno completo como antes, por seguridad.
   const horaNuevaReserva = document.getElementById('fHora').value;
-  // Cena 1 / Cena 2 (solo viernes/sábado): son "momentos" independientes
-  // para la disponibilidad de mesa, igual que Desayuno/Almuerzo/Cena no
-  // se bloquean entre sí. Una mesa ocupada en Cena 1 NO bloquea Cena 2 y
-  // viceversa. Si la reserva que se está armando todavía no tiene franja
-  // elegida, o la otra reserva existente no tiene franja (nunca pasa
-  // entre semana, solo si el staff no la puso), se sigue bloqueando
-  // contra TODA la noche, por seguridad — igual que siempre.
+  // Cena 1 / Cena 2 (solo viernes/sábado): son categorías COMPLETAMENTE
+  // aparte de la disponibilidad de mesa — igual que Desayuno/Almuerzo/
+  // Cena no se bloquean entre sí. Si la reserva que se está armando ya
+  // tiene franja elegida, SOLO otra reserva con esa MISMA franja bloquea
+  // la mesa — una reserva de cena sin franja (o de la franja contraria)
+  // NO cuenta, aunque exista ese día. Si todavía no se ha elegido franja
+  // (reserva de "Cena" a secas), se sigue bloqueando contra TODA la
+  // noche, por seguridad, como siempre.
+  // ⚠️ Esto sí abre una ventana de riesgo real: mientras haya reservas de
+  // fin de semana sin franja clasificar, una mesa que ya tienen ocupada
+  // puede volver a asignarse "libre" a una reserva nueva de Cena 1/Cena
+  // 2 — Guillermo lo pidió así a propósito, entendiendo el riesgo,
+  // mientras se van clasificando las reservas viejas.
   const fFranjaCenaEl = document.getElementById('fFranjaCena');
   const franjaNuevaReserva = fFranjaCenaEl ? fFranjaCenaEl.value : '';
   const esCenaFinDeSemanaModal = modalTurno === 'cena' && diaEsFinDeSemanaCena(modalFecha);
@@ -5857,7 +5863,7 @@ function renderMesaPickerCanvas(){
   reservas
     .filter(r => r.fecha===modalFecha && r.turno===modalTurno && r.estado!=='cancelada' && r.id!==editandoId)
     .filter(r => {
-      if(esCenaFinDeSemanaModal && franjaNuevaReserva && r.franjaCena && r.franjaCena !== franjaNuevaReserva) return false;
+      if(esCenaFinDeSemanaModal && franjaNuevaReserva && r.franjaCena !== franjaNuevaReserva) return false;
       return true;
     })
     .filter(r => {
