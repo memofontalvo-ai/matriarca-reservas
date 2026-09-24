@@ -5515,11 +5515,7 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
         let guestName = '';
         if(reserva){
           estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
-          // DIAGNÓSTICO TEMPORAL (v5.99) — si el nombre sale vacío, en vez de
-          // no mostrar nada, muestra una marca visible para saber si el
-          // problema es que el dato de verdad llega vacío hasta aquí, o si
-          // es otra cosa (esto se revierte en cuanto encontremos la causa).
-          guestName = (reserva.nombre && reserva.nombre.trim()) ? reserva.nombre.trim().split(' ')[0] : `⚠️SIN-NOMBRE(id:${(reserva.id||'').slice(0,5)})`;
+          guestName = (reserva.nombre||'').split(' ')[0];
         }
         const clickJs = reserva ? `abrirModal(${JSON.stringify(reserva.id)})` : `abrirModal(null,${JSON.stringify(idMesa)})`;
         // En un plano de evento el color de fondo es el de su zona (igual
@@ -5585,37 +5581,6 @@ window.addEventListener('resize', () => {
   ajustarEscalaPlanoApp('#mesaPickerScrollWrap', '#mesaPickerCanvas');
 });
 
-// DIAGNÓSTICO TEMPORAL (v5.99) — muestra en un mensaje nativo del celular
-// (sin herramientas de desarrollador) qué hay guardado realmente para la
-// zona de mesas que no está mostrando nombres, y con qué claves están
-// llegando las reservas del día. Se quita en cuanto se resuelva.
-function dumpDiagnosticoPlano(){
-  const pm = window.DIAG_porMesaRef || {};
-  let out = 'RESERVAS ENCONTRADAS PARA ESTE DÍA/TURNO (' + Object.keys(pm).length + '):\n';
-  Object.keys(pm).forEach(k => {
-    out += '  "' + k + '" → ' + (pm[k].nombre || '(sin nombre)') + ' [' + pm[k].estado + ']\n';
-  });
-  alert(out);
-}
-function dumpDiagnosticoZonaC(){
-  const ms = window.DIAG_mesas || {};
-  const pf = window.DIAG_pref || {};
-  const pm = window.DIAG_porMesaRef || {};
-  let out = 'ZONA "C" — para cada casilla: código calculado y si encontró reserva:\n\n';
-  for(let r=0;r<5;r++){
-    for(let c=0;c<4;c++){
-      const mkey = 'C-'+r+'-'+c;
-      const m = ms[mkey];
-      if(!m){ out += mkey+': (vacío)\n'; continue; }
-      const prefType = pf[mkey] || null;
-      const codigo = codeForPlano(m, prefType);
-      const idMesa = (m.ref && m.ref.trim()) ? m.ref.trim() : codigo;
-      const encontro = pm[idMesa.toLowerCase()];
-      out += mkey + ': código="' + codigo + '" idMesa="' + idMesa + '" → ' + (encontro ? ('✅ '+encontro.nombre) : '❌ sin match') + '\n';
-    }
-  }
-  alert(out);
-}
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
   const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
@@ -5658,24 +5623,15 @@ function renderPlano(){
     // Una reserva puede tener varias mesas unidas, guardadas como "A+B+C".
     r.mesa.split('+').forEach(ref => { porMesaRef[ref.trim().toLowerCase()] = r; });
   });
-  // DIAGNÓSTICO TEMPORAL (v5.99) — se guardan en variables globales para
-  // que el botón de abajo pueda mostrarlas en pantalla sin herramientas
-  // de desarrollador. Se quita en cuanto se resuelva el problema de las
-  // mesas PAMA/MA sin nombre.
-  window.DIAG_porMesaRef = porMesaRef;
 
   const legend = `<div class="legend">
     <div class="legend-item"><span class="legend-dot" style="background:var(--confirmed)"></span>Confirmada</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
-    <button type="button" onclick="dumpDiagnosticoPlano()" style="margin-left:auto; padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Reservas</button>
-    <button type="button" onclick="dumpDiagnosticoZonaC()" style="padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Mesas zona C</button>
   </div>`;
 
   const mesas = planoUsado.mesas || {};
-  window.DIAG_mesas = mesas;
   const pref = planoUsado.pref || {};
-  window.DIAG_pref = pref;
   // codeForPlano() decide el formato del código mirando esta variable
   // global — se deja en el estado que corresponde a lo que se está
   // pintando aquí (se sobreescribe otra vez cada vez que se abre el
@@ -5991,6 +5947,18 @@ function cambiarVista(v){
   document.getElementById('panelLista').classList.toggle('mobile-active', v==='lista');
   document.getElementById('panelPlano').classList.toggle('mobile-active', v==='plano');
   document.getElementById('panelResumen').classList.toggle('mobile-active', v==='resumen');
+  // Si el modal de una reserva se había quedado abierto de fondo (típico
+  // caso: guardar la reserva, tocar "Abrir WhatsApp", y luego cambiar de
+  // pestaña directo sin volver a tocar "Volver al menú principal"),
+  // cambiar de pestaña aquí significa que el staff ya salió de esa
+  // reserva — se cierra solo. Antes se quedaba "abierto" por dentro sin
+  // que se notara, y renderAll() se autobloqueaba para no interrumpir una
+  // edición en curso — dejando el plano y la lista congelados con datos
+  // viejos hasta que alguien volviera a tocar ese botón específico.
+  const overlayNav = document.getElementById('overlay');
+  if(overlayNav && overlayNav.classList.contains('open')){
+    overlayNav.classList.remove('open');
+  }
   renderAll();
 }
 
@@ -6319,6 +6287,15 @@ function cambiarVistaApp(v){
   document.getElementById('pantallaSalones').style.display = v==='salones' ? 'flex' : 'none';
   document.getElementById('pantallaConfig').style.display = v==='config' ? 'flex' : 'none';
   if(v==='config') renderConfigMensajes();
+  // Misma protección que en cambiarVista(): si el modal de una reserva se
+  // quedó abierto de fondo, cambiar de pantalla principal también lo
+  // cierra, para que nunca se quede bloqueado el redibujado de datos
+  // frescos en la pantalla a la que se está entrando.
+  const overlayNavApp = document.getElementById('overlay');
+  if(overlayNavApp && overlayNavApp.classList.contains('open')){
+    overlayNavApp.classList.remove('open');
+    renderAll();
+  }
 }
 
 function formatearFechaCorta(iso){
