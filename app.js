@@ -5515,7 +5515,11 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
         let guestName = '';
         if(reserva){
           estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
-          guestName = (reserva.nombre||'').split(' ')[0];
+          // DIAGNÓSTICO TEMPORAL (v5.99) — si el nombre sale vacío, en vez de
+          // no mostrar nada, muestra una marca visible para saber si el
+          // problema es que el dato de verdad llega vacío hasta aquí, o si
+          // es otra cosa (esto se revierte en cuanto encontremos la causa).
+          guestName = (reserva.nombre && reserva.nombre.trim()) ? reserva.nombre.trim().split(' ')[0] : `⚠️SIN-NOMBRE(id:${(reserva.id||'').slice(0,5)})`;
         }
         const clickJs = reserva ? `abrirModal(${JSON.stringify(reserva.id)})` : `abrirModal(null,${JSON.stringify(idMesa)})`;
         // En un plano de evento el color de fondo es el de su zona (igual
