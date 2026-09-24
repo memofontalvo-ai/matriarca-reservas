@@ -3284,10 +3284,13 @@ function turnoRealDesdeActivo(t){
 }
 function reservaCoincideConTurnoActivo(r, t){
   if(t === 'todos') return true;
-  // Reservas de cena SIN franja asignada (viejas, o el staff no la puso
-  // todavía) cuentan para AMBOS filtros hasta que se les asigne una.
-  if(t === 'cena1') return r.turno === 'cena' && r.franjaCena !== 'show';
-  if(t === 'cena2') return r.turno === 'cena' && r.franjaCena !== 'temprano';
+  // Coincidencia estricta: "Cena 1" muestra SOLO lo que de verdad quedó
+  // marcado franjaCena="temprano" — igual de mecánico que Desayuno/
+  // Almuerzo. Una reserva de cena SIN franja (nunca se le puede poner
+  // entre semana, porque el selector solo aparece viernes/sábado) NO
+  // cuenta para ninguno de los dos — solo aparece bajo "Cena" a secas.
+  if(t === 'cena1') return r.turno === 'cena' && r.franjaCena === 'temprano';
+  if(t === 'cena2') return r.turno === 'cena' && r.franjaCena === 'show';
   return r.turno === t;
 }
 let vistaActual = 'lista';
