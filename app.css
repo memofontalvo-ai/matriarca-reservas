@@ -1106,10 +1106,10 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .plano-gridzone{position:absolute; display:grid; gap:0;}
 .plano-cell{border:1px solid rgba(18,71,74,0.18); position:relative;}
 .plano-mesa-core{
-  position:absolute; left:6%; top:6%; right:6%; bottom:6%;
+  position:absolute; left:4%; top:4%; right:4%; bottom:4%;
   background:#0a2f31; border:1px solid #444; border-radius:2px;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  font-size:8px; font-weight:800; color:#fff; cursor:pointer; overflow:hidden;
+  font-size:6.5px; font-weight:800; color:#fff; cursor:pointer; overflow:hidden;
 }
 .plano-mesa-core.p-libre{background:#0a2f31; border-color:#444;}
 /* En un plano de evento el fondo de la mesa toma el color de su zona
@@ -1125,7 +1125,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    cada mesa, en vez de reducir el cuadro de color. */
 .plano-mesa-core.p-ocupada, .plano-mesa-core.p-pendiente{outline:3px solid #111; outline-offset:0;}
 .plano-mesa-core.p-sinvincular{background:#555; opacity:.5; cursor:default;}
-.plano-guest{font-size:7px; font-weight:700; margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.05;}
+.plano-guest{font-size:5.5px; font-weight:700; margin-top:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1;}
 
 /* ===== RESUMEN ===== */
 .resumen-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; margin-bottom:24px;}
