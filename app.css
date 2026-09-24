@@ -1632,7 +1632,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 @media (max-width: 860px){
   header{padding:12px 14px; gap:10px;}
   .brand span{display:none;}
-  .turnos{margin-left:0; order:3; width:100%; overflow-x:auto;}
+  .turnos{margin-left:0; order:3; width:100%; overflow-x:auto; gap:4px;}
+  /* 6 pestañas (Todos/Desayuno/Almuerzo/Cena/Cena 1/Cena 2) tienen que
+     caber sin scroll horizontal en una pantalla de celular normal — más
+     chicas que en computador, sin el puntico de color (ahorra espacio) y
+     sin partir el texto en dos líneas. */
+  .turno-pill{padding:6px 8px; font-size:10.5px; gap:0; white-space:nowrap; flex:1 1 auto; justify-content:center;}
+  .turno-pill .dot{display:none;}
   .new-btn span{display:none;}
   .clear-btn span{display:none;}
   .clear-btn{padding:9px 10px;}

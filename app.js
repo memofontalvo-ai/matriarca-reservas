@@ -3451,7 +3451,7 @@ function renderHeader(){
     `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${DIA_LABEL[grupoDeFecha(d)]||''}</span>`;
 
   const grupo = HORARIOS[grupoDeFecha(d)];
-  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena'],['cena1','🕕 Cena 1'],['cena2','🎶 Cena 2']];
+  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena'],['cena1','Cena 1'],['cena2','Cena 2']];
   document.getElementById('turnosBar').innerHTML = turnos.map(([key,label])=>{
     // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
     // sin importar si ese turno está prendido o apagado en el horario de
