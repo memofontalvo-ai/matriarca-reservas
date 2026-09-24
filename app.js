@@ -5592,17 +5592,6 @@ function forzarRefrescoPlano(){
   if(overlayForzado){ overlayForzado.classList.remove('open'); }
   renderAll();
 }
-// DIAGNÓSTICO TEMPORAL (v6.02) — muestra el HTML real que quedó en
-// pantalla para la mesa PAMA1 (no lo que el código "debería" producir,
-// sino lo que el navegador tiene ahora mismo), en un cuadro de texto que
-// se puede copiar sin herramientas de desarrollador.
-function verHtmlMesaPama1(){
-  const celdas = document.querySelectorAll('.plano-mesa-core');
-  let encontrada = null;
-  celdas.forEach(c => { if(c.textContent.trim().startsWith('PAMA1')) encontrada = c; });
-  if(!encontrada){ alert('No encontré ninguna casilla con texto "PAMA1" en el plano visible ahora mismo. Total de casillas encontradas: ' + celdas.length); return; }
-  prompt('HTML real de la mesa PAMA1 — cópialo (selecciona todo y copia):', encontrada.outerHTML);
-}
 
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
@@ -5652,7 +5641,6 @@ function renderPlano(){
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
     <button type="button" onclick="forzarRefrescoPlano()" style="margin-left:auto; padding:6px 10px; border-radius:8px; border:1px solid var(--gold); background:transparent; color:var(--gold-bright); font-size:11.5px;">🔄 Actualizar</button>
-    <button type="button" onclick="verHtmlMesaPama1()" style="padding:6px 10px; border-radius:8px; border:1px solid #999; background:#333; color:#fff; font-size:11px;">🔧 Ver HTML PAMA1</button>
   </div>`;
 
   const mesas = planoUsado.mesas || {};
