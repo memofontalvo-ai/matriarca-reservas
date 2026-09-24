@@ -403,6 +403,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   table{break-inside:auto;}
   tr{break-inside:avoid; page-break-inside:avoid;}
   thead{display:table-header-group;}
+  /* El plano tiene ~100 mesas, cada una con esquinas redondeadas y un
+     reborde/outline propio — motor de impresión de Safari genera un PDF
+     bastante más pesado por tener que rasterizar cada esquina curva y
+     cada capa de sombra por separado. Sin tocar el tamaño de letra ni la
+     posición de nada (o sea, sin perder legibilidad), aquí se aplanan
+     esas esquinas y se les quita cualquier sombra — en papel, un cuadrito
+     con esquina recta se ve prácticamente igual a uno con esquina curva
+     de 2px, pero el archivo pesa bastante menos. */
+  .plano-mesa-core, .plano-cell, .plano-canvas-app, .plano-canvas-scroll-wrap,
+  .plano-zoneblock, .evento-promotor-banner{
+    border-radius:0 !important; box-shadow:none !important;
+  }
+  .plano-mesa-core.p-ocupada, .plano-mesa-core.p-pendiente{outline-width:1px !important;}
 }
 .ie-total-card{
   background:#f1e6cf; border:1px solid #d4af37; border-radius:8px;
