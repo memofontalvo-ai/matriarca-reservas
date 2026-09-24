@@ -5581,6 +5581,18 @@ window.addEventListener('resize', () => {
   ajustarEscalaPlanoApp('#mesaPickerScrollWrap', '#mesaPickerCanvas');
 });
 
+
+// Botón manual "🔄 Actualizar" en el plano — por si algo dejó la pantalla
+// congelada con datos viejos (un modal que se quedó abierto de fondo, o
+// cualquier otra causa) y el staff no quiere esperar a que se resuelva
+// solo. Cierra cualquier modal atascado y vuelve a dibujar todo de cero
+// con los datos más recientes que la app ya tiene en memoria.
+function forzarRefrescoPlano(){
+  const overlayForzado = document.getElementById('overlay');
+  if(overlayForzado){ overlayForzado.classList.remove('open'); }
+  renderAll();
+}
+
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
   const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
@@ -5628,6 +5640,7 @@ function renderPlano(){
     <div class="legend-item"><span class="legend-dot" style="background:var(--confirmed)"></span>Confirmada</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--pending)"></span>Pendiente</div>
     <div class="legend-item"><span class="legend-dot" style="background:#0a2f31; border:1px solid #444;"></span>Libre</div>
+    <button type="button" onclick="forzarRefrescoPlano()" style="margin-left:auto; padding:6px 10px; border-radius:8px; border:1px solid var(--gold); background:transparent; color:var(--gold-bright); font-size:11.5px;">🔄 Actualizar</button>
   </div>`;
 
   const mesas = planoUsado.mesas || {};
