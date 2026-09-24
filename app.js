@@ -2856,7 +2856,7 @@ function abrirModalBloqueoDia(){
   // bloquear — así nunca se te queda otro turno marcado sin querer, de
   // una vez anterior en la que estabas viendo "Todos". Si estás en
   // "Todos", ahí sí se muestran los tres, para bloquear el día completo.
-  const soloEsteTurno = turnoActivo !== 'todos' ? turnoActivo : null;
+  const soloEsteTurno = turnoActivo !== 'todos' ? turnoRealDesdeActivo(turnoActivo) : null;
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
   document.getElementById('bloqueoDiaTitulo').textContent = soloEsteTurno
     ? `Bloquear ${turnoLabels[soloEsteTurno]} — ${formatearFechaLarga(iso)}`
@@ -3273,6 +3273,23 @@ clientesRef.onSnapshot(snap => {
 let fechaActual = new Date();
 fechaActual.setHours(12,0,0,0); // mediodía para evitar líos de huso horario al comparar fechas
 let turnoActivo = 'todos';
+// "cena1"/"cena2" son valores de FILTRO nada más (Cena 1 · Temprano / Cena
+// 2 · Show) — nunca se guardan como turno real de una reserva, evento ni
+// horario; el dato real en Firestore sigue siendo turno:"cena" +
+// franjaCena. Estos dos helpers son el único lugar que traduce entre el
+// filtro visible y el turno real, para no tener que tocar la lógica de
+// horarios/eventos/informes en cada sitio que ya asumía turnos reales.
+function turnoRealDesdeActivo(t){
+  return (t === 'cena1' || t === 'cena2') ? 'cena' : t;
+}
+function reservaCoincideConTurnoActivo(r, t){
+  if(t === 'todos') return true;
+  // Reservas de cena SIN franja asignada (viejas, o el staff no la puso
+  // todavía) cuentan para AMBOS filtros hasta que se les asigne una.
+  if(t === 'cena1') return r.turno === 'cena' && r.franjaCena !== 'show';
+  if(t === 'cena2') return r.turno === 'cena' && r.franjaCena !== 'temprano';
+  return r.turno === t;
+}
 let vistaActual = 'lista';
 let editandoId = null;
 // Se incrementa cada vez que se ABRE el modal (nueva reserva o editar una
@@ -3434,14 +3451,16 @@ function renderHeader(){
     `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${DIA_LABEL[grupoDeFecha(d)]||''}</span>`;
 
   const grupo = HORARIOS[grupoDeFecha(d)];
-  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
+  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena'],['cena1','🕕 Cena 1'],['cena2','🎶 Cena 2']];
   document.getElementById('turnosBar').innerHTML = turnos.map(([key,label])=>{
     // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
     // sin importar si ese turno está prendido o apagado en el horario de
     // atención configurado — "apagado" solo bloquea que un CLIENTE pida
     // una reserva nueva ahí (eso se valida en solicitud.html), no que el
     // staff pueda filtrar y ver reservas de ese turno en "Por día".
-    const cfg = key==='todos' ? {activo:true} : grupo[key];
+    // "cena1"/"cena2" no son un turno real del horario — usan el mismo
+    // cfg que "cena" (ver turnoRealDesdeActivo).
+    const cfg = key==='todos' ? {activo:true} : (grupo[turnoRealDesdeActivo(key)] || {activo:true});
     const active = turnoActivo===key;
     // El filtro se ve y se usa igual sin importar si ese turno está
     // prendido o apagado en el horario configurado para el día — eso solo
@@ -3469,7 +3488,7 @@ function reservasDelTurno(){
   // siguen en el flujo de solicitud/aprobación del cliente (esas viven en
   // la pantalla "Solicitudes" hasta que el cliente las apruebe).
   let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
-  if(turnoActivo !== 'todos') rs = rs.filter(r=>r.turno===turnoActivo);
+  if(turnoActivo !== 'todos') rs = rs.filter(r=>reservaCoincideConTurnoActivo(r, turnoActivo));
   if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=20);
   return rs;
 }
@@ -4031,7 +4050,7 @@ function renderCalendarioInline(){
   // cada día refleja exactamente lo que se está viendo, no siempre el total.
   const reservasDelMes = reservas.filter(r => {
     if(r.estado!=='confirmada') return false;
-    if(turnoActivo !== 'todos' && r.turno !== turnoActivo) return false;
+    if(turnoActivo !== 'todos' && !reservaCoincideConTurnoActivo(r, turnoActivo)) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && m===(calInlineMes+1);
   });
@@ -4061,7 +4080,7 @@ function renderCalendarioInline(){
     // cualquiera, si estás viendo "Todos"). El micrófono 🎤 es distinto:
     // avisa que hay un show especial anunciado ese turno, pero SIN
     // bloquear nada — el cliente puede reservar igual.
-    const infoTurnoDia = infoBloqueoTurno(iso, turnoActivo);
+    const infoTurnoDia = infoBloqueoTurno(iso, turnoRealDesdeActivo(turnoActivo));
     const bloqueado = esBloqueoDuro(infoTurnoDia);
     const soloShow = !!infoTurnoDia && infoTurnoDia.tipo === 'show_especial';
     const total = conteoPorDia[iso] || 0;
@@ -4102,7 +4121,7 @@ function seleccionarDiaInline(d){
   if(usuarioActual && usuarioActual.rol === 'promotor') return;
   fechaActual = new Date(calInlineAno, calInlineMes, d, 12);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoRealDesdeActivo(turnoActivo)].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   renderAll();
@@ -4260,7 +4279,7 @@ function renderStats(){
         inicio: 'Todo el',
         fin: 'día'
       }
-    : grupoDia[turnoActivo];
+    : grupoDia[turnoRealDesdeActivo(turnoActivo)];
   const rs = reservasDelTurno().filter(r=>r.estado!=='cancelada');
   const pax = rs.reduce((a,r)=>a+Number(r.pax||0),0);
   const mesasOcupadas = new Set(rs.map(r=>r.mesa).filter(Boolean)).size;
@@ -4372,13 +4391,19 @@ function renderLista(){
     // Esto solo aplica si estás viendo un turno específico — en "Todos" ya
     // se están mirando los 3 turnos, así que si está vacío es que no hay nada.
     const iso = fechaISO(fechaActual);
-    const otrosTurnos = turnoActivo === 'todos' ? [] : ['desayuno','almuerzo','cena']
+    // Etiquetas legibles — incluye Cena 1/Cena 2, que no son un turno real
+    // pero sí un filtro que el staff puede tocar arriba.
+    const nombresTurno = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1 · Temprano', cena2:'Cena 2 · Show'};
+    const candidatosOtrosTurnos = (turnoActivo === 'cena1' || turnoActivo === 'cena2')
+      ? ['desayuno','almuerzo', turnoActivo==='cena1' ? 'cena2' : 'cena1']
+      : ['desayuno','almuerzo','cena'];
+    const otrosTurnos = turnoActivo === 'todos' ? [] : candidatosOtrosTurnos
       .filter(t => t !== turnoActivo)
-      .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'));
+      .filter(t => reservas.some(r => r.fecha===iso && reservaCoincideConTurnoActivo(r,t) && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'));
     if(otrosTurnos.length){
-      const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
+      const nombresTurnos = otrosTurnos.map(t => nombresTurno[t]||t).join(' y ');
       const resumenPartes = renderResumenTurnoHTML(rsTodas);
-      el.innerHTML = avisoBloqueoHtml + resumenPartes.top + `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>` + resumenPartes.bottom;
+      el.innerHTML = avisoBloqueoHtml + resumenPartes.top + `<div class="empty-state">No hay reservas en ${nombresTurno[turnoActivo]||turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>` + resumenPartes.bottom;
     } else {
       const resumenPartes2 = renderResumenTurnoHTML(rsTodas);
       el.innerHTML = avisoBloqueoHtml + resumenPartes2.top + `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>` + resumenPartes2.bottom;
@@ -4463,8 +4488,8 @@ function renderResumenTurnoHTML(rsTodas){
     const rsTemprano = rsCenaDia.filter(r=>r.franjaCena==='temprano');
     const rsShow = rsCenaDia.filter(r=>r.franjaCena==='show');
     const rsSinFranja = rsCenaDia.filter(r=>!r.franjaCena);
-    porTurnoDia.push({ turno:'cena', label:'🕕 Cena 1', count:rsTemprano.length, pax:rsTemprano.reduce((a,r)=>a+Number(r.pax||0),0) });
-    porTurnoDia.push({ turno:'cena', label:'🎶 Cena 2', count:rsShow.length, pax:rsShow.reduce((a,r)=>a+Number(r.pax||0),0) });
+    porTurnoDia.push({ turno:'cena1', label:'🕕 Cena 1', count:rsTemprano.length, pax:rsTemprano.reduce((a,r)=>a+Number(r.pax||0),0) });
+    porTurnoDia.push({ turno:'cena2', label:'🎶 Cena 2', count:rsShow.length, pax:rsShow.reduce((a,r)=>a+Number(r.pax||0),0) });
     if(rsSinFranja.length > 0){
       porTurnoDia.push({ turno:'cena', label:'Cena (sin franja)', count:rsSinFranja.length, pax:rsSinFranja.reduce((a,r)=>a+Number(r.pax||0),0) });
     }
@@ -4553,7 +4578,7 @@ function renderResumenTurnoHTML(rsTodas){
   // Fecha legible para que el resumen se entienda solo, si alguien le toma
   // una captura de pantalla sin más contexto (a qué día y turno corresponde).
   const fechaLegibleResumen = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
-  const turnoLabelResumen = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'}[turnoActivo] || 'Todos los turnos';
+  const turnoLabelResumen = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1 · Temprano', cena2:'Cena 2 · Show'}[turnoActivo] || 'Todos los turnos';
 
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
     const nombres = reservas.length ? reservas.map(r=>escapeHtml(r.nombre)).join(', ') : 'Sin reservas';
@@ -4783,15 +4808,16 @@ function descargarInformeDia(){
   const iso = fechaISO(fechaActual);
   const fechaLarga = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
   const turnosAIncluir = [turnoActivo];
-  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1 · Temprano', cena2:'Cena 2 · Show'};
 
   // Igual que en renderPlano(): si este día/turno coincide con un evento
   // especial que tiene su propio plano, el informe debe mostrar ESE plano
   // (zonas, colores, mesas reales del evento) — no el plano General. Antes
   // esto no se revisaba aquí y el informe siempre mostraba el plano
   // General, aunque la pantalla de "Plano" ya mostrara correctamente el
-  // del evento.
-  const evConPlanoInforme = eventosCache.find(e => e.fecha === iso && e.turno === turnoActivo && e.planoId && e.activo !== false);
+  // del evento. Los eventos siempre usan el turno REAL (nunca "cena1"/
+  // "cena2", que son solo un filtro).
+  const evConPlanoInforme = eventosCache.find(e => e.fecha === iso && e.turno === turnoRealDesdeActivo(turnoActivo) && e.planoId && e.activo !== false);
   const planoIdEventoInforme = evConPlanoInforme ? evConPlanoInforme.planoId : null;
 
   function seguirConPlano(planoEventoUsado){
@@ -4802,7 +4828,7 @@ function descargarInformeDia(){
 
     const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
-      .filter(r => r.fecha===iso && r.turno===turno && r.estado==='confirmada')
+      .filter(r => r.fecha===iso && reservaCoincideConTurnoActivo(r, turno) && r.estado==='confirmada')
       .sort((a,b) => minutosParaOrdenHora(a.hora) - minutosParaOrdenHora(b.hora));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
     const totalAbonoTurno = rs.reduce((s,r) => s + (Number(r.abono)||0), 0);
@@ -5638,7 +5664,7 @@ function forzarRefrescoPlano(){
 
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
-  const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
+  const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoRealDesdeActivo(turnoActivo)));
   const planoIdEvento = evConPlano ? evConPlano.planoId : null;
 
   // Si el día que se está viendo cae en un evento con plano propio y
@@ -6025,7 +6051,7 @@ function cambiarDia(delta){
   if(usuarioActual && usuarioActual.rol === 'promotor') return;
   fechaActual.setDate(fechaActual.getDate()+delta);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoRealDesdeActivo(turnoActivo)].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   // Aquí sí sincronizamos el calendario, porque el usuario acaba de elegir
@@ -6225,7 +6251,7 @@ function seleccionarDiaCal(d){
   }
   fechaActual = nuevaFecha;
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoRealDesdeActivo(turnoActivo)].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   cerrarCalendario();
@@ -6932,11 +6958,15 @@ function abrirModal(id, mesaId){
       horaEntradaPromotor = (evCompletoPromotor && evCompletoPromotor.horaEntrada) || usuarioActual.eventoAsignado.horaEntrada || '';
     } else {
       modalFecha = fechaISO(hoyDate);
-      modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
+      modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoRealDesdeActivo(turnoActivo);
     }
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
-    document.getElementById('fFranjaCena').value = '';
+    // Si se está creando desde el filtro "Cena 1"/"Cena 2", se precarga esa
+    // franja como punto de partida (el staff la puede cambiar) — pero solo
+    // sirve de verdad si la fecha con la que arranca (hoy) es viernes o
+    // sábado; si no, renderFranjaCenaBlock() la oculta igual.
+    document.getElementById('fFranjaCena').value = (turnoActivo === 'cena1') ? 'temprano' : (turnoActivo === 'cena2') ? 'show' : '';
     renderFranjaCenaBlock();
     if(esPromotorNueva){
       // Un promotor no elige tipo de reserva ni evento — ese paso entero
