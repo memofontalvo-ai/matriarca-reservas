@@ -170,8 +170,14 @@ header{
 .dia-acciones-row{
   width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
 }
-.turno-cena-slot{display:flex; flex:1 1 140px; justify-content:flex-end; min-width:100px;}
-.turno-cena-slot .turno-pill{flex:1 1 auto; max-width:240px; justify-content:center;}
+.turno-cena-slot{
+  display:flex; justify-content:flex-end; margin-left:auto;
+  /* El ancho real lo fija alinearBotonCena() en JS, midiendo Cena 1 +
+     Cena 2 en la fila de abajo, para que "Total Cena" quede exactamente
+     del mismo ancho que esos dos botones juntos — nunca más ancho. */
+  width:var(--cena-slot-w, 140px);
+}
+.turno-cena-slot .turno-pill{width:100%; justify-content:center;}
 .turno-pill{
   background:var(--panel-alt); border:1px solid var(--border); color:var(--text-muted);
   padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:600;
@@ -1642,8 +1648,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
      fila junto a Especiales/Bloquear día (ver .turno-cena-slot). */
   .turno-pill{padding:6px 8px; font-size:10.5px; gap:0; white-space:nowrap; flex:1 1 auto; justify-content:center;}
   .turno-pill .dot{display:none;}
-  .turno-cena-slot{flex:1 1 auto; min-width:90px;}
-  .turno-cena-slot .turno-pill{width:100%;}
+  .turno-cena-slot{min-width:90px;}
   .new-btn span{display:none;}
   .clear-btn span{display:none;}
   .clear-btn{padding:9px 10px;}

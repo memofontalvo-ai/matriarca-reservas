@@ -3471,10 +3471,39 @@ function renderHeader(){
   // "Cena" se pinta aparte, en su propia fila (junto a Especiales/Bloquear
   // día), centrada arriba de Cena 1/Cena 2 — antes estaba metida en la
   // misma fila que los otros 5 botones y quedaba muy apretada.
-  document.getElementById('turnoCenaBar').innerHTML = pillHTML(['cena','Cena']);
+  document.getElementById('turnoCenaBar').innerHTML = pillHTML(['cena','Total Cena']);
   const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']];
   document.getElementById('turnosBar').innerHTML = turnos.map(pillHTML).join('');
+  alinearBotonCena();
 }
+// Mide en vivo cuánto ocupan juntos los botones "Cena 1" y "Cena 2" en la
+// fila de abajo, y le fija ESE mismo ancho al botón "Total Cena" de la
+// fila de arriba — así queda exactamente del doble de ancho de uno solo,
+// nunca más ancho, sin importar el tamaño de pantalla. Se recalcula en
+// cada render y también si el teléfono gira/cambia de ancho.
+function alinearBotonCena(){
+  const slot = document.getElementById('turnoCenaBar');
+  const barra = document.getElementById('turnosBar');
+  if(!slot || !barra) return;
+  requestAnimationFrame(()=>{
+    const botones = barra.querySelectorAll('.turno-pill');
+    // Los últimos dos botones de la fila de abajo son siempre Cena 1 y
+    // Cena 2 (ver el array `turnos` en renderHeader) — si por alguna
+    // razón no hay al menos 2, no se toca el ancho (queda el de CSS).
+    if(botones.length < 2) return;
+    const cena1 = botones[botones.length - 2];
+    const cena2 = botones[botones.length - 1];
+    const r1 = cena1.getBoundingClientRect();
+    const r2 = cena2.getBoundingClientRect();
+    const ancho = r2.right - r1.left;
+    if(ancho > 0) slot.style.setProperty('--cena-slot-w', ancho + 'px');
+  });
+}
+let _resizeTimerCena = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(_resizeTimerCena);
+  _resizeTimerCena = setTimeout(alinearBotonCena, 150);
+});
 
 /* ============ RENDER: STATS ============ */
 let filtroEspecialesPorDia = false;
