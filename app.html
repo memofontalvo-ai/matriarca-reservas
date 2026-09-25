@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.17">
+<link rel="stylesheet" href="app.css?v=6.18">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -532,7 +532,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.17</div>
+<div class="version-tag">v6.18</div>
 
 
 <div class="overlay" id="overlay">
@@ -1087,6 +1087,7 @@
     <div class="informe-toolbar">
       <button class="btn btn-ghost" onclick="cerrarInforme()">✕ Cerrar</button>
       <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+      <button class="btn btn-ghost" onclick="descargarInformeComoImagen()" id="btnDescargarInformeImg">📥 Descargar imagen (más rápido)</button>
     </div>
     <div id="informeContenido"></div>
   </div>
@@ -1305,6 +1306,6 @@
 </div>
 
 
-<script src="app.js?v=6.17"></script>
+<script src="app.js?v=6.18"></script>
 </body>
 </html>

@@ -3985,14 +3985,15 @@ function cerrarInformeEjecutivo(){
 // WhatsApp, que es más limitado que Safari), reintenta una vez a menor
 // calidad antes de rendirse. Así se recupera sola en la mayoría de los
 // casos en vez de fallar directo.
-async function ieCapturarCanvas(poster, scalePreferida){
+async function ieCapturarCanvas(poster, scalePreferida, bgColor){
+  const fondo = bgColor || '#0d1420';
   if(document.fonts && document.fonts.ready) await document.fonts.ready;
   try{
-    return await html2canvas(poster, {scale:scalePreferida, backgroundColor:'#0d1420', useCORS:true});
+    return await html2canvas(poster, {scale:scalePreferida, backgroundColor:fondo, useCORS:true});
   } catch(errPrimero){
     console.error('Primer intento de captura falló, reintentando a menor calidad:', errPrimero);
     try{
-      return await html2canvas(poster, {scale:1, backgroundColor:'#0d1420'});
+      return await html2canvas(poster, {scale:1, backgroundColor:fondo});
     } catch(errSegundo){
       console.error('Segundo intento también falló:', errSegundo);
       throw errSegundo;
@@ -4000,6 +4001,38 @@ async function ieCapturarCanvas(poster, scalePreferida){
   }
 }
 
+// Alternativa a "Imprimir / Guardar como PDF" — en iPhone, tocar
+// window.print() abre el diálogo nativo de iOS que primero busca
+// impresoras AirPrint cercanas (eso es lo que se demora, no el código de
+// la app) antes de ofrecer "Guardar en Archivos". Esta opción se salta
+// todo eso: captura el informe tal cual se ve (mismo html2canvas que ya
+// usa el informe ejecutivo mensual) y descarga una imagen directo, sin
+// pasar por ningún diálogo del sistema. Sirve para cualquiera de los
+// informes que comparten el overlay #overlayInforme (día, mes, clientes
+// especiales, estadísticas de solicitudes).
+async function descargarInformeComoImagen(){
+  const contenedor = document.querySelector('#overlayInforme .informe-modal');
+  const toolbar = document.getElementById('overlayInforme') ? document.querySelector('#overlayInforme .informe-toolbar') : null;
+  const btn = document.getElementById('btnDescargarInformeImg');
+  if(!contenedor) return;
+  if(toolbar) toolbar.style.display = 'none';
+  const textoOriginalBtn = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  try{
+    const canvas = await ieCapturarCanvas(contenedor, 2, '#ffffff');
+    const link = document.createElement('a');
+    const fechaArchivo = (typeof fechaISO === 'function' && typeof fechaActual !== 'undefined') ? fechaISO(fechaActual) : new Date().toISOString().slice(0,10);
+    link.download = `Informe_La_Matriarca_${fechaArchivo}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.click();
+  } catch(err){
+    console.error('Error descargando informe como imagen:', err);
+    alert('No fue posible generar la imagen. Detalle: ' + (err && err.message ? err.message : err));
+  } finally {
+    if(toolbar) toolbar.style.display = 'flex';
+    if(btn){ btn.textContent = textoOriginalBtn; btn.disabled = false; }
+  }
+}
 async function mostrarImagenParaGuardar(){
   const poster = document.getElementById('iePoster');
   const toolbar = document.getElementById('ieToolbar');
