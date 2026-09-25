@@ -4001,6 +4001,32 @@ async function ieCapturarCanvas(poster, scalePreferida, bgColor){
   }
 }
 
+// Descarga un <canvas> como archivo, preservando el nombre elegido.
+// OJO: antes esto se hacía con canvas.toDataURL() + <a download>, pero
+// Safari en iPhone no siempre respeta el nombre de archivo cuando el
+// link apunta a un data: URI larguísimo (que es lo que da toDataURL) —
+// en la práctica termina guardando el archivo con un nombre genérico
+// ("app"), aunque el diálogo de descarga sí muestre el nombre correcto
+// antes de tocar "Descargar". Usando un Blob + URL de objeto en vez de
+// un data: URI, Safari sí preserva el nombre de forma confiable.
+function descargarCanvasComoArchivo(canvas, nombreArchivo, tipo, calidad){
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if(!blob){ reject(new Error('No se pudo generar el archivo de imagen')); return; }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = nombreArchivo;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // Se libera el URL de objeto un momento después — hay que darle
+      // tiempo al navegador a que empiece a leerlo antes de revocarlo.
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      resolve();
+    }, tipo, calidad);
+  });
+}
 // Alternativa a "Imprimir / Guardar como PDF" — en iPhone, tocar
 // window.print() abre el diálogo nativo de iOS que primero busca
 // impresoras AirPrint cercanas (eso es lo que se demora, no el código de
@@ -4020,11 +4046,8 @@ async function descargarInformeComoImagen(){
   if(btn){ btn.textContent = '⏳ Generando...'; btn.disabled = true; }
   try{
     const canvas = await ieCapturarCanvas(contenedor, 2, '#ffffff');
-    const link = document.createElement('a');
     const fechaArchivo = (typeof fechaISO === 'function' && typeof fechaActual !== 'undefined') ? fechaISO(fechaActual) : new Date().toISOString().slice(0,10);
-    link.download = `Informe_La_Matriarca_${fechaArchivo}.jpg`;
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
-    link.click();
+    await descargarCanvasComoArchivo(canvas, `Informe_La_Matriarca_${fechaArchivo}.jpg`, 'image/jpeg', 0.92);
   } catch(err){
     console.error('Error descargando informe como imagen:', err);
     alert('No fue posible generar la imagen. Detalle: ' + (err && err.message ? err.message : err));
@@ -4058,11 +4081,8 @@ async function descargarInformeEjecutivoPNG(){
   toolbar.style.display = 'none'; // que no salga la barra de botones en la captura
   try{
     const canvas = await ieCapturarCanvas(poster, 2.5);
-    const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
-    link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    await descargarCanvasComoArchivo(canvas, `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.png`, 'image/png');
   } catch(err){
     console.error('Error descargando informe (PNG):', err);
     alert('No fue posible generar la imagen. Detalle: ' + (err && err.message ? err.message : err));
@@ -4082,11 +4102,8 @@ async function descargarInformeEjecutivoLiviana(){
   toolbar.style.display = 'none';
   try{
     const canvas = await ieCapturarCanvas(poster, 1.8);
-    const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
-    link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}_liviano.jpg`;
-    link.href = canvas.toDataURL('image/jpeg', 0.85);
-    link.click();
+    await descargarCanvasComoArchivo(canvas, `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}_liviano.jpg`, 'image/jpeg', 0.85);
   } catch(err){
     console.error('Error descargando informe (liviano):', err);
     alert('No fue posible generar la imagen liviana. Detalle: ' + (err && err.message ? err.message : err));
