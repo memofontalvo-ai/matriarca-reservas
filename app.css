@@ -168,8 +168,10 @@ header{
    sin relación visual clara con nada. width:100% obliga al contenedor
    flex-wrap del <header> a bajarla de línea siempre, en cualquier ancho. */
 .dia-acciones-row{
-  width:100%; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
 }
+.turno-cena-slot{display:flex; flex:1 1 140px; justify-content:flex-end; min-width:100px;}
+.turno-cena-slot .turno-pill{flex:1 1 auto; max-width:240px; justify-content:center;}
 .turno-pill{
   background:var(--panel-alt); border:1px solid var(--border); color:var(--text-muted);
   padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:600;
@@ -1633,12 +1635,15 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   header{padding:12px 14px; gap:10px;}
   .brand span{display:none;}
   .turnos{margin-left:0; order:3; width:100%; overflow-x:auto; gap:4px;}
-  /* 6 pestañas (Todos/Desayuno/Almuerzo/Cena/Cena 1/Cena 2) tienen que
-     caber sin scroll horizontal en una pantalla de celular normal — más
-     chicas que en computador, sin el puntico de color (ahorra espacio) y
-     sin partir el texto en dos líneas. */
+  /* 5 pestañas (Todos/Desayuno/Almuerzo/Cena 1/Cena 2) tienen que caber
+     sin scroll horizontal en una pantalla de celular normal — más chicas
+     que en computador, sin el puntico de color (ahorra espacio) y sin
+     partir el texto en dos líneas. "Cena" va aparte, arriba, en su propia
+     fila junto a Especiales/Bloquear día (ver .turno-cena-slot). */
   .turno-pill{padding:6px 8px; font-size:10.5px; gap:0; white-space:nowrap; flex:1 1 auto; justify-content:center;}
   .turno-pill .dot{display:none;}
+  .turno-cena-slot{flex:1 1 auto; min-width:90px;}
+  .turno-cena-slot .turno-pill{width:100%;}
   .new-btn span{display:none;}
   .clear-btn span{display:none;}
   .clear-btn{padding:9px 10px;}

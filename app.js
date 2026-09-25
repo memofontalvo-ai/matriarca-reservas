@@ -3454,25 +3454,26 @@ function renderHeader(){
     `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${DIA_LABEL[grupoDeFecha(d)]||''}</span>`;
 
   const grupo = HORARIOS[grupoDeFecha(d)];
-  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena'],['cena1','Cena 1'],['cena2','Cena 2']];
-  document.getElementById('turnosBar').innerHTML = turnos.map(([key,label])=>{
-    // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
-    // sin importar si ese turno está prendido o apagado en el horario de
-    // atención configurado — "apagado" solo bloquea que un CLIENTE pida
-    // una reserva nueva ahí (eso se valida en solicitud.html), no que el
-    // staff pueda filtrar y ver reservas de ese turno en "Por día".
-    // "cena1"/"cena2" no son un turno real del horario — usan el mismo
-    // cfg que "cena" (ver turnoRealDesdeActivo).
+  // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
+  // sin importar si ese turno está prendido o apagado en el horario de
+  // atención configurado — "apagado" solo bloquea que un CLIENTE pida
+  // una reserva nueva ahí (eso se valida en solicitud.html), no que el
+  // staff pueda filtrar y ver reservas de ese turno en "Por día".
+  // "cena1"/"cena2" no son un turno real del horario — usan el mismo
+  // cfg que "cena" (ver turnoRealDesdeActivo).
+  const pillHTML = ([key,label])=>{
     const cfg = key==='todos' ? {activo:true} : (grupo[turnoRealDesdeActivo(key)] || {activo:true});
     const active = turnoActivo===key;
-    // El filtro se ve y se usa igual sin importar si ese turno está
-    // prendido o apagado en el horario configurado para el día — eso solo
-    // importa para bloquear reservas nuevas de clientes, no para filtrar
-    // lo que ya existe.
     return `<button class="turno-pill ${active?'active':''}" onclick="setTurno('${key}')">
       <span class="dot"></span>${label}
     </button>`;
-  }).join('');
+  };
+  // "Cena" se pinta aparte, en su propia fila (junto a Especiales/Bloquear
+  // día), centrada arriba de Cena 1/Cena 2 — antes estaba metida en la
+  // misma fila que los otros 5 botones y quedaba muy apretada.
+  document.getElementById('turnoCenaBar').innerHTML = pillHTML(['cena','Cena']);
+  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']];
+  document.getElementById('turnosBar').innerHTML = turnos.map(pillHTML).join('');
 }
 
 /* ============ RENDER: STATS ============ */

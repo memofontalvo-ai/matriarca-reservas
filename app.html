@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.14">
+<link rel="stylesheet" href="app.css?v=6.15">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -176,6 +176,7 @@
       <div class="dia-acciones-row">
         <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (20+)</span></button>
         <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
+        <div class="turno-cena-slot" id="turnoCenaBar"></div>
       </div>
       <div class="turnos" id="turnosBar"></div>
     </header>
@@ -531,7 +532,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.14</div>
+<div class="version-tag">v6.15</div>
 
 
 <div class="overlay" id="overlay">
@@ -1304,6 +1305,6 @@
 </div>
 
 
-<script src="app.js?v=6.14"></script>
+<script src="app.js?v=6.15"></script>
 </body>
 </html>
