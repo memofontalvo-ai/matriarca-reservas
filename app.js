@@ -4057,11 +4057,24 @@ async function descargarInformeComoPDFRapido(){
   if(toolbar) toolbar.style.display = 'none';
   const textoOriginalBtn = btn ? btn.textContent : '';
   if(btn){ btn.textContent = '⏳ Generando PDF...'; btn.disabled = true; }
+  // En el celular, la tabla se ve angosta (el texto se parte en varias
+  // líneas) porque el modal solo tiene el ancho de la pantalla del
+  // teléfono — muy distinto a como se ve impreso. Se ensancha temporal
+  // (como si fuera una pantalla grande) para que la captura salga
+  // parecida a la impresa, con menos texto partido, y se deja como
+  // estaba al terminar.
+  const anchoOriginal = contenedor.style.width;
+  const maxAnchoOriginal = contenedor.style.maxWidth;
+  contenedor.style.width = '1400px';
+  contenedor.style.maxWidth = 'none';
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   try{
     const canvas = await ieCapturarCanvas(contenedor, 2, '#ffffff');
     const { jsPDF } = window.jspdf;
     const margenMM = 10;
-    const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'letter' });
+    // Forma clásica del constructor (orientación, unidad, formato) — más
+    // confiable entre versiones que la forma con objeto.
+    const pdf = new jsPDF('landscape', 'mm', 'letter');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const contentW = pageW - margenMM*2;
@@ -4093,8 +4106,9 @@ async function descargarInformeComoPDFRapido(){
   } catch(err){
     console.error('Error generando el PDF rápido:', err);
     alert('No fue posible generar el PDF. Detalle: ' + (err && err.message ? err.message : err));
-    alert('No fue posible generar la imagen. Detalle: ' + (err && err.message ? err.message : err));
   } finally {
+    contenedor.style.width = anchoOriginal;
+    contenedor.style.maxWidth = maxAnchoOriginal;
     if(toolbar) toolbar.style.display = 'flex';
     if(btn){ btn.textContent = textoOriginalBtn; btn.disabled = false; }
   }
