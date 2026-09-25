@@ -4063,10 +4063,21 @@ async function descargarInformeComoPDFRapido(){
   // (como si fuera una pantalla grande) para que la captura salga
   // parecida a la impresa, con menos texto partido, y se deja como
   // estaba al terminar.
+  // El modal ADEMÁS tiene su propio scroll interno (max-height + overflow,
+  // para que quepa en pantalla) — eso hacía que la captura solo agarrara
+  // el pedazo que se veía en ese momento según dónde tuviera el scroll
+  // Guillermo, en vez del documento completo. Se le quita también el
+  // scroll (max-height:none; overflow:visible) antes de capturar, para
+  // que TODO el contenido esté realmente ahí, sin importar el scroll.
   const anchoOriginal = contenedor.style.width;
   const maxAnchoOriginal = contenedor.style.maxWidth;
+  const maxAltoOriginal = contenedor.style.maxHeight;
+  const overflowOriginal = contenedor.style.overflowY;
   contenedor.style.width = '1400px';
   contenedor.style.maxWidth = 'none';
+  contenedor.style.maxHeight = 'none';
+  contenedor.style.overflowY = 'visible';
+  contenedor.scrollTop = 0;
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   try{
     const canvas = await ieCapturarCanvas(contenedor, 2, '#ffffff');
@@ -4109,6 +4120,8 @@ async function descargarInformeComoPDFRapido(){
   } finally {
     contenedor.style.width = anchoOriginal;
     contenedor.style.maxWidth = maxAnchoOriginal;
+    contenedor.style.maxHeight = maxAltoOriginal;
+    contenedor.style.overflowY = overflowOriginal;
     if(toolbar) toolbar.style.display = 'flex';
     if(btn){ btn.textContent = textoOriginalBtn; btn.disabled = false; }
   }
