@@ -4031,25 +4031,68 @@ function descargarCanvasComoArchivo(canvas, nombreArchivo, tipo, calidad){
 // window.print() abre el diálogo nativo de iOS que primero busca
 // impresoras AirPrint cercanas (eso es lo que se demora, no el código de
 // la app) antes de ofrecer "Guardar en Archivos". Esta opción se salta
-// todo eso: captura el informe tal cual se ve (mismo html2canvas que ya
-// usa el informe ejecutivo mensual) y descarga una imagen directo, sin
-// pasar por ningún diálogo del sistema. Sirve para cualquiera de los
-// informes que comparten el overlay #overlayInforme (día, mes, clientes
-// especiales, estadísticas de solicitudes).
-async function descargarInformeComoImagen(){
+// todo eso: captura el informe tal cual se ve (html2canvas) y arma un
+// PDF real de verdad (jsPDF) en carta horizontal, cortando la captura en
+// páginas — sin pasar por ningún diálogo del sistema. Sirve para
+// cualquiera de los informes que comparten el overlay #overlayInforme
+// (día, mes, clientes especiales, estadísticas de solicitudes).
+// OJO — diferencia real con "Imprimir / Guardar como PDF": ese usa la
+// paginación del propio navegador, que sabe evitar cortar una fila de la
+// tabla justo en el borde de una hoja (ver break-inside:avoid en el CSS
+// de impresión). Este método corta la captura cada cierta altura fija,
+// así que en un caso raro podría partir una fila justo en el borde de una
+// página — no debería notarse casi nunca (las filas son angostas), pero
+// si Guillermo ve algo cortado a la mitad, esa es la explicación, y
+// "Imprimir / Guardar como PDF" sigue siendo la opción 100% fiel al
+// original para esos casos.
+async function descargarInformeComoPDFRapido(){
   const contenedor = document.querySelector('#overlayInforme .informe-modal');
   const toolbar = document.getElementById('overlayInforme') ? document.querySelector('#overlayInforme .informe-toolbar') : null;
   const btn = document.getElementById('btnDescargarInformeImg');
   if(!contenedor) return;
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('No fue posible cargar el generador de PDF (revisa la conexión a internet e intenta de nuevo). Mientras tanto, puedes usar "Imprimir / Guardar como PDF".');
+    return;
+  }
   if(toolbar) toolbar.style.display = 'none';
   const textoOriginalBtn = btn ? btn.textContent : '';
-  if(btn){ btn.textContent = '⏳ Generando...'; btn.disabled = true; }
+  if(btn){ btn.textContent = '⏳ Generando PDF...'; btn.disabled = true; }
   try{
     const canvas = await ieCapturarCanvas(contenedor, 2, '#ffffff');
+    const { jsPDF } = window.jspdf;
+    const margenMM = 10;
+    const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'letter' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const contentW = pageW - margenMM*2;
+    const contentH = pageH - margenMM*2;
+    // Cuántos píxeles del canvas caben en el ancho útil de una hoja —
+    // define la escala; con eso se saca cuántos píxeles de ALTO caben en
+    // una hoja, y se va cortando el canvas en tiras de esa altura.
+    const pxPorMM = canvas.width / contentW;
+    const altoPaginaPx = Math.max(1, Math.floor(contentH * pxPorMM));
+    let y = 0;
+    let primeraPagina = true;
+    while(y < canvas.height){
+      const altoTiraPx = Math.min(altoPaginaPx, canvas.height - y);
+      const tira = document.createElement('canvas');
+      tira.width = canvas.width;
+      tira.height = altoTiraPx;
+      const ctx = tira.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, tira.width, tira.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, altoTiraPx, 0, 0, canvas.width, altoTiraPx);
+      const imgData = tira.toDataURL('image/jpeg', 0.92);
+      if(!primeraPagina) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', margenMM, margenMM, contentW, altoTiraPx / pxPorMM);
+      primeraPagina = false;
+      y += altoTiraPx;
+    }
     const fechaArchivo = (typeof fechaISO === 'function' && typeof fechaActual !== 'undefined') ? fechaISO(fechaActual) : new Date().toISOString().slice(0,10);
-    await descargarCanvasComoArchivo(canvas, `Informe_La_Matriarca_${fechaArchivo}.jpg`, 'image/jpeg', 0.92);
+    pdf.save(`Informe_La_Matriarca_${fechaArchivo}.pdf`);
   } catch(err){
-    console.error('Error descargando informe como imagen:', err);
+    console.error('Error generando el PDF rápido:', err);
+    alert('No fue posible generar el PDF. Detalle: ' + (err && err.message ? err.message : err));
     alert('No fue posible generar la imagen. Detalle: ' + (err && err.message ? err.message : err));
   } finally {
     if(toolbar) toolbar.style.display = 'flex';

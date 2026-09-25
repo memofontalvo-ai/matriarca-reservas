@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.19">
+<link rel="stylesheet" href="app.css?v=6.20">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -16,6 +16,7 @@
 <!-- Solo para el Informe Ejecutivo mensual (captura de la cartelera como
      imagen) — no se usa para nada más de la app. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 
 </head>
@@ -532,7 +533,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.19</div>
+<div class="version-tag">v6.20</div>
 
 
 <div class="overlay" id="overlay">
@@ -1087,7 +1088,7 @@
     <div class="informe-toolbar">
       <button class="btn btn-ghost" onclick="cerrarInforme()">✕ Cerrar</button>
       <button class="btn btn-primary" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
-      <button class="btn btn-ghost" onclick="descargarInformeComoImagen()" id="btnDescargarInformeImg">📥 Descargar imagen (más rápido)</button>
+      <button class="btn btn-ghost" onclick="descargarInformeComoPDFRapido()" id="btnDescargarInformeImg">📥 Guardar PDF (más rápido)</button>
     </div>
     <div id="informeContenido"></div>
   </div>
@@ -1306,6 +1307,6 @@
 </div>
 
 
-<script src="app.js?v=6.19"></script>
+<script src="app.js?v=6.20"></script>
 </body>
 </html>
