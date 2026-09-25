@@ -4924,7 +4924,7 @@ function descargarInformeDia(){
       </div>
       </div>`
       : (PLANO_MAESTRO ? `
-      <div class="plano-canvas-app" style="max-width:640px; margin:14px auto 0;">
+      <div class="plano-canvas-app" style="margin:14px auto 0;">
         ${buildBackgroundPlano(false, null, porMesaRef)}
         ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
         ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
