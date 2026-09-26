@@ -1545,6 +1545,7 @@ function abrirModalEvento(){
   eventoImagenBase64Temp = null;
   elegirTurnoEvento('cena');
   cargarOpcionesPlanoEvento('');
+  document.getElementById('sincronizarHoraBloque').style.display = 'none';
   document.getElementById('eventoModalError').textContent = '';
   document.getElementById('overlayEvento').classList.add('open');
 }
@@ -1567,11 +1568,44 @@ function editarEvento(id){
   else { preview.style.display = 'none'; }
   elegirTurnoEvento(ev.turno || 'cena');
   cargarOpcionesPlanoEvento(ev.planoId || '');
+  document.getElementById('sincronizarHoraBloque').style.display = 'block';
   document.getElementById('eventoModalError').textContent = '';
   document.getElementById('overlayEvento').classList.add('open');
 }
 function cerrarModalEvento(){
   document.getElementById('overlayEvento').classList.remove('open');
+}
+// Utilidad puntual: cambiar la "Hora de entrada" de un evento (arriba en
+// este mismo formulario) NO actualiza las reservas que ya existían para
+// ese evento — cada una guarda su propia hora, independiente de la del
+// evento, por si alguna vez alguien necesita una hora distinta a la
+// general (ej. un VIP que entra antes). Este botón sirve para cuando SÍ
+// se quiere que todas se muevan parejo: busca todas las reservas con el
+// eventoId de este evento y les pone la hora de entrada actual del
+// formulario, sin excepción.
+function sincronizarHoraReservasEvento(){
+  const editId = document.getElementById('fEventoEditId').value;
+  const nuevaHora = document.getElementById('fEventoHoraEntrada').value;
+  const nombreEvento = document.getElementById('fEventoNombre').value.trim();
+  if(!editId || !nuevaHora){ alert('Primero guarda la hora de entrada del evento.'); return; }
+  const afectadas = reservas.filter(r => r.eventoId === editId);
+  if(afectadas.length === 0){ alert('No hay ninguna reserva guardada todavía para este evento.'); return; }
+  const horaLegible = (typeof formatearHora12 === 'function') ? formatearHora12(nuevaHora) : nuevaHora;
+  const confirmar = confirm(`Esto va a cambiar la hora a ${horaLegible} en ${afectadas.length} reserva(s) de "${nombreEvento}", sin excepción (incluidas las que ya tuvieran una hora distinta). ¿Continuar?`);
+  if(!confirmar) return;
+  const btn = document.getElementById('btnSincronizarHoraEvento');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Actualizando…';
+  const lote = db.batch();
+  afectadas.forEach(r => lote.update(reservasRef.doc(r.id), { hora: nuevaHora }));
+  lote.commit().then(() => {
+    alert(`Listo — se actualizó la hora en ${afectadas.length} reserva(s).`);
+  }).catch(err => {
+    console.error('Error sincronizando hora de reservas del evento:', err);
+    alert('No se pudo actualizar. Detalle: ' + (err && err.message ? err.message : err));
+  }).finally(() => {
+    btn.disabled = false; btn.textContent = textoOriginal;
+  });
 }
 function guardarEvento(){
   const errEl = document.getElementById('eventoModalError');
