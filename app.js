@@ -474,14 +474,27 @@ function aplicarRestriccionesRol(){
   const btnConfig = document.getElementById('toggleConfig');
   const btnSalones = document.getElementById('toggleSalones');
   const btnNueva = document.getElementById('btnNuevaReservaHeader');
+  // "Consulta" es el nivel más restringido: solo puede VER las reservas
+  // ya aprobadas en "Por día" (calendario, lista, plano, resumen) — nada
+  // de Solicitudes (pendientes por gestionar/aprobar), nada de Salones,
+  // nada de Config, y tampoco puede bloquear un día. Los formularios
+  // dentro de una reserva ya quedaban en solo-lectura desde antes
+  // (aplicarModoConsultaEnModal) — esto es lo que le cierra el resto de
+  // la navegación alrededor.
+  const btnSolicitudesTab = document.getElementById('toggleSolicitudes');
+  const btnBloquearDia = document.getElementById('btnBloquearDia');
 
   if(btnConfig) btnConfig.style.display = (rol === 'admin') ? '' : 'none';
   if(btnSalones) btnSalones.style.display = (rol === 'admin') ? '' : 'none';
   if(rol === 'consulta'){
     document.body.classList.add('rol-consulta');
     if(btnNueva) btnNueva.style.display = 'none';
+    if(btnSolicitudesTab) btnSolicitudesTab.style.display = 'none';
+    if(btnBloquearDia) btnBloquearDia.style.display = 'none';
   } else {
     if(btnNueva) btnNueva.style.display = '';
+    if(btnSolicitudesTab) btnSolicitudesTab.style.display = '';
+    if(btnBloquearDia) btnBloquearDia.style.display = '';
     if(rol === 'operativo') document.body.classList.add('rol-operativo');
   }
   // Un "Promotor de eventos" solo tiene datos de UN día en todo el
@@ -513,9 +526,17 @@ function aplicarRestriccionesRol(){
   if(calWrap) calWrap.style.display = esPromotorNav ? 'none' : '';
   // Si por algo la pestaña activa en este momento es una que este nivel ya
   // no puede ver (por ejemplo quedó en Config o Salones y le bajaron el
-  // nivel), lo mandamos de vuelta a Solicitudes en vez de dejarlo colgado.
-  if((vistaApp === 'config' && rol !== 'admin') || (vistaApp === 'salones' && rol !== 'admin')){
+  // nivel), lo mandamos a una pantalla que sí pueda ver, en vez de
+  // dejarlo colgado. Para "consulta" eso es "Por día" — nunca Solicitudes,
+  // que es justo lo que este nivel no debe ver — incluyendo el arranque
+  // normal de la app, que siempre abre en Solicitudes por defecto antes
+  // de saber qué rol inició sesión.
+  if(vistaApp === 'config' && rol !== 'admin'){
     cambiarVistaApp('solicitudes');
+  } else if(vistaApp === 'salones' && rol !== 'admin'){
+    cambiarVistaApp('solicitudes');
+  } else if(vistaApp === 'solicitudes' && rol === 'consulta'){
+    cambiarVistaApp('porDia');
   }
 }
 
@@ -2882,6 +2903,10 @@ function construirEventosContainer(iso){
     </div>`).join('');
 }
 function abrirModalBloqueoDia(){
+  // Refuerzo de seguridad, igual que en cambiarVistaApp(): aunque el
+  // botón ya esté oculto para "consulta", esto bloquea el acceso real.
+  const rolBloqueoDia = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
+  if(rolBloqueoDia === 'consulta') return;
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
   document.getElementById('bloqueoDiaError').textContent = '';
@@ -6556,6 +6581,10 @@ function cambiarVistaApp(v){
   // viejo guardado), esto bloquea el acceso real a la pantalla.
   const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
   if(v === 'config' && rol !== 'admin') return;
+  // Mismo refuerzo que arriba: "consulta" no debe poder entrar a
+  // Solicitudes (reservas pendientes/por aprobar) por ningún camino,
+  // aunque los botones ya estén ocultos.
+  if(v === 'solicitudes' && rol === 'consulta') return;
   vistaApp = v;
   if(v === 'solicitudes') cerrarToastNuevaSolicitud();
   document.getElementById('toggleSolicitudes').classList.toggle('active', v==='solicitudes');
