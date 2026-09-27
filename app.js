@@ -8498,6 +8498,14 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   let calCursor = new Date();
   let initializingWheels = false;
   let timeHadOriginalValue = false;
+  // Ficha de la reserva que está abierta AHORA MISMO en las ruedas de
+  // hora/minutos/AM-PM. El scroll de la rueda dispara un evento nativo
+  // 'scroll' del navegador que puede llegar con retraso (hasta 80ms
+  // después, por el debounce de abajo) — si mientras tanto el staff cerró
+  // esta reserva y ya abrió OTRA, ese eco tardío no debe escribir la hora
+  // de la reserva vieja encima de la que está viendo ahora. Por eso se
+  // compara siempre contra modalToken antes de escribir en #fHora.
+  let wheelOpenToken = 0;
   // "Seguro" de fecha y hora: una vez que una reserva YA tiene fecha y
   // hora guardadas, se abren bloqueadas (nadie puede moverlas por
   // accidente al entrar a gestionar la mesa, el abono, etc.) — hay que
@@ -8575,6 +8583,11 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     // evita que una rueda que termine de posicionarse antes que las otras
     // dos alcance a guardar una combinación a medio armar por accidente.
     if(initializingWheels) return;
+    // Defensa contra el eco tardío del scroll: si esto pertenece a una
+    // reserva que ya no es la que está abierta (modal cerrado y vuelto a
+    // abrir para otra reserva mientras este eco venía en camino), se
+    // ignora en vez de pisar la hora de la reserva que se ve ahora.
+    if(wheelOpenToken !== modalToken) return;
     const h12=Number(wheelState.hour)||12, min=Number(wheelState.minute)||0;
     let h24=h12%12; if(wheelState.ampm==='PM') h24+=12;
     document.getElementById('fHora').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
@@ -8621,13 +8634,14 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       items.forEach((it,i)=>{it.classList.toggle('selected',i===idx);it.classList.toggle('near',Math.abs(i-idx)===1);});
       onSelect(items[idx].dataset.value); syncHiddenTime();
     }
-    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(update,80); };
+    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(()=>{ if(isReadOnly()) return; update(); },80); };
     items.forEach((it,i)=>it.onclick=()=>{if(!isReadOnly()) el.scrollTo({top:i*ITEM_H,behavior:'smooth'});});
     const current=String(getCurrent()); const idx=Math.max(0,values.map(String).indexOf(current));
     requestAnimationFrame(()=>{el.scrollTop=idx*ITEM_H; update();});
   }
   function initWheels(){
     initializingWheels = true;
+    wheelOpenToken = modalToken;
     readTimeFromHidden();
     makeWheel('phoneHourWheel',Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),()=>String(wheelState.hour).padStart(2,'0'),v=>wheelState.hour=Number(v));
     makeWheel('phoneMinuteWheel',Array.from({length:60},(_,i)=>String(i).padStart(2,'0')),()=>String(wheelState.minute).padStart(2,'0'),v=>wheelState.minute=Number(v));
@@ -8644,6 +8658,9 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   let timeHadOriginalValueSalida = false;
   function syncHiddenTimeSalida(){
     if(initializingWheelsSalida && !timeHadOriginalValueSalida) return;
+    // Mismo seguro contra eco tardío que syncHiddenTime() — ver comentario
+    // junto a la declaración de wheelOpenToken.
+    if(wheelOpenToken !== modalToken) return;
     const h12=Number(wheelStateSalida.hour)||12, min=Number(wheelStateSalida.minute)||0;
     let h24=h12%12; if(wheelStateSalida.ampm==='PM') h24+=12;
     document.getElementById('fHoraSalida').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
@@ -8663,13 +8680,14 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       items.forEach((it,i)=>{it.classList.toggle('selected',i===idx);it.classList.toggle('near',Math.abs(i-idx)===1);});
       onSelect(items[idx].dataset.value); syncHiddenTimeSalida();
     }
-    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(update,80); };
+    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(()=>{ if(isReadOnly()) return; update(); },80); };
     items.forEach((it,i)=>it.onclick=()=>{if(!isReadOnly()) el.scrollTo({top:i*ITEM_H,behavior:'smooth'});});
     const current=String(getCurrent()); const idx=Math.max(0,values.map(String).indexOf(current));
     requestAnimationFrame(()=>{el.scrollTop=idx*ITEM_H; update();});
   }
   function initWheelsSalida(){
     initializingWheelsSalida = true;
+    wheelOpenToken = modalToken;
     readTimeFromHiddenSalida();
     makeWheelSalida('phoneHourWheelSalida',Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),()=>String(wheelStateSalida.hour).padStart(2,'0'),v=>wheelStateSalida.hour=Number(v));
     makeWheelSalida('phoneMinuteWheelSalida',Array.from({length:60},(_,i)=>String(i).padStart(2,'0')),()=>String(wheelStateSalida.minute).padStart(2,'0'),v=>wheelStateSalida.minute=Number(v));
