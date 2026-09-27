@@ -3581,7 +3581,7 @@ function reservasDelTurno(){
   // la pantalla "Solicitudes" hasta que el cliente las apruebe).
   let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
   if(turnoActivo !== 'todos') rs = rs.filter(r=>reservaCoincideConTurnoActivo(r, turnoActivo));
-  if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=20);
+  if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=30);
   return rs;
 }
 
@@ -3720,7 +3720,7 @@ function groupPaxByDate(rsMes, ano, mes){
       dia: d, iso,
       pax: rsDia.reduce((a,r)=>a+Number(r.pax||0),0),
       reservas: rsDia.length,
-      tieneEspecial: rsDia.some(r=>Number(r.pax)>=20),
+      tieneEspecial: rsDia.some(r=>Number(r.pax)>=30),
     });
   }
   return porDia;
@@ -3745,7 +3745,7 @@ function groupPaxByWeekday(rsMes){
 }
 
 // Picos: entre los 5 días de más pax del mes, o cualquier día con una
-// reserva especial (20+ pax) — no hay un "umbral de alta demanda"
+// reserva especial (30+ pax) — no hay un "umbral de alta demanda"
 // configurado aparte en la app, así que se usa exactamente este criterio
 // de respaldo que pide el documento.
 function identifyDemandPeaks(porDia){
@@ -3865,9 +3865,9 @@ async function generarInformeEjecutivoMensual(anoParam, mesParam){
     const insights = generateExecutiveInsights(porServicioOrdenado, porDiaSemana, metrics);
     const oportunidad = calcularOportunidad(porServicio, porDiaSemana, metrics);
 
-    // Reservas especiales (20+ personas) del mes — mismo umbral que ya usa
-    // el resto de la app (⭐ en el calendario, filtro "Especiales (20+)").
-    const rsEspeciales = rsMes.filter(r=>Number(r.pax)>=20);
+    // Reservas especiales (30+ personas) del mes — mismo umbral que ya usa
+    // el resto de la app (⭐ en el calendario, filtro "Especiales (30+)").
+    const rsEspeciales = rsMes.filter(r=>Number(r.pax)>=30);
     const especiales = {
       count: rsEspeciales.length,
       pax: rsEspeciales.reduce((a,r)=>a+Number(r.pax||0),0),
@@ -4007,7 +4007,7 @@ function renderExecutiveReport(d){
     </div>
 
     <div class="ie-especiales-row">
-      <div class="ie-especiales-titulo">⭐ RESERVAS ESPECIALES (20+ PERSONAS)</div>
+      <div class="ie-especiales-titulo">⭐ RESERVAS ESPECIALES (30+ PERSONAS)</div>
       <div class="ie-especiales-cards">
         <div class="ie-especiales-card">
           <div class="ie-especiales-num">${numCO(d.especiales.count)}</div>
@@ -4267,7 +4267,7 @@ function renderCalendarioInline(){
     return y===calInlineAno && m===(calInlineMes+1);
   });
   const diasConReserva = new Set(reservasDelMes.map(r=>r.fecha));
-  const diasConEspecial = new Set(reservasDelMes.filter(r=>Number(r.pax)>=20).map(r=>r.fecha));
+  const diasConEspecial = new Set(reservasDelMes.filter(r=>Number(r.pax)>=30).map(r=>r.fecha));
   // Total de PERSONAS (suma de pax de todas las reservas), no cantidad de
   // reservas — así el número refleja cuánta gente hay ese día en total.
   const conteoPorDia = {};
@@ -4642,7 +4642,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     </div>
     <div class="res-meta">
       <span>${r.pax} pax</span>
-      ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
+      ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
       ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${textoAbonoBadge(r)}
@@ -5069,7 +5069,7 @@ function descargarInformeDia(){
       <tr>
         <td>${escapeHtml(r.hora)}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
         <td>${escapeHtml(r.nombre)}</td>
-        <td style="text-align:center;">${r.pax}${Number(r.pax)>=20?' ⭐':''}</td>
+        <td style="text-align:center;">${r.pax}${Number(r.pax)>=30?' ⭐':''}</td>
         <td>${escapeHtml(r.celular||'—')}</td>
         <td>${r.mesa?escapeHtml(r.mesa.split('+').join(' + ')):'—'}</td>
         <td>${r.abono>0?'$'+Number(r.abono).toLocaleString('es-CO'):'—'}</td>
@@ -5172,7 +5172,7 @@ function cerrarInforme(){
   document.getElementById('overlayInforme').classList.remove('open');
 }
 
-// ===== Informe administrativo: reservas especiales (20+ personas) por mes =====
+// ===== Informe administrativo: reservas especiales (30+ personas) por mes =====
 // Se agrupa semana a semana (lunes a domingo) dentro del mes elegido, con
 // cliente, personas y quién gestionó cada reserva, más abono por reserva,
 // subtotal de abono por semana y totales al cierre del mes. Reutiliza el
@@ -5186,7 +5186,7 @@ function generarInformeEspecialesMes(){
     yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
   }
   const tipoInforme = document.getElementById('fInformeEspecialesTipo').value; // 'aprobadas' | 'solicitudes'
-  renderInformeReservas(yearMonth, tipoInforme, 20);
+  renderInformeReservas(yearMonth, tipoInforme, 30);
 }
 function generarInformeGeneralMes(){
   const inputMes = document.getElementById('fInformeGeneralMes').value;
@@ -5231,12 +5231,12 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   const noCanceladasPax = totalPax - canceladasPax;
   const pctNoCanceladas = totalSolicitudes>0 ? (noCanceladas/totalSolicitudes*100) : 0;
 
-  // Gestión de reservas ESPECIALES (20+ personas) — medición totalmente
+  // Gestión de reservas ESPECIALES (30+ personas) — medición totalmente
   // aparte: su propio universo (especialesDelMes), nunca el total general
   // como denominador. Así la tasa de cancelación especial mide de verdad
   // el desempeño sobre las reservas especiales, no se diluye entre todas
   // las solicitudes del mes.
-  const especialesDelMes = todasDelMes.filter(r => Number(r.pax) >= 20);
+  const especialesDelMes = todasDelMes.filter(r => Number(r.pax) >= 30);
   const totalEspeciales = especialesDelMes.length;
   const especialesPax = sumaPax(especialesDelMes);
   const especialesCanceladas = especialesDelMes.filter(r => r.estado === 'cancelada');
@@ -5347,7 +5347,7 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
       <div class="ie-formula">${canceladas.length} ÷ ${totalSolicitudes||0} × 100</div>
     </div>
     <div class="ie-bloque-gestion ie-bloque-especial">
-      <h2 style="background:none; color:#a17a1c; padding:0; margin-bottom:10px;">👥 GESTIÓN DE RESERVAS ESPECIALES · 20+ PERSONAS</h2>
+      <h2 style="background:none; color:#a17a1c; padding:0; margin-bottom:10px;">👥 GESTIÓN DE RESERVAS ESPECIALES · 30+ PERSONAS</h2>
       <div class="ie-fila-metrica"><span>Total de solicitudes especiales recibidas:</span><b>${totalEspeciales} · ${especialesPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Especiales canceladas:</span><b>${especialesCanceladas.length} · ${especialesCanceladasPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Especiales no canceladas:</span><b>${especialesNoCanceladas} · ${especialesNoCanceladasPax} pax</b></div>
@@ -5368,7 +5368,7 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   document.getElementById('overlayInforme').classList.add('open');
 }
 // Motor común de los dos informes (especiales y general) — la única
-// diferencia real entre ambos es el umbral mínimo de pax: 20 para el de
+// diferencia real entre ambos es el umbral mínimo de pax: 30 para el de
 // especiales, 0 (sin filtro) para el general, que incluye TODAS las
 // reservas de cualquier tamaño, especiales incluidas.
 function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
@@ -5470,7 +5470,7 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
         ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
         <td>${escapeHtml(r.hora||'—')}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
-        <td style="text-align:center;">${r.pax}${!esGeneral || Number(r.pax)>=20 ? ' ⭐' : ''}</td>
+        <td style="text-align:center;">${r.pax}${!esGeneral || Number(r.pax)>=30 ? ' ⭐' : ''}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td style="text-align:right;">$${Number(r.abono||0).toLocaleString('es-CO')}</td>
       </tr>`).join('');
@@ -5479,7 +5479,7 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
         <td>${formatearFechaLarga(fechaClave(r))}</td>
         ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
-        <td style="text-align:center;">${r.pax}${Number(r.pax)>=20 ? ' ⭐' : ''}</td>
+        <td style="text-align:center;">${r.pax}${Number(r.pax)>=30 ? ' ⭐' : ''}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td>${escapeHtml(r.motivoCancelacion || '— sin motivo registrado —')}</td>
       </tr>`).join('');
@@ -5522,7 +5522,7 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
       <h1>La Matriarca Barranquilla — ${tituloInforme}</h1>
-      <div class="informe-subtitulo">${mesLabel} · ${filtroLabel} · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}${esGeneral ? ' · Las marcadas con ⭐ son las reservas especiales (20+)' : ''}</div>
+      <div class="informe-subtitulo">${mesLabel} · ${filtroLabel} · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}${esGeneral ? ' · Las marcadas con ⭐ son las reservas especiales (30+)' : ''}</div>
     </div>
     ${semanasHtml}
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
@@ -6787,7 +6787,7 @@ function renderSolicitudesScreen(){
       .sort((a,b) => (fechaSolicitudEfectiva(b)+(b.horaSolicitud||'')).localeCompare(fechaSolicitudEfectiva(a)+(a.horaSolicitud||'')));
   } else {
     delDia = delDiaTotal;
-    if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=20);
+    if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=30);
   }
   // Se aplica al final para que pueda combinarse tanto con el día de
   // llegada visible como con una búsqueda por nombre/celular. Solo compara
@@ -6803,7 +6803,7 @@ function renderSolicitudesScreen(){
     } else {
       el.innerHTML = textoBusquedaSol
         ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en ninguna fecha.</div>`
-        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (30+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
     }
     renderCalendarioSolInline();
     if(document.getElementById('panelFiltroFechaReserva')?.classList.contains('abierto')) renderCalendarioFiltroFechaReserva();
@@ -6865,7 +6865,7 @@ function renderSolicitudesScreen(){
       </div>
       <div class="sc-meta">
         <span>${r.pax} pax</span>
-        ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
+        ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
         ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}

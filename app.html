@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.24">
+<link rel="stylesheet" href="app.css?v=6.25">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -132,7 +132,7 @@
     <div class="resumen-sol-dia" id="resumenSolicitudesDia" style="display:none;"></div>
 
     <div class="filtro-especiales-row">
-      <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> Reservas especiales (20+ personas) <svg class="especial-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+      <button class="especial-btn" id="btnFiltroEspecialesSol" onclick="toggleFiltroEspecialesSolicitudes()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> Reservas especiales (30+ personas) <svg class="especial-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
     </div>
     <div class="buscador-cliente-wrap">
       <span class="buscador-cliente-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
@@ -175,7 +175,7 @@
         <button id="btnDiaSiguientePD" onclick="cambiarDia(1)">›</button>
       </div>
       <div class="dia-acciones-row">
-        <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (20+)</span></button>
+        <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (30+)</span></button>
         <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
         <div class="turno-cena-slot" id="turnoCenaBar"></div>
       </div>
@@ -194,7 +194,7 @@
       <div class="cal-days cal-days-inline" id="calInlineDays"></div>
       <div class="cal-inline-leyenda">
         <span><span class="cal-dot-leyenda" style="border-radius:4px; width:14px; background:var(--gold-bright);"></span> Total de personas ese día</span>
-        <span><span class="cal-star-leyenda">⭐</span> Incluye reserva especial (20+)</span>
+        <span><span class="cal-star-leyenda">⭐</span> Incluye reserva especial (30+)</span>
       </div>
       <div class="cal-aviso-navegando" id="calAvisoNavegando" style="display:none;"></div>
     </div>
@@ -401,8 +401,8 @@
         </button>
         <div class="config-grupo-contenido" id="grupoInformesAdmin" style="display:none;">
         <div class="config-mensaje-bloque">
-          <div class="config-mensaje-titulo">⭐ Informe de reservas especiales (20+ personas)</div>
-          <div class="config-mensaje-sub">Desglosa mes a mes, semana a semana (lunes a domingo), todas las reservas de 20 o más personas: cliente, cantidad de personas, quién la gestionó y el abono de cada una — con subtotal de abono por semana y totales al final del mes.</div>
+          <div class="config-mensaje-titulo">⭐ Informe de reservas especiales (30+ personas)</div>
+          <div class="config-mensaje-sub">Desglosa mes a mes, semana a semana (lunes a domingo), todas las reservas de 30 o más personas: cliente, cantidad de personas, quién la gestionó y el abono de cada una — con subtotal de abono por semana y totales al final del mes.</div>
           <div class="field" style="margin-top:10px;">
             <label>Tipo de informe</label>
             <select id="fInformeEspecialesTipo">
@@ -443,7 +443,7 @@
         </div>
         <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">📈 Estadísticas de solicitudes</div>
-          <div class="config-mensaje-sub">Qué día de la semana llegan más solicitudes y cuál menos, en qué rango de horario llegan más, y cuántas se cancelaron en el mes (con su porcentaje) — total y solo las especiales (20+).</div>
+          <div class="config-mensaje-sub">Qué día de la semana llegan más solicitudes y cuál menos, en qué rango de horario llegan más, y cuántas se cancelaron en el mes (con su porcentaje) — total y solo las especiales (30+).</div>
           <div class="field-row phone-two-cols" style="margin-top:10px;">
             <div class="field">
               <label>Mes</label>
@@ -533,7 +533,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.24</div>
+<div class="version-tag">v6.25</div>
 
 
 <div class="overlay" id="overlay">
@@ -1310,6 +1310,6 @@
 </div>
 
 
-<script src="app.js?v=6.24"></script>
+<script src="app.js?v=6.25"></script>
 </body>
 </html>
