@@ -5643,10 +5643,14 @@ function libreMesaHtmlDisplay(m, porMesaRef, categorias){
     guestName = (reserva.nombre||'').split(' ')[0];
   }
   const clickJs = reserva ? `onclick='abrirModal(${JSON.stringify(reserva.id)})'` : `onclick='abrirModal(null,${JSON.stringify(idMesa)})'`;
-  const capHtml = m.cap ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
-  const precioHtml = (cat && cat.precio) ? `<div class="plano-mesa-precio">$${Number(cat.precio).toLocaleString('es-CO')}</div>` : '';
+  // Cuando la mesa ya tiene una reserva encima, el nombre del cliente es lo
+  // importante para ubicarla de un vistazo — se prioriza sobre la
+  // capacidad/precio (que solo importan mientras la mesa está libre) para
+  // que el nombre tenga espacio de sobra y nunca se recorte.
+  const capHtml = (!reserva && m.cap) ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
+  const precioHtml = (!reserva && cat && cat.precio) ? `<div class="plano-mesa-precio">$${Number(cat.precio).toLocaleString('es-CO')}</div>` : '';
   const bg = m.color ? `background:${m.color};` : '';
-  return `<div class="plano-mesa-libre ${estadoCls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
+  return `<div class="plano-mesa-libre ${estadoCls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}${guestName?' · '+escapeHtml(guestName):''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
 }
 function libreMesaHtmlPicker(m, ocupadasPorOtro, categorias){
   const idMesa = libreIdMesa(m);
@@ -5699,7 +5703,10 @@ function libreZonaHtmlDisplay(z, porMesaRef){
   const colorZona = !reserva ? z.color : null;
   const bg = colorZona ? `background:${colorZona};` : '';
   const clickJs = reserva ? `onclick='abrirModal(${JSON.stringify(reserva.id)})'` : `onclick='abrirModal(null,${JSON.stringify(idZona)})'`;
-  return `<div class="plano-zona-libre reservable ${estadoCls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}">${escapeHtml(label)}${libreZonaCapHtml(z)}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
+  // Igual que con las mesas: con una reserva encima, el nombre del cliente
+  // importa más que la capacidad — se prioriza para que quepa sin recortarse.
+  const capHtml = reserva ? '' : libreZonaCapHtml(z);
+  return `<div class="plano-zona-libre reservable ${estadoCls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}${guestName?' · '+escapeHtml(guestName):''}">${escapeHtml(label)}${capHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
 }
 function libreZonaHtmlPicker(z, ocupadasPorOtro){
   if(!ZONA_KINDS_RESERVABLES.has(z.kind)) return libreZonaHtmlDecorativa(z);
