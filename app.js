@@ -5621,10 +5621,13 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
    tamaño (w,h) en las mismas unidades del "salón" (plano.hall.{w,h}) que
    se editó en Salones — se dibujan en un lienzo de ese mismo tamaño y
    luego se escala con ajustarEscalaPlanoLibre(), igual que ya se hace con
-   los planos de evento de tamaño fijo (880×640). Las zonas (bar, pista,
-   etc.) se muestran solo como referencia visual — no son reservables —
-   para no arriesgar nada de la lógica ya existente de salones VIP
-   completos (SALON-ORO, etc.), que sigue funcionando exactamente igual. */
+   los planos de evento de tamaño fijo (880×640). Las zonas de kind 'vip' o
+   'lobby' (salones VIP y lobbies completos, ej. "SALÓN ARENOSA") SÍ son
+   reservables como si fueran una mesa grande — muestran su capacidad
+   (z.cap) y se pueden seleccionar/ver su reserva igual que una mesa,
+   equivalente a como funcionaban SALON-ORO/CURRAMBA/ARENOSA/LOBBY1/LOBBY2
+   en el plano de cuadrícula viejo. El resto de kinds (tarima, barra,
+   franja) siguen siendo solo referencia visual, sin click. */
 function libreIdMesa(m){
   return (m.ref && String(m.ref).trim()) ? String(m.ref).trim() : m.num;
 }
@@ -5659,18 +5662,64 @@ function libreMesaHtmlPicker(m, ocupadasPorOtro, categorias){
   const precioHtml = (cat && cat.precio) ? `<div class="plano-mesa-precio">$${Number(cat.precio).toLocaleString('es-CO')}</div>` : '';
   return `<div class="plano-mesa-libre ${cls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}</div>`;
 }
-function libreZonaHtml(z){
+// Zonas de kind 'vip' o 'lobby' son salones/lobbies completos que SÍ se
+// pueden reservar como si fueran una mesa grande (igual que antes
+// SALON-ORO/CURRAMBA/ARENOSA/LOBBY1/LOBBY2 en el plano de cuadrícula) —
+// el resto de kinds (tarima, barra, franja) siguen siendo solo
+// decorativos, sin click ni estado de reserva.
+const ZONA_KINDS_RESERVABLES = new Set(['vip', 'lobby']);
+// Las zonas no tienen un código fijo como las mesas (ref/num) — se
+// identifican por su propio nombre (z.label, ej. "SALÓN ARENOSA"), que es
+// lo que el staff ve y reconoce. Si por algún motivo queda sin nombre, se
+// usa su id interno para no perder la reserva.
+function libreIdZona(z){
+  return (z.label && String(z.label).trim()) ? String(z.label).trim() : z.id;
+}
+function libreZonaCapHtml(z){
+  return z.cap ? `<div class="plano-zona-libre-sub">Máx. ${z.cap}p</div>` : '';
+}
+function libreZonaHtmlDecorativa(z){
   const bg = z.color ? `background:${z.color};` : '';
   const label = (z.label||'').trim();
   const sub = (z.sub||'').trim();
   return `<div class="plano-zona-libre" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}">${escapeHtml(label)}${sub?`<div class="plano-zona-libre-sub">${escapeHtml(sub)}</div>`:''}</div>`;
+}
+function libreZonaHtmlDisplay(z, porMesaRef){
+  if(!ZONA_KINDS_RESERVABLES.has(z.kind)) return libreZonaHtmlDecorativa(z);
+  const label = (z.label||'').trim();
+  const idZona = libreIdZona(z);
+  const idLower = String(idZona).toLowerCase();
+  const reserva = porMesaRef ? porMesaRef[idLower] : null;
+  let estadoCls = 'p-libre';
+  let guestName = '';
+  if(reserva){
+    estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
+    guestName = (reserva.nombre||'').split(' ')[0];
+  }
+  const colorZona = !reserva ? z.color : null;
+  const bg = colorZona ? `background:${colorZona};` : '';
+  const clickJs = reserva ? `onclick='abrirModal(${JSON.stringify(reserva.id)})'` : `onclick='abrirModal(null,${JSON.stringify(idZona)})'`;
+  return `<div class="plano-zona-libre reservable ${estadoCls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}">${escapeHtml(label)}${libreZonaCapHtml(z)}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
+}
+function libreZonaHtmlPicker(z, ocupadasPorOtro){
+  if(!ZONA_KINDS_RESERVABLES.has(z.kind)) return libreZonaHtmlDecorativa(z);
+  const label = (z.label||'').trim();
+  const idZona = libreIdZona(z);
+  const idLower = String(idZona).toLowerCase();
+  const elegida = mesaSeleccionTemp.includes(idZona);
+  const ocupada = !elegida && ocupadasPorOtro && ocupadasPorOtro[idLower];
+  const cls = elegida ? 'p-elegida' : (ocupada ? 'p-ocupada-otra' : 'p-libre');
+  const colorZona = (!elegida && !ocupada) ? z.color : null;
+  const bg = colorZona ? `background:${colorZona};` : '';
+  const clickJs = ocupada ? '' : `onclick='toggleMesaSeleccion(${JSON.stringify(idZona)})'`;
+  return `<div class="plano-zona-libre reservable ${cls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}">${escapeHtml(label)}${libreZonaCapHtml(z)}</div>`;
 }
 function buildLibrePlanoDisplay(plano, porMesaRef){
   const hall = plano.hall || {w:880, h:640};
   const zonas = Object.values(plano.zonas||{});
   const mesas = Object.values(plano.mesas||{});
   const categorias = plano.categorias || {};
-  const body = zonas.map(z => libreZonaHtml(z)).join('') + mesas.map(m => libreMesaHtmlDisplay(m, porMesaRef, categorias)).join('');
+  const body = zonas.map(z => libreZonaHtmlDisplay(z, porMesaRef)).join('') + mesas.map(m => libreMesaHtmlDisplay(m, porMesaRef, categorias)).join('');
   return `<div class="plano-canvas-libre" data-design-w="${hall.w}" data-design-h="${hall.h}" style="width:${hall.w}px; height:${hall.h}px;">${body}</div>`;
 }
 function buildLibrePlanoPicker(plano, ocupadasPorOtro){
@@ -5678,7 +5727,7 @@ function buildLibrePlanoPicker(plano, ocupadasPorOtro){
   const zonas = Object.values(plano.zonas||{});
   const mesas = Object.values(plano.mesas||{});
   const categorias = plano.categorias || {};
-  const body = zonas.map(z => libreZonaHtml(z)).join('') + mesas.map(m => libreMesaHtmlPicker(m, ocupadasPorOtro, categorias)).join('');
+  const body = zonas.map(z => libreZonaHtmlPicker(z, ocupadasPorOtro)).join('') + mesas.map(m => libreMesaHtmlPicker(m, ocupadasPorOtro, categorias)).join('');
   return `<div class="plano-canvas-libre" data-design-w="${hall.w}" data-design-h="${hall.h}" style="width:${hall.w}px; height:${hall.h}px;">${body}</div>`;
 }
 // Igual que ajustarEscalaPlanoApp (más abajo) pero para un lienzo de
