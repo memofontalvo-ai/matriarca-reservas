@@ -2376,30 +2376,24 @@ function planoIdParaFechaTurno(fecha, turno){
 // Salones se puede activar CUALQUIER plano de formato libre (por ejemplo
 // "PERMANENTE") para que haga las veces de General en toda la app — Plano
 // del día, selector de mesas al crear/editar una reserva, informe, etc.
-// Esto se guarda en configuracion/planoGeneralActivo → { planoId: "..." }.
-// Si ese documento no existe o no tiene planoId, todo sigue funcionando
-// exactamente igual que siempre (formato grid). El plano de cuadrícula
-// original NUNCA se borra ni se modifica por esto — queda intacto en
-// Firestore, listo para reactivarlo con solo borrar ese planoId.
-let planoMaestroUnsubGrid = null;
+// Esto se guarda como un CAMPO nuevo (`planoGeneralActivoId`) dentro del
+// MISMO documento configuracion/planoMesas de siempre — a propósito, en
+// vez de un documento nuevo aparte, para no depender de que alguien abra
+// las reglas de seguridad de Firestore para un documento que nunca
+// existió (eso fue justo lo que falló al probarlo: "No se pudo
+// actualizar" al tocar el botón en Salones, porque un documento nuevo
+// bajo configuracion/ no estaba permitido por las reglas — este mismo
+// documento sí lo está, se usa para guardar el plano General hace rato).
+// Si el campo no existe o está vacío, todo sigue funcionando exactamente
+// igual que siempre (formato grid). El plano de cuadrícula (campo `json`
+// de este mismo documento) NUNCA se borra ni se modifica por esto — sigue
+// intacto, listo para reactivarlo con solo quitarle este campo.
 let planoMaestroUnsubLibre = null;
-function suscribirPlanoMaestroGrid(){
-  if(planoMaestroUnsubLibre){ planoMaestroUnsubLibre(); planoMaestroUnsubLibre = null; }
-  if(planoMaestroUnsubGrid) return;
-  planoMaestroUnsubGrid = db.collection('configuracion').doc('planoMesas').onSnapshot(snap => {
-    if(snap.exists && snap.data().json){
-      try { PLANO_MAESTRO = JSON.parse(snap.data().json); }
-      catch(e){ console.error('Plano maestro con formato inválido:', e); }
-    } else {
-      PLANO_MAESTRO = null;
-    }
-    PLANO_MAESTRO_FORMATO = 'grid';
-    if(vistaActual==='plano') renderPlano();
-  }, err => console.error('Error de conexión con el plano maestro:', err));
-}
+let planoMaestroLibreIdActual = null;
 function suscribirPlanoMaestroLibre(planoId){
-  if(planoMaestroUnsubGrid){ planoMaestroUnsubGrid(); planoMaestroUnsubGrid = null; }
+  if(planoMaestroLibreIdActual === planoId && planoMaestroUnsubLibre) return;
   if(planoMaestroUnsubLibre){ planoMaestroUnsubLibre(); planoMaestroUnsubLibre = null; }
+  planoMaestroLibreIdActual = planoId;
   planoMaestroUnsubLibre = db.collection('planosMesasEventos').doc(planoId).onSnapshot(snap => {
     if(snap.exists && snap.data().json){
       try { PLANO_MAESTRO = JSON.parse(snap.data().json); }
@@ -2411,14 +2405,23 @@ function suscribirPlanoMaestroLibre(planoId){
     if(vistaActual==='plano') renderPlano();
   }, err => console.error('Error de conexión con el plano General (libre):', err));
 }
-db.collection('configuracion').doc('planoGeneralActivo').onSnapshot(snap => {
-  const planoIdActivo = (snap.exists && snap.data().planoId) ? snap.data().planoId : null;
-  if(planoIdActivo) suscribirPlanoMaestroLibre(planoIdActivo);
-  else suscribirPlanoMaestroGrid();
-}, err => {
-  console.error('Error de conexión con planoGeneralActivo:', err);
-  suscribirPlanoMaestroGrid();
-});
+db.collection('configuracion').doc('planoMesas').onSnapshot(snap => {
+  const data = snap.exists ? (snap.data() || {}) : {};
+  const planoIdActivo = data.planoGeneralActivoId || null;
+  if(planoIdActivo){
+    suscribirPlanoMaestroLibre(planoIdActivo);
+    return;
+  }
+  if(planoMaestroUnsubLibre){ planoMaestroUnsubLibre(); planoMaestroUnsubLibre = null; planoMaestroLibreIdActual = null; }
+  if(data.json){
+    try { PLANO_MAESTRO = JSON.parse(data.json); }
+    catch(e){ console.error('Plano maestro con formato inválido:', e); }
+  } else {
+    PLANO_MAESTRO = null;
+  }
+  PLANO_MAESTRO_FORMATO = 'grid';
+  if(vistaActual==='plano') renderPlano();
+}, err => console.error('Error de conexión con el plano maestro:', err));
 
 function actualizarCapacidad(grupoKey, turnoKey, valor){
   const cap = Math.max(0, Math.round(Number(valor)) || 0);
