@@ -474,14 +474,27 @@ function aplicarRestriccionesRol(){
   const btnConfig = document.getElementById('toggleConfig');
   const btnSalones = document.getElementById('toggleSalones');
   const btnNueva = document.getElementById('btnNuevaReservaHeader');
+  // "Consulta" es el nivel más restringido: solo puede VER las reservas
+  // ya aprobadas en "Por día" (calendario, lista, plano, resumen) — nada
+  // de Solicitudes (pendientes por gestionar/aprobar), nada de Salones,
+  // nada de Config, y tampoco puede bloquear un día. Los formularios
+  // dentro de una reserva ya quedaban en solo-lectura desde antes
+  // (aplicarModoConsultaEnModal) — esto es lo que le cierra el resto de
+  // la navegación alrededor.
+  const btnSolicitudesTab = document.getElementById('toggleSolicitudes');
+  const btnBloquearDia = document.getElementById('btnBloquearDia');
 
   if(btnConfig) btnConfig.style.display = (rol === 'admin') ? '' : 'none';
   if(btnSalones) btnSalones.style.display = (rol === 'admin') ? '' : 'none';
   if(rol === 'consulta'){
     document.body.classList.add('rol-consulta');
     if(btnNueva) btnNueva.style.display = 'none';
+    if(btnSolicitudesTab) btnSolicitudesTab.style.display = 'none';
+    if(btnBloquearDia) btnBloquearDia.style.display = 'none';
   } else {
     if(btnNueva) btnNueva.style.display = '';
+    if(btnSolicitudesTab) btnSolicitudesTab.style.display = '';
+    if(btnBloquearDia) btnBloquearDia.style.display = '';
     if(rol === 'operativo') document.body.classList.add('rol-operativo');
   }
   // Un "Promotor de eventos" solo tiene datos de UN día en todo el
@@ -513,9 +526,17 @@ function aplicarRestriccionesRol(){
   if(calWrap) calWrap.style.display = esPromotorNav ? 'none' : '';
   // Si por algo la pestaña activa en este momento es una que este nivel ya
   // no puede ver (por ejemplo quedó en Config o Salones y le bajaron el
-  // nivel), lo mandamos de vuelta a Solicitudes en vez de dejarlo colgado.
-  if((vistaApp === 'config' && rol !== 'admin') || (vistaApp === 'salones' && rol !== 'admin')){
+  // nivel), lo mandamos a una pantalla que sí pueda ver, en vez de
+  // dejarlo colgado. Para "consulta" eso es "Por día" — nunca Solicitudes,
+  // que es justo lo que este nivel no debe ver — incluyendo el arranque
+  // normal de la app, que siempre abre en Solicitudes por defecto antes
+  // de saber qué rol inició sesión.
+  if(vistaApp === 'config' && rol !== 'admin'){
     cambiarVistaApp('solicitudes');
+  } else if(vistaApp === 'salones' && rol !== 'admin'){
+    cambiarVistaApp('solicitudes');
+  } else if(vistaApp === 'solicitudes' && rol === 'consulta'){
+    cambiarVistaApp('porDia');
   }
 }
 
@@ -1545,6 +1566,7 @@ function abrirModalEvento(){
   eventoImagenBase64Temp = null;
   elegirTurnoEvento('cena');
   cargarOpcionesPlanoEvento('');
+  document.getElementById('sincronizarHoraBloque').style.display = 'none';
   document.getElementById('eventoModalError').textContent = '';
   document.getElementById('overlayEvento').classList.add('open');
 }
@@ -1567,11 +1589,44 @@ function editarEvento(id){
   else { preview.style.display = 'none'; }
   elegirTurnoEvento(ev.turno || 'cena');
   cargarOpcionesPlanoEvento(ev.planoId || '');
+  document.getElementById('sincronizarHoraBloque').style.display = 'block';
   document.getElementById('eventoModalError').textContent = '';
   document.getElementById('overlayEvento').classList.add('open');
 }
 function cerrarModalEvento(){
   document.getElementById('overlayEvento').classList.remove('open');
+}
+// Utilidad puntual: cambiar la "Hora de entrada" de un evento (arriba en
+// este mismo formulario) NO actualiza las reservas que ya existían para
+// ese evento — cada una guarda su propia hora, independiente de la del
+// evento, por si alguna vez alguien necesita una hora distinta a la
+// general (ej. un VIP que entra antes). Este botón sirve para cuando SÍ
+// se quiere que todas se muevan parejo: busca todas las reservas con el
+// eventoId de este evento y les pone la hora de entrada actual del
+// formulario, sin excepción.
+function sincronizarHoraReservasEvento(){
+  const editId = document.getElementById('fEventoEditId').value;
+  const nuevaHora = document.getElementById('fEventoHoraEntrada').value;
+  const nombreEvento = document.getElementById('fEventoNombre').value.trim();
+  if(!editId || !nuevaHora){ alert('Primero guarda la hora de entrada del evento.'); return; }
+  const afectadas = reservas.filter(r => r.eventoId === editId);
+  if(afectadas.length === 0){ alert('No hay ninguna reserva guardada todavía para este evento.'); return; }
+  const horaLegible = (typeof formatearHora12 === 'function') ? formatearHora12(nuevaHora) : nuevaHora;
+  const confirmar = confirm(`Esto va a cambiar la hora a ${horaLegible} en ${afectadas.length} reserva(s) de "${nombreEvento}", sin excepción (incluidas las que ya tuvieran una hora distinta). ¿Continuar?`);
+  if(!confirmar) return;
+  const btn = document.getElementById('btnSincronizarHoraEvento');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Actualizando…';
+  const lote = db.batch();
+  afectadas.forEach(r => lote.update(reservasRef.doc(r.id), { hora: nuevaHora }));
+  lote.commit().then(() => {
+    alert(`Listo — se actualizó la hora en ${afectadas.length} reserva(s).`);
+  }).catch(err => {
+    console.error('Error sincronizando hora de reservas del evento:', err);
+    alert('No se pudo actualizar. Detalle: ' + (err && err.message ? err.message : err));
+  }).finally(() => {
+    btn.disabled = false; btn.textContent = textoOriginal;
+  });
 }
 function guardarEvento(){
   const errEl = document.getElementById('eventoModalError');
@@ -2192,10 +2247,16 @@ const HORARIOS_SEED = {
 let HORARIOS = JSON.parse(JSON.stringify(HORARIOS_SEED));
 const horariosConfigRef = db.collection('configuracion').doc('horarios');
 let suprimirRenderHorarios = false;
+// Hora de corte entre "Cena 1" (temprano) y "Cena 2" (show) — SOLO viernes
+// y sábado. Es un dato de referencia para el staff (una sugerencia de hora
+// de salida); NO bloquea mesas por sí solo — la disponibilidad real la
+// sigue manejando el campo horaSalida de cada reserva (ver ocupadasPorOtro
+// en el selector de mesas). Se edita desde Config → Horario de atención.
+let CORTE_CENA_FINDE = '21:00';
 
 horariosConfigRef.get().then(snap => {
   if(!snap.exists){
-    return horariosConfigRef.set(HORARIOS_SEED);
+    return horariosConfigRef.set({...HORARIOS_SEED, corteCenaFinDeSemana: CORTE_CENA_FINDE});
   }
   const data = snap.data();
   // Migración desde la versión anterior (agrupada en "lunjue" / "viesab" /
@@ -2209,6 +2270,7 @@ horariosConfigRef.get().then(snap => {
       domingo: data.domingo || HORARIOS_SEED.domingo,
       festivo: HORARIOS_SEED.festivo,
       domingoAntesFestivo: HORARIOS_SEED.domingoAntesFestivo,
+      corteCenaFinDeSemana: data.corteCenaFinDeSemana || CORTE_CENA_FINDE,
     };
     return horariosConfigRef.set(migrado);
   }
@@ -2216,6 +2278,7 @@ horariosConfigRef.get().then(snap => {
   horariosConfigRef.onSnapshot(snap => {
     if(snap.exists){
       const data = snap.data();
+      CORTE_CENA_FINDE = data.corteCenaFinDeSemana || CORTE_CENA_FINDE;
       // Combinamos con el seed por si falta algún día/turno (por ejemplo,
       // festivo/domingoAntesFestivo en un documento migrado antes de que
       // existieran).
@@ -2233,6 +2296,8 @@ horariosConfigRef.get().then(snap => {
       // de otro lado (otro empleado, u otra pestaña del mismo usuario).
       if(!suprimirRenderHorarios){
         renderCapacidadTurnos();
+        const corteInput = document.getElementById('fCorteCenaFinde');
+        if(corteInput) corteInput.value = CORTE_CENA_FINDE;
       }
       suprimirRenderHorarios = false;
     }
@@ -2501,6 +2566,21 @@ function renderCapacidadTurnos(){
         }).join('')}
       </div>
     </div>`).join('');
+}
+
+// Hora de corte editable entre Cena 1 (temprano) y Cena 2 (show), solo
+// viernes/sábado. Ver nota junto a CORTE_CENA_FINDE más arriba: es un dato
+// de referencia (sugerencia de hora de salida), no altera la disponibilidad
+// de mesas por sí solo.
+function actualizarCorteCenaFinDeSemana(valor){
+  if(!valor) return;
+  CORTE_CENA_FINDE = valor;
+  suprimirRenderHorarios = true;
+  horariosConfigRef.set({ corteCenaFinDeSemana: valor }, { merge: true }).catch(err => {
+    suprimirRenderHorarios = false;
+    alert('No se pudo guardar la hora de corte. Revisa tu conexión e intenta de nuevo.');
+    console.error(err);
+  });
 }
 
 // ============ CONFIGURACIÓN: MENSAJES DE WHATSAPP ============
@@ -2873,6 +2953,10 @@ function construirEventosContainer(iso){
     </div>`).join('');
 }
 function abrirModalBloqueoDia(){
+  // Refuerzo de seguridad, igual que en cambiarVistaApp(): aunque el
+  // botón ya esté oculto para "consulta", esto bloquea el acceso real.
+  const rolBloqueoDia = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
+  if(rolBloqueoDia === 'consulta') return;
   const iso = fechaISO(fechaActual);
   const dia = FECHAS_BLOQUEADAS[iso] || {};
   document.getElementById('bloqueoDiaError').textContent = '';
@@ -2881,7 +2965,7 @@ function abrirModalBloqueoDia(){
   // bloquear — así nunca se te queda otro turno marcado sin querer, de
   // una vez anterior en la que estabas viendo "Todos". Si estás en
   // "Todos", ahí sí se muestran los tres, para bloquear el día completo.
-  const soloEsteTurno = turnoActivo !== 'todos' ? turnoActivo : null;
+  const soloEsteTurno = turnoActivo !== 'todos' ? turnoRealDesdeActivo(turnoActivo) : null;
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
   document.getElementById('bloqueoDiaTitulo').textContent = soloEsteTurno
     ? `Bloquear ${turnoLabels[soloEsteTurno]} — ${formatearFechaLarga(iso)}`
@@ -3298,6 +3382,26 @@ clientesRef.onSnapshot(snap => {
 let fechaActual = new Date();
 fechaActual.setHours(12,0,0,0); // mediodía para evitar líos de huso horario al comparar fechas
 let turnoActivo = 'todos';
+// "cena1"/"cena2" son valores de FILTRO nada más (Cena 1 · Temprano / Cena
+// 2 · Show) — nunca se guardan como turno real de una reserva, evento ni
+// horario; el dato real en Firestore sigue siendo turno:"cena" +
+// franjaCena. Estos dos helpers son el único lugar que traduce entre el
+// filtro visible y el turno real, para no tener que tocar la lógica de
+// horarios/eventos/informes en cada sitio que ya asumía turnos reales.
+function turnoRealDesdeActivo(t){
+  return (t === 'cena1' || t === 'cena2') ? 'cena' : t;
+}
+function reservaCoincideConTurnoActivo(r, t){
+  if(t === 'todos') return true;
+  // Coincidencia estricta: "Cena 1" muestra SOLO lo que de verdad quedó
+  // marcado franjaCena="temprano" — igual de mecánico que Desayuno/
+  // Almuerzo. Una reserva de cena SIN franja (nunca se le puede poner
+  // entre semana, porque el selector solo aparece viernes/sábado) NO
+  // cuenta para ninguno de los dos — solo aparece bajo "Cena" a secas.
+  if(t === 'cena1') return r.turno === 'cena' && r.franjaCena === 'temprano';
+  if(t === 'cena2') return r.turno === 'cena' && r.franjaCena === 'show';
+  return r.turno === t;
+}
 let vistaActual = 'lista';
 let editandoId = null;
 // Se incrementa cada vez que se ABRE el modal (nueva reserva o editar una
@@ -3459,24 +3563,56 @@ function renderHeader(){
     `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<span class="grupo">${DIA_LABEL[grupoDeFecha(d)]||''}</span>`;
 
   const grupo = HORARIOS[grupoDeFecha(d)];
-  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
-  document.getElementById('turnosBar').innerHTML = turnos.map(([key,label])=>{
-    // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
-    // sin importar si ese turno está prendido o apagado en el horario de
-    // atención configurado — "apagado" solo bloquea que un CLIENTE pida
-    // una reserva nueva ahí (eso se valida en solicitud.html), no que el
-    // staff pueda filtrar y ver reservas de ese turno en "Por día".
-    const cfg = key==='todos' ? {activo:true} : grupo[key];
+  // El filtro de turno SIEMPRE se puede usar para ver lo que ya existe,
+  // sin importar si ese turno está prendido o apagado en el horario de
+  // atención configurado — "apagado" solo bloquea que un CLIENTE pida
+  // una reserva nueva ahí (eso se valida en solicitud.html), no que el
+  // staff pueda filtrar y ver reservas de ese turno en "Por día".
+  // "cena1"/"cena2" no son un turno real del horario — usan el mismo
+  // cfg que "cena" (ver turnoRealDesdeActivo).
+  const pillHTML = ([key,label])=>{
+    const cfg = key==='todos' ? {activo:true} : (grupo[turnoRealDesdeActivo(key)] || {activo:true});
     const active = turnoActivo===key;
-    // El filtro se ve y se usa igual sin importar si ese turno está
-    // prendido o apagado en el horario configurado para el día — eso solo
-    // importa para bloquear reservas nuevas de clientes, no para filtrar
-    // lo que ya existe.
     return `<button class="turno-pill ${active?'active':''}" onclick="setTurno('${key}')">
       <span class="dot"></span>${label}
     </button>`;
-  }).join('');
+  };
+  // "Cena" se pinta aparte, en su propia fila (junto a Especiales/Bloquear
+  // día), centrada arriba de Cena 1/Cena 2 — antes estaba metida en la
+  // misma fila que los otros 5 botones y quedaba muy apretada.
+  document.getElementById('turnoCenaBar').innerHTML = pillHTML(['cena','Total Cena']);
+  const turnos = [['todos','Todos'], ['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']];
+  document.getElementById('turnosBar').innerHTML = turnos.map(pillHTML).join('');
+  alinearBotonCena();
 }
+// Mide en vivo cuánto ocupan juntos los botones "Cena 1" y "Cena 2" en la
+// fila de abajo, y le fija ESE mismo ancho al botón "Total Cena" de la
+// fila de arriba — así queda exactamente del doble de ancho de uno solo,
+// nunca más ancho, sin importar el tamaño de pantalla. Se recalcula en
+// cada render y también si el teléfono gira/cambia de ancho.
+function alinearBotonCena(){
+  const slot = document.getElementById('turnoCenaBar');
+  const barra = document.getElementById('turnosBar');
+  if(!slot || !barra) return;
+  requestAnimationFrame(()=>{
+    const botones = barra.querySelectorAll('.turno-pill');
+    // Los últimos dos botones de la fila de abajo son siempre Cena 1 y
+    // Cena 2 (ver el array `turnos` en renderHeader) — si por alguna
+    // razón no hay al menos 2, no se toca el ancho (queda el de CSS).
+    if(botones.length < 2) return;
+    const cena1 = botones[botones.length - 2];
+    const cena2 = botones[botones.length - 1];
+    const r1 = cena1.getBoundingClientRect();
+    const r2 = cena2.getBoundingClientRect();
+    const ancho = r2.right - r1.left;
+    if(ancho > 0) slot.style.setProperty('--cena-slot-w', ancho + 'px');
+  });
+}
+let _resizeTimerCena = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(_resizeTimerCena);
+  _resizeTimerCena = setTimeout(alinearBotonCena, 150);
+});
 
 /* ============ RENDER: STATS ============ */
 let filtroEspecialesPorDia = false;
@@ -3494,8 +3630,8 @@ function reservasDelTurno(){
   // siguen en el flujo de solicitud/aprobación del cliente (esas viven en
   // la pantalla "Solicitudes" hasta que el cliente las apruebe).
   let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
-  if(turnoActivo !== 'todos') rs = rs.filter(r=>r.turno===turnoActivo);
-  if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=20);
+  if(turnoActivo !== 'todos') rs = rs.filter(r=>reservaCoincideConTurnoActivo(r, turnoActivo));
+  if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=30);
   return rs;
 }
 
@@ -3634,7 +3770,7 @@ function groupPaxByDate(rsMes, ano, mes){
       dia: d, iso,
       pax: rsDia.reduce((a,r)=>a+Number(r.pax||0),0),
       reservas: rsDia.length,
-      tieneEspecial: rsDia.some(r=>Number(r.pax)>=20),
+      tieneEspecial: rsDia.some(r=>Number(r.pax)>=30),
     });
   }
   return porDia;
@@ -3659,7 +3795,7 @@ function groupPaxByWeekday(rsMes){
 }
 
 // Picos: entre los 5 días de más pax del mes, o cualquier día con una
-// reserva especial (20+ pax) — no hay un "umbral de alta demanda"
+// reserva especial (30+ pax) — no hay un "umbral de alta demanda"
 // configurado aparte en la app, así que se usa exactamente este criterio
 // de respaldo que pide el documento.
 function identifyDemandPeaks(porDia){
@@ -3779,9 +3915,9 @@ async function generarInformeEjecutivoMensual(anoParam, mesParam){
     const insights = generateExecutiveInsights(porServicioOrdenado, porDiaSemana, metrics);
     const oportunidad = calcularOportunidad(porServicio, porDiaSemana, metrics);
 
-    // Reservas especiales (20+ personas) del mes — mismo umbral que ya usa
-    // el resto de la app (⭐ en el calendario, filtro "Especiales (20+)").
-    const rsEspeciales = rsMes.filter(r=>Number(r.pax)>=20);
+    // Reservas especiales (30+ personas) del mes — mismo umbral que ya usa
+    // el resto de la app (⭐ en el calendario, filtro "Especiales (30+)").
+    const rsEspeciales = rsMes.filter(r=>Number(r.pax)>=30);
     const especiales = {
       count: rsEspeciales.length,
       pax: rsEspeciales.reduce((a,r)=>a+Number(r.pax||0),0),
@@ -3921,7 +4057,7 @@ function renderExecutiveReport(d){
     </div>
 
     <div class="ie-especiales-row">
-      <div class="ie-especiales-titulo">⭐ RESERVAS ESPECIALES (20+ PERSONAS)</div>
+      <div class="ie-especiales-titulo">⭐ RESERVAS ESPECIALES (30+ PERSONAS)</div>
       <div class="ie-especiales-cards">
         <div class="ie-especiales-card">
           <div class="ie-especiales-num">${numCO(d.especiales.count)}</div>
@@ -3958,14 +4094,15 @@ function cerrarInformeEjecutivo(){
 // WhatsApp, que es más limitado que Safari), reintenta una vez a menor
 // calidad antes de rendirse. Así se recupera sola en la mayoría de los
 // casos en vez de fallar directo.
-async function ieCapturarCanvas(poster, scalePreferida){
+async function ieCapturarCanvas(poster, scalePreferida, bgColor){
+  const fondo = bgColor || '#0d1420';
   if(document.fonts && document.fonts.ready) await document.fonts.ready;
   try{
-    return await html2canvas(poster, {scale:scalePreferida, backgroundColor:'#0d1420', useCORS:true});
+    return await html2canvas(poster, {scale:scalePreferida, backgroundColor:fondo, useCORS:true});
   } catch(errPrimero){
     console.error('Primer intento de captura falló, reintentando a menor calidad:', errPrimero);
     try{
-      return await html2canvas(poster, {scale:1, backgroundColor:'#0d1420'});
+      return await html2canvas(poster, {scale:1, backgroundColor:fondo});
     } catch(errSegundo){
       console.error('Segundo intento también falló:', errSegundo);
       throw errSegundo;
@@ -3973,6 +4110,131 @@ async function ieCapturarCanvas(poster, scalePreferida){
   }
 }
 
+// Descarga un <canvas> como archivo, preservando el nombre elegido.
+// OJO: antes esto se hacía con canvas.toDataURL() + <a download>, pero
+// Safari en iPhone no siempre respeta el nombre de archivo cuando el
+// link apunta a un data: URI larguísimo (que es lo que da toDataURL) —
+// en la práctica termina guardando el archivo con un nombre genérico
+// ("app"), aunque el diálogo de descarga sí muestre el nombre correcto
+// antes de tocar "Descargar". Usando un Blob + URL de objeto en vez de
+// un data: URI, Safari sí preserva el nombre de forma confiable.
+function descargarCanvasComoArchivo(canvas, nombreArchivo, tipo, calidad){
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if(!blob){ reject(new Error('No se pudo generar el archivo de imagen')); return; }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = nombreArchivo;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // Se libera el URL de objeto un momento después — hay que darle
+      // tiempo al navegador a que empiece a leerlo antes de revocarlo.
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      resolve();
+    }, tipo, calidad);
+  });
+}
+// Alternativa a "Imprimir / Guardar como PDF" — en iPhone, tocar
+// window.print() abre el diálogo nativo de iOS que primero busca
+// impresoras AirPrint cercanas (eso es lo que se demora, no el código de
+// la app) antes de ofrecer "Guardar en Archivos". Esta opción se salta
+// todo eso: captura el informe tal cual se ve (html2canvas) y arma un
+// PDF real de verdad (jsPDF) en carta horizontal, cortando la captura en
+// páginas — sin pasar por ningún diálogo del sistema. Sirve para
+// cualquiera de los informes que comparten el overlay #overlayInforme
+// (día, mes, clientes especiales, estadísticas de solicitudes).
+// OJO — diferencia real con "Imprimir / Guardar como PDF": ese usa la
+// paginación del propio navegador, que sabe evitar cortar una fila de la
+// tabla justo en el borde de una hoja (ver break-inside:avoid en el CSS
+// de impresión). Este método corta la captura cada cierta altura fija,
+// así que en un caso raro podría partir una fila justo en el borde de una
+// página — no debería notarse casi nunca (las filas son angostas), pero
+// si Guillermo ve algo cortado a la mitad, esa es la explicación, y
+// "Imprimir / Guardar como PDF" sigue siendo la opción 100% fiel al
+// original para esos casos.
+async function descargarInformeComoPDFRapido(){
+  const contenedor = document.querySelector('#overlayInforme .informe-modal');
+  const toolbar = document.getElementById('overlayInforme') ? document.querySelector('#overlayInforme .informe-toolbar') : null;
+  const btn = document.getElementById('btnDescargarInformeImg');
+  if(!contenedor) return;
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('No fue posible cargar el generador de PDF (revisa la conexión a internet e intenta de nuevo). Mientras tanto, puedes usar "Imprimir / Guardar como PDF".');
+    return;
+  }
+  if(toolbar) toolbar.style.display = 'none';
+  const textoOriginalBtn = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = '⏳ Generando PDF...'; btn.disabled = true; }
+  // En el celular, la tabla se ve angosta (el texto se parte en varias
+  // líneas) porque el modal solo tiene el ancho de la pantalla del
+  // teléfono — muy distinto a como se ve impreso. Se ensancha temporal
+  // (como si fuera una pantalla grande) para que la captura salga
+  // parecida a la impresa, con menos texto partido, y se deja como
+  // estaba al terminar.
+  // El modal ADEMÁS tiene su propio scroll interno (max-height + overflow,
+  // para que quepa en pantalla) — eso hacía que la captura solo agarrara
+  // el pedazo que se veía en ese momento según dónde tuviera el scroll
+  // Guillermo, en vez del documento completo. Se le quita también el
+  // scroll (max-height:none; overflow:visible) antes de capturar, para
+  // que TODO el contenido esté realmente ahí, sin importar el scroll.
+  const anchoOriginal = contenedor.style.width;
+  const maxAnchoOriginal = contenedor.style.maxWidth;
+  const maxAltoOriginal = contenedor.style.maxHeight;
+  const overflowOriginal = contenedor.style.overflowY;
+  contenedor.style.width = '1400px';
+  contenedor.style.maxWidth = 'none';
+  contenedor.style.maxHeight = 'none';
+  contenedor.style.overflowY = 'visible';
+  contenedor.scrollTop = 0;
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try{
+    const canvas = await ieCapturarCanvas(contenedor, 2, '#ffffff');
+    const { jsPDF } = window.jspdf;
+    const margenMM = 10;
+    // Forma clásica del constructor (orientación, unidad, formato) — más
+    // confiable entre versiones que la forma con objeto.
+    const pdf = new jsPDF('landscape', 'mm', 'letter');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const contentW = pageW - margenMM*2;
+    const contentH = pageH - margenMM*2;
+    // Cuántos píxeles del canvas caben en el ancho útil de una hoja —
+    // define la escala; con eso se saca cuántos píxeles de ALTO caben en
+    // una hoja, y se va cortando el canvas en tiras de esa altura.
+    const pxPorMM = canvas.width / contentW;
+    const altoPaginaPx = Math.max(1, Math.floor(contentH * pxPorMM));
+    let y = 0;
+    let primeraPagina = true;
+    while(y < canvas.height){
+      const altoTiraPx = Math.min(altoPaginaPx, canvas.height - y);
+      const tira = document.createElement('canvas');
+      tira.width = canvas.width;
+      tira.height = altoTiraPx;
+      const ctx = tira.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, tira.width, tira.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, altoTiraPx, 0, 0, canvas.width, altoTiraPx);
+      const imgData = tira.toDataURL('image/jpeg', 0.92);
+      if(!primeraPagina) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', margenMM, margenMM, contentW, altoTiraPx / pxPorMM);
+      primeraPagina = false;
+      y += altoTiraPx;
+    }
+    const fechaArchivo = (typeof fechaISO === 'function' && typeof fechaActual !== 'undefined') ? fechaISO(fechaActual) : new Date().toISOString().slice(0,10);
+    pdf.save(`Informe_La_Matriarca_${fechaArchivo}.pdf`);
+  } catch(err){
+    console.error('Error generando el PDF rápido:', err);
+    alert('No fue posible generar el PDF. Detalle: ' + (err && err.message ? err.message : err));
+  } finally {
+    contenedor.style.width = anchoOriginal;
+    contenedor.style.maxWidth = maxAnchoOriginal;
+    contenedor.style.maxHeight = maxAltoOriginal;
+    contenedor.style.overflowY = overflowOriginal;
+    if(toolbar) toolbar.style.display = 'flex';
+    if(btn){ btn.textContent = textoOriginalBtn; btn.disabled = false; }
+  }
+}
 async function mostrarImagenParaGuardar(){
   const poster = document.getElementById('iePoster');
   const toolbar = document.getElementById('ieToolbar');
@@ -3998,11 +4260,8 @@ async function descargarInformeEjecutivoPNG(){
   toolbar.style.display = 'none'; // que no salga la barra de botones en la captura
   try{
     const canvas = await ieCapturarCanvas(poster, 2.5);
-    const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
-    link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    await descargarCanvasComoArchivo(canvas, `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}.png`, 'image/png');
   } catch(err){
     console.error('Error descargando informe (PNG):', err);
     alert('No fue posible generar la imagen. Detalle: ' + (err && err.message ? err.message : err));
@@ -4022,11 +4281,8 @@ async function descargarInformeEjecutivoLiviana(){
   toolbar.style.display = 'none';
   try{
     const canvas = await ieCapturarCanvas(poster, 1.8);
-    const link = document.createElement('a');
     const nombreMes = MESES[ieMesActual.mes].charAt(0).toUpperCase()+MESES[ieMesActual.mes].slice(1);
-    link.download = `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}_liviano.jpg`;
-    link.href = canvas.toDataURL('image/jpeg', 0.85);
-    link.click();
+    await descargarCanvasComoArchivo(canvas, `Informe_Reservas_La_Matriarca_${nombreMes}_${ieMesActual.ano}_liviano.jpg`, 'image/jpeg', 0.85);
   } catch(err){
     console.error('Error descargando informe (liviano):', err);
     alert('No fue posible generar la imagen liviana. Detalle: ' + (err && err.message ? err.message : err));
@@ -4056,12 +4312,12 @@ function renderCalendarioInline(){
   // cada día refleja exactamente lo que se está viendo, no siempre el total.
   const reservasDelMes = reservas.filter(r => {
     if(r.estado!=='confirmada') return false;
-    if(turnoActivo !== 'todos' && r.turno !== turnoActivo) return false;
+    if(turnoActivo !== 'todos' && !reservaCoincideConTurnoActivo(r, turnoActivo)) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && m===(calInlineMes+1);
   });
   const diasConReserva = new Set(reservasDelMes.map(r=>r.fecha));
-  const diasConEspecial = new Set(reservasDelMes.filter(r=>Number(r.pax)>=20).map(r=>r.fecha));
+  const diasConEspecial = new Set(reservasDelMes.filter(r=>Number(r.pax)>=30).map(r=>r.fecha));
   // Total de PERSONAS (suma de pax de todas las reservas), no cantidad de
   // reservas — así el número refleja cuánta gente hay ese día en total.
   const conteoPorDia = {};
@@ -4086,7 +4342,7 @@ function renderCalendarioInline(){
     // cualquiera, si estás viendo "Todos"). El micrófono 🎤 es distinto:
     // avisa que hay un show especial anunciado ese turno, pero SIN
     // bloquear nada — el cliente puede reservar igual.
-    const infoTurnoDia = infoBloqueoTurno(iso, turnoActivo);
+    const infoTurnoDia = infoBloqueoTurno(iso, turnoRealDesdeActivo(turnoActivo));
     const bloqueado = esBloqueoDuro(infoTurnoDia);
     const soloShow = !!infoTurnoDia && infoTurnoDia.tipo === 'show_especial';
     const total = conteoPorDia[iso] || 0;
@@ -4127,7 +4383,7 @@ function seleccionarDiaInline(d){
   if(usuarioActual && usuarioActual.rol === 'promotor') return;
   fechaActual = new Date(calInlineAno, calInlineMes, d, 12);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoRealDesdeActivo(turnoActivo)].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   renderAll();
@@ -4285,7 +4541,7 @@ function renderStats(){
         inicio: 'Todo el',
         fin: 'día'
       }
-    : grupoDia[turnoActivo];
+    : grupoDia[turnoRealDesdeActivo(turnoActivo)];
   const rs = reservasDelTurno().filter(r=>r.estado!=='cancelada');
   const pax = rs.reduce((a,r)=>a+Number(r.pax||0),0);
   const mesasOcupadas = new Set(rs.map(r=>r.mesa).filter(Boolean)).size;
@@ -4397,13 +4653,19 @@ function renderLista(){
     // Esto solo aplica si estás viendo un turno específico — en "Todos" ya
     // se están mirando los 3 turnos, así que si está vacío es que no hay nada.
     const iso = fechaISO(fechaActual);
-    const otrosTurnos = turnoActivo === 'todos' ? [] : ['desayuno','almuerzo','cena']
+    // Etiquetas legibles — incluye Cena 1/Cena 2, que no son un turno real
+    // pero sí un filtro que el staff puede tocar arriba.
+    const nombresTurno = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1 · Temprano', cena2:'Cena 2 · Show'};
+    const candidatosOtrosTurnos = (turnoActivo === 'cena1' || turnoActivo === 'cena2')
+      ? ['desayuno','almuerzo', turnoActivo==='cena1' ? 'cena2' : 'cena1']
+      : ['desayuno','almuerzo','cena'];
+    const otrosTurnos = turnoActivo === 'todos' ? [] : candidatosOtrosTurnos
       .filter(t => t !== turnoActivo)
-      .filter(t => reservas.some(r => r.fecha===iso && r.turno===t && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'));
+      .filter(t => reservas.some(r => r.fecha===iso && reservaCoincideConTurnoActivo(r,t) && r.estado!=='cancelada' && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera'));
     if(otrosTurnos.length){
-      const nombresTurnos = otrosTurnos.map(t => t.charAt(0).toUpperCase()+t.slice(1)).join(' y ');
+      const nombresTurnos = otrosTurnos.map(t => nombresTurno[t]||t).join(' y ');
       const resumenPartes = renderResumenTurnoHTML(rsTodas);
-      el.innerHTML = avisoBloqueoHtml + resumenPartes.top + `<div class="empty-state">No hay reservas en ${turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>` + resumenPartes.bottom;
+      el.innerHTML = avisoBloqueoHtml + resumenPartes.top + `<div class="empty-state">No hay reservas en ${nombresTurno[turnoActivo]||turnoActivo} para este día.<br>Este día sí tiene reservas en <b>${nombresTurnos}</b> — toca ese turno arriba para verlas.</div>` + resumenPartes.bottom;
     } else {
       const resumenPartes2 = renderResumenTurnoHTML(rsTodas);
       el.innerHTML = avisoBloqueoHtml + resumenPartes2.top + `<div class="empty-state">No hay reservas para este turno todavía.<br>Toca "+ Nueva reserva" para crear una.</div>` + resumenPartes2.bottom;
@@ -4420,7 +4682,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px; line-height:1.4;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}${r.fechaSolicitudMusico ? `<br><span style="font-weight:600; font-size:10px; opacity:.85;">Pedido el ${escapeHtml(formatearFechaCorta(r.fechaSolicitudMusico))}</span>` : ''}</div>` : ''}
     <div class="res-top">
       <div>
-        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}</div>
+        <div class="res-hora">${mostrarFecha && r.fecha ? `${formatearFechaCorta(r.fecha)} · ` : ''}${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${(mostrarFecha || turnoActivo==='todos')?` <span class="badge turno-badge">${turnoLabels[r.turno]||r.turno}</span>`:''}${r.franjaCena?` <span class="badge franja-badge">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`:''}</div>
         <div class="res-nombre">${escapeHtml(r.nombre)}</div>
       </div>
       <div class="res-top-right">
@@ -4430,7 +4692,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
     </div>
     <div class="res-meta">
       <span>${r.pax} pax</span>
-      ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
+      ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
       ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
       ${salonVipNombre ? `<span class="vip-tag">👑 VIP: ${escapeHtml(salonVipNombre)}</span>` : `<span>Mesa ${mesaTxt}</span>${isVip?`<span class="vip-tag">VIP</span>`:''}`}
       ${textoAbonoBadge(r)}
@@ -4474,10 +4736,28 @@ function renderResumenTurnoHTML(rsTodas){
   // ir a buscarlo reserva por reserva.
   const canceladasDia = reservas.filter(r=>r.fecha===iso && r.estado==='cancelada');
   const canceladasDiaPax = canceladasDia.reduce((a,r)=>a+Number(r.pax||0),0);
-  const porTurnoDia = ['desayuno','almuerzo','cena'].map(t=>{
+  const porTurnoDia = [];
+  ['desayuno','almuerzo'].forEach(t=>{
     const rs = reservasDia.filter(r=>r.turno===t);
-    return { turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo',cena:'Cena'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) };
+    porTurnoDia.push({ turno:t, label:{desayuno:'Desayuno',almuerzo:'Almuerzo'}[t], count:rs.length, pax:rs.reduce((a,r)=>a+Number(r.pax||0),0) });
   });
+  // Cena: los viernes y sábados se desglosa en Cena 1 (temprano) / Cena 2
+  // (show) según el campo franjaCena de cada reserva — es solo una vista
+  // de reporte, no cambia el conteo total de cena. Entre semana se muestra
+  // igual que siempre, sin desglosar.
+  const rsCenaDia = reservasDia.filter(r=>r.turno==='cena');
+  if(diaEsFinDeSemanaCena(iso)){
+    const rsTemprano = rsCenaDia.filter(r=>r.franjaCena==='temprano');
+    const rsShow = rsCenaDia.filter(r=>r.franjaCena==='show');
+    const rsSinFranja = rsCenaDia.filter(r=>!r.franjaCena);
+    porTurnoDia.push({ turno:'cena1', label:'🕕 Cena 1', count:rsTemprano.length, pax:rsTemprano.reduce((a,r)=>a+Number(r.pax||0),0) });
+    porTurnoDia.push({ turno:'cena2', label:'🎶 Cena 2', count:rsShow.length, pax:rsShow.reduce((a,r)=>a+Number(r.pax||0),0) });
+    if(rsSinFranja.length > 0){
+      porTurnoDia.push({ turno:'cena', label:'Cena (sin franja)', count:rsSinFranja.length, pax:rsSinFranja.reduce((a,r)=>a+Number(r.pax||0),0) });
+    }
+  } else {
+    porTurnoDia.push({ turno:'cena', label:'Cena', count:rsCenaDia.length, pax:rsCenaDia.reduce((a,r)=>a+Number(r.pax||0),0) });
+  }
   const totalDiaReservas = reservasDia.length;
   const totalDiaPax = reservasDia.reduce((a,r)=>a+Number(r.pax||0),0);
   const resumenDiaHtml = `
@@ -4560,7 +4840,7 @@ function renderResumenTurnoHTML(rsTodas){
   // Fecha legible para que el resumen se entienda solo, si alguien le toma
   // una captura de pantalla sin más contexto (a qué día y turno corresponde).
   const fechaLegibleResumen = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
-  const turnoLabelResumen = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'}[turnoActivo] || 'Todos los turnos';
+  const turnoLabelResumen = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1 · Temprano', cena2:'Cena 2 · Show'}[turnoActivo] || 'Todos los turnos';
 
   const vipSalonesHtml = vipPorSalon.map(({salon, reservas, pax}) => {
     const nombres = reservas.length ? reservas.map(r=>escapeHtml(r.nombre)).join(', ') : 'Sin reservas';
@@ -4798,15 +5078,16 @@ function descargarInformeDia(){
   const iso = fechaISO(fechaActual);
   const fechaLarga = `${DIAS[fechaActual.getDay()]} ${fechaActual.getDate()} de ${MESES[fechaActual.getMonth()]} de ${fechaActual.getFullYear()}`;
   const turnosAIncluir = [turnoActivo];
-  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
+  const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1 · Temprano', cena2:'Cena 2 · Show'};
 
   // Igual que en renderPlano(): si este día/turno coincide con un evento
   // especial que tiene su propio plano, el informe debe mostrar ESE plano
   // (zonas, colores, mesas reales del evento) — no el plano General. Antes
   // esto no se revisaba aquí y el informe siempre mostraba el plano
   // General, aunque la pantalla de "Plano" ya mostrara correctamente el
-  // del evento.
-  const evConPlanoInforme = eventosCache.find(e => e.fecha === iso && e.turno === turnoActivo && e.planoId && e.activo !== false);
+  // del evento. Los eventos siempre usan el turno REAL (nunca "cena1"/
+  // "cena2", que son solo un filtro).
+  const evConPlanoInforme = eventosCache.find(e => e.fecha === iso && e.turno === turnoRealDesdeActivo(turnoActivo) && e.planoId && e.activo !== false);
   const planoIdEventoInforme = evConPlanoInforme ? evConPlanoInforme.planoId : null;
 
   function seguirConPlano(planoEventoUsado){
@@ -4818,7 +5099,7 @@ function descargarInformeDia(){
 
     const seccionesHtml = turnosAIncluir.map(turno => {
     const rs = reservas
-      .filter(r => r.fecha===iso && r.turno===turno && r.estado==='confirmada')
+      .filter(r => r.fecha===iso && reservaCoincideConTurnoActivo(r, turno) && r.estado==='confirmada')
       .sort((a,b) => minutosParaOrdenHora(a.hora) - minutosParaOrdenHora(b.hora));
     const totalPax = rs.reduce((s,r) => s + (Number(r.pax)||0), 0);
     const totalAbonoTurno = rs.reduce((s,r) => s + (Number(r.abono)||0), 0);
@@ -4847,7 +5128,7 @@ function descargarInformeDia(){
       <tr>
         <td>${escapeHtml(r.hora)}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
         <td>${escapeHtml(r.nombre)}</td>
-        <td style="text-align:center;">${r.pax}${Number(r.pax)>=20?' ⭐':''}</td>
+        <td style="text-align:center;">${r.pax}${Number(r.pax)>=30?' ⭐':''}</td>
         <td>${escapeHtml(r.celular||'—')}</td>
         <td>${r.mesa?escapeHtml(r.mesa.split('+').join(' + ')):'—'}</td>
         <td>${r.abono>0?'$'+Number(r.abono).toLocaleString('es-CO'):'—'}</td>
@@ -4886,7 +5167,7 @@ function descargarInformeDia(){
       </div>
       </div>`
       : (PLANO_MAESTRO ? `
-      <div class="plano-canvas-app" style="max-width:640px; margin:14px auto 0;">
+      <div class="plano-canvas-app" style="margin:14px auto 0;">
         ${buildBackgroundPlano(false, null, porMesaRef)}
         ${buildZoneGridPlano('A', ZONES_PLANO.A, mesas, pref, porMesaRef)}
         ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
@@ -4963,7 +5244,7 @@ function cerrarInforme(){
   document.getElementById('overlayInforme').classList.remove('open');
 }
 
-// ===== Informe administrativo: reservas especiales (20+ personas) por mes =====
+// ===== Informe administrativo: reservas especiales (30+ personas) por mes =====
 // Se agrupa semana a semana (lunes a domingo) dentro del mes elegido, con
 // cliente, personas y quién gestionó cada reserva, más abono por reserva,
 // subtotal de abono por semana y totales al cierre del mes. Reutiliza el
@@ -4977,7 +5258,7 @@ function generarInformeEspecialesMes(){
     yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
   }
   const tipoInforme = document.getElementById('fInformeEspecialesTipo').value; // 'aprobadas' | 'solicitudes'
-  renderInformeReservas(yearMonth, tipoInforme, 20);
+  renderInformeReservas(yearMonth, tipoInforme, 30);
 }
 function generarInformeGeneralMes(){
   const inputMes = document.getElementById('fInformeGeneralMes').value;
@@ -5022,12 +5303,12 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   const noCanceladasPax = totalPax - canceladasPax;
   const pctNoCanceladas = totalSolicitudes>0 ? (noCanceladas/totalSolicitudes*100) : 0;
 
-  // Gestión de reservas ESPECIALES (20+ personas) — medición totalmente
+  // Gestión de reservas ESPECIALES (30+ personas) — medición totalmente
   // aparte: su propio universo (especialesDelMes), nunca el total general
   // como denominador. Así la tasa de cancelación especial mide de verdad
   // el desempeño sobre las reservas especiales, no se diluye entre todas
   // las solicitudes del mes.
-  const especialesDelMes = todasDelMes.filter(r => Number(r.pax) >= 20);
+  const especialesDelMes = todasDelMes.filter(r => Number(r.pax) >= 30);
   const totalEspeciales = especialesDelMes.length;
   const especialesPax = sumaPax(especialesDelMes);
   const especialesCanceladas = especialesDelMes.filter(r => r.estado === 'cancelada');
@@ -5138,7 +5419,7 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
       <div class="ie-formula">${canceladas.length} ÷ ${totalSolicitudes||0} × 100</div>
     </div>
     <div class="ie-bloque-gestion ie-bloque-especial">
-      <h2 style="background:none; color:#a17a1c; padding:0; margin-bottom:10px;">👥 GESTIÓN DE RESERVAS ESPECIALES · 20+ PERSONAS</h2>
+      <h2 style="background:none; color:#a17a1c; padding:0; margin-bottom:10px;">👥 GESTIÓN DE RESERVAS ESPECIALES · 30+ PERSONAS</h2>
       <div class="ie-fila-metrica"><span>Total de solicitudes especiales recibidas:</span><b>${totalEspeciales} · ${especialesPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Especiales canceladas:</span><b>${especialesCanceladas.length} · ${especialesCanceladasPax} pax</b></div>
       <div class="ie-fila-metrica"><span>Especiales no canceladas:</span><b>${especialesNoCanceladas} · ${especialesNoCanceladasPax} pax</b></div>
@@ -5159,7 +5440,7 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
   document.getElementById('overlayInforme').classList.add('open');
 }
 // Motor común de los dos informes (especiales y general) — la única
-// diferencia real entre ambos es el umbral mínimo de pax: 20 para el de
+// diferencia real entre ambos es el umbral mínimo de pax: 30 para el de
 // especiales, 0 (sin filtro) para el general, que incluye TODAS las
 // reservas de cualquier tamaño, especiales incluidas.
 function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
@@ -5261,7 +5542,7 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
         ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
         <td>${escapeHtml(r.hora||'—')}${r.horaSalida?' → '+escapeHtml(r.horaSalida):''}</td>
-        <td style="text-align:center;">${r.pax}${!esGeneral || Number(r.pax)>=20 ? ' ⭐' : ''}</td>
+        <td style="text-align:center;">${r.pax}${!esGeneral || Number(r.pax)>=30 ? ' ⭐' : ''}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td style="text-align:right;">$${Number(r.abono||0).toLocaleString('es-CO')}</td>
       </tr>`).join('');
@@ -5270,7 +5551,7 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
         <td>${formatearFechaLarga(fechaClave(r))}</td>
         ${tipoInforme==='solicitudes' ? `<td>${formatearFechaLarga(r.fecha)}</td>` : ''}
         <td>${escapeHtml(r.nombre||'—')}</td>
-        <td style="text-align:center;">${r.pax}${Number(r.pax)>=20 ? ' ⭐' : ''}</td>
+        <td style="text-align:center;">${r.pax}${Number(r.pax)>=30 ? ' ⭐' : ''}</td>
         <td>${escapeHtml(nombreGestor(r))}</td>
         <td>${escapeHtml(r.motivoCancelacion || '— sin motivo registrado —')}</td>
       </tr>`).join('');
@@ -5313,7 +5594,7 @@ function renderInformeReservas(yearMonth, tipoInforme, umbralPax){
   document.getElementById('informeContenido').innerHTML = `
     <div class="informe-header">
       <h1>La Matriarca Barranquilla — ${tituloInforme}</h1>
-      <div class="informe-subtitulo">${mesLabel} · ${filtroLabel} · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}${esGeneral ? ' · Las marcadas con ⭐ son las reservas especiales (20+)' : ''}</div>
+      <div class="informe-subtitulo">${mesLabel} · ${filtroLabel} · Semanas de lunes a domingo${tipoInforme==='solicitudes' ? ' · Agrupado por el día en que llegó la solicitud (no por la fecha de la reserva pedida) · Incluye todos los canales (web y teléfono)' : ' · Agrupado por la fecha de la reserva · Solo confirmadas / pendientes / walk-in'}${esGeneral ? ' · Las marcadas con ⭐ son las reservas especiales (30+)' : ''}</div>
     </div>
     ${semanasHtml}
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:13px;">
@@ -5807,6 +6088,95 @@ window.addEventListener('resize', () => {
   ajustarEscalaPlanoLibre('#mesaPickerScrollWrap', '#mesaPickerCanvas .plano-canvas-libre');
 });
 
+/* ===== ZOOM MANUAL DEL SELECTOR DE MESA (para computador con mouse) =====
+   En el celular el staff puede pellizcar con los dedos para hacer zoom
+   sobre el plano y ver bien la mesa antes de elegirla. En computador, sin
+   pantalla táctil, no existe ese gesto — así que aquí se agrega un control
+   de zoom manual (botones +/-/"Ajustar", más rueda del mouse para
+   acercar/alejar y arrastrar con el mouse para moverse) que actúa ENCIMA
+   del ajuste automático que ya deja el plano completo la primera vez que
+   se abre (ajustarEscalaPlanoApp/Libre, sin tocar). Solo vive dentro del
+   selector de mesas — no afecta la pestaña "Plano" ni el informe. */
+let mesaPickerZoom = 1;
+const MESA_PICKER_ZOOM_MIN = 1;
+const MESA_PICKER_ZOOM_MAX = 3.2;
+
+function aplicarZoomManualPicker(){
+  const wrap = document.getElementById('mesaPickerScrollWrap');
+  const canvasApp = document.getElementById('mesaPickerCanvas');
+  if(!wrap || !canvasApp) return;
+  const inner = canvasApp.classList.contains('libre') ? canvasApp.querySelector('.plano-canvas-libre') : canvasApp;
+  if(!inner) return;
+  // La escala "de ajuste" (el plano completo cabiendo en el recuadro) ya la
+  // dejó puesta ajustarEscalaPlanoApp/Libre justo antes de llamar aquí —
+  // se lee de su propio transform y se multiplica por el zoom manual.
+  const m = /scale\(([^)]+)\)/.exec(inner.style.transform || '');
+  const baseScale = m ? Number(m[1]) : 1;
+  inner.style.transform = 'scale(' + (baseScale * mesaPickerZoom) + ')';
+  inner.style.transformOrigin = 'top left';
+  const zoomActivo = mesaPickerZoom > 1.001;
+  wrap.classList.toggle('zoom-activo', zoomActivo);
+  wrap.style.overflow = zoomActivo ? 'auto' : 'hidden';
+  if(zoomActivo){
+    wrap.style.height = Math.min(wrap.clientHeight || 380, Math.round(window.innerHeight * 0.55)) + 'px';
+  }
+  const label = document.getElementById('mesaPickerZoomLabel');
+  if(label) label.textContent = Math.round(mesaPickerZoom * 100) + '%';
+  const btnMenos = document.getElementById('mesaPickerZoomMenos');
+  if(btnMenos) btnMenos.disabled = mesaPickerZoom <= MESA_PICKER_ZOOM_MIN + 0.001;
+  const btnMas = document.getElementById('mesaPickerZoomMas');
+  if(btnMas) btnMas.disabled = mesaPickerZoom >= MESA_PICKER_ZOOM_MAX - 0.001;
+}
+function cambiarZoomMesaPicker(delta){
+  mesaPickerZoom = Math.min(MESA_PICKER_ZOOM_MAX, Math.max(MESA_PICKER_ZOOM_MIN, +(mesaPickerZoom + delta).toFixed(2)));
+  aplicarZoomManualPicker();
+}
+function restablecerZoomMesaPicker(){
+  mesaPickerZoom = 1;
+  aplicarZoomManualPicker();
+  const wrap = document.getElementById('mesaPickerScrollWrap');
+  if(wrap){ wrap.scrollLeft = 0; wrap.scrollTop = 0; }
+}
+// Arrastrar con el mouse para moverse por el plano ya con zoom aplicado
+// (con el mouse no se puede "deslizar" con el dedo como en el celular), y
+// rueda del mouse para acercar/alejar sin tener que tocar los botones.
+(function(){
+  const wrap = document.getElementById('mesaPickerScrollWrap');
+  if(!wrap) return;
+  let arrastrando = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  wrap.addEventListener('mousedown', (e) => {
+    if(mesaPickerZoom <= 1.001) return; // sin zoom no hace falta arrastrar
+    arrastrando = true; moved = false;
+    startX = e.clientX; startY = e.clientY;
+    startLeft = wrap.scrollLeft; startTop = wrap.scrollTop;
+    wrap.classList.add('arrastrando');
+  });
+  window.addEventListener('mousemove', (e) => {
+    if(!arrastrando) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    wrap.scrollLeft = startLeft - dx;
+    wrap.scrollTop = startTop - dy;
+  });
+  window.addEventListener('mouseup', () => {
+    if(arrastrando && moved){
+      // evita que el "soltar" después de arrastrar dispare por accidente el
+      // click de una mesa que haya quedado justo debajo del cursor
+      wrap.dataset.justDragged = '1';
+      setTimeout(() => { delete wrap.dataset.justDragged; }, 80);
+    }
+    arrastrando = false;
+    wrap.classList.remove('arrastrando');
+  });
+  wrap.addEventListener('click', (e) => {
+    if(wrap.dataset.justDragged){ e.stopPropagation(); e.preventDefault(); }
+  }, true);
+  wrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cambiarZoomMesaPicker(e.deltaY > 0 ? -0.3 : 0.3);
+  }, { passive:false });
+})();
+
 
 // Botón manual "🔄 Actualizar" en el plano — por si algo dejó la pantalla
 // congelada con datos viejos (un modal que se quedó abierto de fondo, o
@@ -5821,7 +6191,7 @@ function forzarRefrescoPlano(){
 
 function renderPlano(){
   const fechaVista = fechaISO(fechaActual);
-  const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoActivo));
+  const evConPlano = eventosCache.find(e => e.fecha === fechaVista && e.planoId && (turnoActivo === 'todos' || e.turno === turnoRealDesdeActivo(turnoActivo)));
   const planoIdEvento = evConPlano ? evConPlano.planoId : null;
 
   // Si el día que se está viendo cae en un evento con plano propio y
@@ -6010,9 +6380,29 @@ function renderMesaPickerCanvas(){
   // 8pm no bloquea toda la noche). Si no tiene hora de salida guardada,
   // se sigue bloqueando el turno completo como antes, por seguridad.
   const horaNuevaReserva = document.getElementById('fHora').value;
+  // Cena 1 / Cena 2 (solo viernes/sábado): son categorías COMPLETAMENTE
+  // aparte de la disponibilidad de mesa — igual que Desayuno/Almuerzo/
+  // Cena no se bloquean entre sí. Si la reserva que se está armando ya
+  // tiene franja elegida, SOLO otra reserva con esa MISMA franja bloquea
+  // la mesa — una reserva de cena sin franja (o de la franja contraria)
+  // NO cuenta, aunque exista ese día. Si todavía no se ha elegido franja
+  // (reserva de "Cena" a secas), se sigue bloqueando contra TODA la
+  // noche, por seguridad, como siempre.
+  // ⚠️ Esto sí abre una ventana de riesgo real: mientras haya reservas de
+  // fin de semana sin franja clasificar, una mesa que ya tienen ocupada
+  // puede volver a asignarse "libre" a una reserva nueva de Cena 1/Cena
+  // 2 — Guillermo lo pidió así a propósito, entendiendo el riesgo,
+  // mientras se van clasificando las reservas viejas.
+  const fFranjaCenaEl = document.getElementById('fFranjaCena');
+  const franjaNuevaReserva = fFranjaCenaEl ? fFranjaCenaEl.value : '';
+  const esCenaFinDeSemanaModal = modalTurno === 'cena' && diaEsFinDeSemanaCena(modalFecha);
   const ocupadasPorOtro = {};
   reservas
     .filter(r => r.fecha===modalFecha && r.turno===modalTurno && r.estado!=='cancelada' && r.id!==editandoId)
+    .filter(r => {
+      if(esCenaFinDeSemanaModal && franjaNuevaReserva && r.franjaCena !== franjaNuevaReserva) return false;
+      return true;
+    })
     .filter(r => {
       if(!r.horaSalida || !horaNuevaReserva) return true; // sin datos suficientes: bloquea, por seguridad
       return horaNuevaReserva < r.horaSalida; // ya salió antes de que llegue la nueva → no bloquea
@@ -6057,12 +6447,17 @@ function renderMesaPickerCanvas(){
   seleccionEl.textContent = mesaSeleccionTemp.length
     ? `Elegidas: ${mesaSeleccionTemp.join(' + ')}`
     : 'Ninguna mesa elegida';
-  if(usandoPlanoEvento || formatoUsado === 'libre'){
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if(usandoPlanoEvento || formatoUsado === 'libre'){
       if(formatoUsado === 'libre') ajustarEscalaPlanoLibre('#mesaPickerScrollWrap', '#mesaPickerCanvas .plano-canvas-libre');
       else ajustarEscalaPlanoApp('#mesaPickerScrollWrap', '#mesaPickerCanvas');
-    }));
-  }
+    }
+    // El zoom manual (botones/rueda del mouse) se aplica encima del ajuste
+    // automático de arriba en cualquier formato de plano — así el control
+    // queda disponible siempre en el selector de mesas, no solo en el
+    // plano libre.
+    aplicarZoomManualPicker();
+  }));
 }
 
 function toggleMesaSeleccion(ref){
@@ -6082,6 +6477,7 @@ function abrirSelectorMesa(){
   document.getElementById('mesaPickerSub').textContent =
     `${modalTurno ? modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1) : ''} · ${modalFecha || ''}`;
   document.getElementById('mesaPickerOverlay').classList.add('open');
+  mesaPickerZoom = 1; // cada vez que se abre el selector, arranca viendo el plano completo
 
   const planoId = planoIdParaFechaTurno(modalFecha, modalTurno);
   if(!planoId){
@@ -6227,7 +6623,7 @@ function cambiarDia(delta){
   if(usuarioActual && usuarioActual.rol === 'promotor') return;
   fechaActual.setDate(fechaActual.getDate()+delta);
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoRealDesdeActivo(turnoActivo)].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   // Aquí sí sincronizamos el calendario, porque el usuario acaba de elegir
@@ -6427,7 +6823,7 @@ function seleccionarDiaCal(d){
   }
   fechaActual = nuevaFecha;
   const grupo = HORARIOS[grupoDeFecha(fechaActual)];
-  if(turnoActivo !== 'todos' && !grupo[turnoActivo].activo){
+  if(turnoActivo !== 'todos' && !grupo[turnoRealDesdeActivo(turnoActivo)].activo){
     turnoActivo = ['almuerzo','cena','desayuno'].find(t=>grupo[t].activo) || 'almuerzo';
   }
   cerrarCalendario();
@@ -6525,6 +6921,10 @@ function cambiarVistaApp(v){
   // viejo guardado), esto bloquea el acceso real a la pantalla.
   const rol = usuarioActual ? (usuarioActual.rol || 'admin') : 'admin';
   if(v === 'config' && rol !== 'admin') return;
+  // Mismo refuerzo que arriba: "consulta" no debe poder entrar a
+  // Solicitudes (reservas pendientes/por aprobar) por ningún camino,
+  // aunque los botones ya estén ocultos.
+  if(v === 'solicitudes' && rol === 'consulta') return;
   vistaApp = v;
   if(v === 'solicitudes') cerrarToastNuevaSolicitud();
   document.getElementById('toggleSolicitudes').classList.toggle('active', v==='solicitudes');
@@ -6727,7 +7127,7 @@ function renderSolicitudesScreen(){
       .sort((a,b) => (fechaSolicitudEfectiva(b)+(b.horaSolicitud||'')).localeCompare(fechaSolicitudEfectiva(a)+(a.horaSolicitud||'')));
   } else {
     delDia = delDiaTotal;
-    if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=20);
+    if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=30);
   }
   // Se aplica al final para que pueda combinarse tanto con el día de
   // llegada visible como con una búsqueda por nombre/celular. Solo compara
@@ -6743,7 +7143,7 @@ function renderSolicitudesScreen(){
     } else {
       el.innerHTML = textoBusquedaSol
         ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en ninguna fecha.</div>`
-        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (20+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (30+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
     }
     renderCalendarioSolInline();
     if(document.getElementById('panelFiltroFechaReserva')?.classList.contains('abierto')) renderCalendarioFiltroFechaReserva();
@@ -6798,14 +7198,14 @@ function renderSolicitudesScreen(){
       <div class="sc-top">
         <div>
           <div class="sc-fecha">${escapeHtml(r.turno)}${r.fecha?` · ${escapeHtml(formatearFechaCorta(r.fecha))}`:''}</div>
-          <div class="sc-hora">${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}</div>
+          <div class="sc-hora">${formatearHora12(r.hora)}${r.horaSalida?` <span class="res-hora-salida">→ ${formatearHora12(r.horaSalida)}</span>`:''}${r.franjaCena?` <span class="badge franja-badge">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`:''}</div>
           <div class="sc-nombre">${escapeHtml(r.nombre)}</div>
         </div>
         <span class="badge ${r.estado}">${estadoLabel(r.estado)}</span>
       </div>
       <div class="sc-meta">
         <span>${r.pax} pax</span>
-        ${Number(r.pax)>=20?`<span class="especial-tag">⭐ Especial</span>`:''}
+        ${Number(r.pax)>=30?`<span class="especial-tag">⭐ Especial</span>`:''}
         ${r.celular?`<span class="tel-destacado">${escapeHtml(r.celular)}</span>`:''}
         ${r.mesa ? (esSalonVipEspecial(r.mesa) ? `<span class="vip-tag">👑 VIP: ${escapeHtml(esSalonVipEspecial(r.mesa))}</span>` : `<span>Mesa ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`) : ''}
         ${r.vipSolicitada?`<span class="vip-tag">Quiere VIP</span>`:''}
@@ -7000,6 +7400,13 @@ function abrirModal(id, mesaId){
     }
     document.getElementById('fHora').value = r.hora;
     document.getElementById('fHoraSalida').value = r.horaSalida || '';
+    document.getElementById('fFranjaCena').value = String(r.franjaCena || '').trim();
+    renderFranjaCenaBlock();
+    // Seguro extra: en algunos iPhone el resaltado dorado de Cena 1/Cena 2
+    // no se repinta a tiempo si este render cae en el mismo instante en que
+    // el modal se está mostrando — se repite en el siguiente frame para
+    // garantizar que quede pintado, sin cambiar ningún dato.
+    requestAnimationFrame(renderFranjaCenaBlock);
     document.getElementById('fPax').value = r.pax;
     document.getElementById('fNombre').value = r.nombre;
     { const cel = partirCelularGuardado(r.celular); document.getElementById('fCelularCod').value = cel.codigo; document.getElementById('fCelular').value = cel.numero; }
@@ -7132,10 +7539,16 @@ function abrirModal(id, mesaId){
       horaEntradaPromotor = (evCompletoPromotor && evCompletoPromotor.horaEntrada) || usuarioActual.eventoAsignado.horaEntrada || '';
     } else {
       modalFecha = fechaISO(hoyDate);
-      modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoActivo;
+      modalTurno = turnoActivo === 'todos' ? turnoRealDeAhora() : turnoRealDesdeActivo(turnoActivo);
     }
     document.getElementById('fechaReservaEditBlock').style.display = 'none';
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
+    // Si se está creando desde el filtro "Cena 1"/"Cena 2", se precarga esa
+    // franja como punto de partida (el staff la puede cambiar) — pero solo
+    // sirve de verdad si la fecha con la que arranca (hoy) es viernes o
+    // sábado; si no, renderFranjaCenaBlock() la oculta igual.
+    document.getElementById('fFranjaCena').value = (turnoActivo === 'cena1') ? 'temprano' : (turnoActivo === 'cena2') ? 'show' : '';
+    renderFranjaCenaBlock();
     if(esPromotorNueva){
       // Un promotor no elige tipo de reserva ni evento — ese paso entero
       // (con la parrilla de TODOS los eventos activos) se salta, porque
@@ -7334,6 +7747,7 @@ function elegirCanalNuevo(tipo){
     document.getElementById('fFechaReservaEdit').value = modalFecha;
     document.getElementById('fTurnoReservaEdit').value = modalTurno;
     document.getElementById('turnoInvalidoAviso').style.display = 'none';
+    renderFranjaCenaBlock();
   } else {
     document.getElementById('whatsappBlock').style.display = 'block';
   }
@@ -7461,9 +7875,65 @@ function actualizarSubtituloModalDesdeCampos(){
   const hoyISO = fechaISO(new Date());
   const turnoLabel = turno.charAt(0).toUpperCase()+turno.slice(1);
   document.getElementById('modalSub').textContent = `${turnoLabel} · ${fecha}${fecha===hoyISO ? ' (hoy)' : ''}`;
+  renderFranjaCenaBlock();
 }
 document.getElementById('fFechaReservaEdit').addEventListener('change', actualizarSubtituloModalDesdeCampos);
 document.getElementById('fTurnoReservaEdit').addEventListener('change', actualizarSubtituloModalDesdeCampos);
+
+// ============ CENA 1 (TEMPRANO) / CENA 2 (SHOW) — SOLO VIERNES/SÁBADO ============
+// Es solo una etiqueta de referencia para el staff y para los informes; la
+// disponibilidad real de la mesa la sigue manejando el campo horaSalida de
+// cada reserva (ver ocupadasPorOtro en el selector de mesas), sin tocar esa
+// lógica — así no se duplica ni se puede desincronizar.
+function diaEsFinDeSemanaCena(fechaStr){
+  if(!fechaStr) return false;
+  const dow = new Date(fechaStr+'T12:00:00').getDay(); // 5=viernes, 6=sábado
+  return dow === 5 || dow === 6;
+}
+function renderFranjaCenaBlock(){
+  const bloque = document.getElementById('franjaCenaBlock');
+  if(!bloque) return;
+  const editBlockVisible = document.getElementById('fechaReservaEditBlock').style.display !== 'none';
+  const fecha = editBlockVisible ? document.getElementById('fFechaReservaEdit').value : modalFecha;
+  const turno = editBlockVisible ? document.getElementById('fTurnoReservaEdit').value : modalTurno;
+  const aplica = turno === 'cena' && diaEsFinDeSemanaCena(fecha);
+  bloque.style.display = aplica ? 'block' : 'none';
+  if(!aplica) document.getElementById('fFranjaCena').value = '';
+  const valorFranja = document.getElementById('fFranjaCena').value;
+  document.querySelectorAll('#franjaCenaSelect .estado-opt').forEach(b=>{
+    b.classList.toggle('on', String(b.dataset.val).trim() === String(valorFranja).trim());
+  });
+  const sugerenciaEl = document.getElementById('franjaCenaSugerencia');
+  if(sugerenciaEl){
+    const yaTieneSalida = !!document.getElementById('fHoraSalida').value;
+    if(aplica && valorFranja === 'temprano' && !yaTieneSalida){
+      sugerenciaEl.style.display = 'block';
+      sugerenciaEl.innerHTML = `💡 Sugerencia: al ser Cena 1 (temprano), puedes asignar la hora de salida sugerida (${formatearHora12(CORTE_CENA_FINDE)}) para que la mesa quede libre a tiempo para Cena 2. <button type="button" class="btn-config-guardar" style="margin-top:6px; padding:4px 10px; font-size:11.5px;" onclick="usarSugerenciaHoraSalida()">Usar ${formatearHora12(CORTE_CENA_FINDE)}</button>`;
+    } else {
+      sugerenciaEl.style.display = 'none';
+      sugerenciaEl.innerHTML = '';
+    }
+  }
+}
+function usarSugerenciaHoraSalida(){
+  const el = document.getElementById('fHoraSalida');
+  if(el) el.value = CORTE_CENA_FINDE;
+  if(window.toggleHoraSalidaBlock) window.toggleHoraSalidaBlock(true);
+  renderFranjaCenaBlock();
+}
+document.getElementById('franjaCenaSelect').addEventListener('click', e=>{
+  const btn = e.target.closest('.estado-opt');
+  if(!btn) return;
+  const actual = document.getElementById('fFranjaCena').value;
+  // Tocar la opción ya elegida la desmarca (queda "sin definir") — por si
+  // el staff todavía no sabe cuál va a pedir el cliente.
+  document.getElementById('fFranjaCena').value = (actual === btn.dataset.val) ? '' : btn.dataset.val;
+  renderFranjaCenaBlock();
+  // Si el plano de mesas ya está abierto, se refresca para reflejar la
+  // disponibilidad de la franja recién elegida (una mesa puede pasar de
+  // "ocupada" a "libre" o viceversa al cambiar entre Cena 1 y Cena 2).
+  if(typeof renderMesaPickerCanvas === 'function') renderMesaPickerCanvas();
+});
 
 function cerrarModal(){
   document.getElementById('overlay').classList.remove('open');
@@ -7726,6 +8196,7 @@ function guardarReserva(){
     turno: turnoFinal,
     hora: document.getElementById('fHora').value || '00:00',
     horaSalida: document.getElementById('fHoraSalida').value || '',
+    franjaCena: (turnoFinal==='cena' && diaEsFinDeSemanaCena(fechaFinal)) ? (document.getElementById('fFranjaCena').value || '') : '',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular: armarCelularCompleto(document.getElementById('fCelularCod').value, document.getElementById('fCelular').value),
@@ -7917,6 +8388,7 @@ function enviarParaAprobacion(){
     turno: modalTurno,
     hora: document.getElementById('fHora').value || '00:00',
     horaSalida: horaSalida || '',
+    franjaCena: (modalTurno==='cena' && diaEsFinDeSemanaCena(modalFecha)) ? (document.getElementById('fFranjaCena').value || '') : '',
     pax: Number(document.getElementById('fPax').value)||1,
     nombre,
     celular,
@@ -8366,6 +8838,14 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   let calCursor = new Date();
   let initializingWheels = false;
   let timeHadOriginalValue = false;
+  // Ficha de la reserva que está abierta AHORA MISMO en las ruedas de
+  // hora/minutos/AM-PM. El scroll de la rueda dispara un evento nativo
+  // 'scroll' del navegador que puede llegar con retraso (hasta 80ms
+  // después, por el debounce de abajo) — si mientras tanto el staff cerró
+  // esta reserva y ya abrió OTRA, ese eco tardío no debe escribir la hora
+  // de la reserva vieja encima de la que está viendo ahora. Por eso se
+  // compara siempre contra modalToken antes de escribir en #fHora.
+  let wheelOpenToken = 0;
   // "Seguro" de fecha y hora: una vez que una reserva YA tiene fecha y
   // hora guardadas, se abren bloqueadas (nadie puede moverlas por
   // accidente al entrar a gestionar la mesa, el abono, etc.) — hay que
@@ -8443,6 +8923,11 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
     // evita que una rueda que termine de posicionarse antes que las otras
     // dos alcance a guardar una combinación a medio armar por accidente.
     if(initializingWheels) return;
+    // Defensa contra el eco tardío del scroll: si esto pertenece a una
+    // reserva que ya no es la que está abierta (modal cerrado y vuelto a
+    // abrir para otra reserva mientras este eco venía en camino), se
+    // ignora en vez de pisar la hora de la reserva que se ve ahora.
+    if(wheelOpenToken !== modalToken) return;
     const h12=Number(wheelState.hour)||12, min=Number(wheelState.minute)||0;
     let h24=h12%12; if(wheelState.ampm==='PM') h24+=12;
     document.getElementById('fHora').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
@@ -8489,13 +8974,14 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       items.forEach((it,i)=>{it.classList.toggle('selected',i===idx);it.classList.toggle('near',Math.abs(i-idx)===1);});
       onSelect(items[idx].dataset.value); syncHiddenTime();
     }
-    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(update,80); };
+    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(()=>{ if(isReadOnly()) return; update(); },80); };
     items.forEach((it,i)=>it.onclick=()=>{if(!isReadOnly()) el.scrollTo({top:i*ITEM_H,behavior:'smooth'});});
     const current=String(getCurrent()); const idx=Math.max(0,values.map(String).indexOf(current));
     requestAnimationFrame(()=>{el.scrollTop=idx*ITEM_H; update();});
   }
   function initWheels(){
     initializingWheels = true;
+    wheelOpenToken = modalToken;
     readTimeFromHidden();
     makeWheel('phoneHourWheel',Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),()=>String(wheelState.hour).padStart(2,'0'),v=>wheelState.hour=Number(v));
     makeWheel('phoneMinuteWheel',Array.from({length:60},(_,i)=>String(i).padStart(2,'0')),()=>String(wheelState.minute).padStart(2,'0'),v=>wheelState.minute=Number(v));
@@ -8512,6 +8998,9 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
   let timeHadOriginalValueSalida = false;
   function syncHiddenTimeSalida(){
     if(initializingWheelsSalida && !timeHadOriginalValueSalida) return;
+    // Mismo seguro contra eco tardío que syncHiddenTime() — ver comentario
+    // junto a la declaración de wheelOpenToken.
+    if(wheelOpenToken !== modalToken) return;
     const h12=Number(wheelStateSalida.hour)||12, min=Number(wheelStateSalida.minute)||0;
     let h24=h12%12; if(wheelStateSalida.ampm==='PM') h24+=12;
     document.getElementById('fHoraSalida').value=String(h24).padStart(2,'0')+':'+String(min).padStart(2,'0');
@@ -8531,13 +9020,14 @@ cambiarVistaApp('solicitudes'); // pantalla de inicio: solicitudes del día en c
       items.forEach((it,i)=>{it.classList.toggle('selected',i===idx);it.classList.toggle('near',Math.abs(i-idx)===1);});
       onSelect(items[idx].dataset.value); syncHiddenTimeSalida();
     }
-    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(update,80); };
+    el.onscroll=()=>{ if(isReadOnly()) return; update(); clearTimeout(timer); timer=setTimeout(()=>{ if(isReadOnly()) return; update(); },80); };
     items.forEach((it,i)=>it.onclick=()=>{if(!isReadOnly()) el.scrollTo({top:i*ITEM_H,behavior:'smooth'});});
     const current=String(getCurrent()); const idx=Math.max(0,values.map(String).indexOf(current));
     requestAnimationFrame(()=>{el.scrollTop=idx*ITEM_H; update();});
   }
   function initWheelsSalida(){
     initializingWheelsSalida = true;
+    wheelOpenToken = modalToken;
     readTimeFromHiddenSalida();
     makeWheelSalida('phoneHourWheelSalida',Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),()=>String(wheelStateSalida.hour).padStart(2,'0'),v=>wheelStateSalida.hour=Number(v));
     makeWheelSalida('phoneMinuteWheelSalida',Array.from({length:60},(_,i)=>String(i).padStart(2,'0')),()=>String(wheelStateSalida.minute).padStart(2,'0'),v=>wheelStateSalida.minute=Number(v));

@@ -168,8 +168,16 @@ header{
    sin relación visual clara con nada. width:100% obliga al contenedor
    flex-wrap del <header> a bajarla de línea siempre, en cualquier ancho. */
 .dia-acciones-row{
-  width:100%; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
 }
+.turno-cena-slot{
+  display:flex; justify-content:flex-end; margin-left:auto;
+  /* El ancho real lo fija alinearBotonCena() en JS, midiendo Cena 1 +
+     Cena 2 en la fila de abajo, para que "Total Cena" quede exactamente
+     del mismo ancho que esos dos botones juntos — nunca más ancho. */
+  width:var(--cena-slot-w, 140px);
+}
+.turno-cena-slot .turno-pill{width:100%; justify-content:center;}
 .turno-pill{
   background:var(--panel-alt); border:1px solid var(--border); color:var(--text-muted);
   padding:8px 14px; border-radius:999px; font-size:12.5px; font-weight:600;
@@ -384,9 +392,13 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    Esto es lo que evita tener que abrir una pestaña/ventana nueva: ya no
    hay que salir de la app para imprimir, y "Cerrar" solo cierra el
    informe sin afectar nada más. */
-/* Al imprimir el informe con el plano de un evento adentro, la hoja
-   queda mucho mejor en horizontal — el plano es más ancho que alto. */
-@page{ size: landscape; margin: 10mm; }
+/* Al imprimir el informe (con o sin plano de evento adentro), la hoja
+   queda mucho mejor en horizontal — tanto la tabla como el plano son más
+   anchos que altos. "11in 8.5in" (ancho × alto) es carta horizontal —
+   se usa así, con las medidas explícitas, en vez de la palabra clave
+   "landscape", porque algunos navegadores (incluido Safari en iPhone al
+   "Guardar como PDF") la respetan de forma más confiable. */
+@page{ size: 11in 8.5in; margin: 10mm; }
 @media print{
   /* OJO: antes esto usaba visibility:hidden en todo body *, lo cual deja
      el resto de la app (con sus imágenes enormes en base64: logo, fotos
@@ -415,6 +427,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   .plano-zoneblock, .evento-promotor-banner{
     border-radius:0 !important; box-shadow:none !important;
   }
+  .plano-canvas-scroll-wrap, .plano-canvas-app{break-inside:avoid; page-break-inside:avoid;}
   .plano-mesa-core.p-ocupada, .plano-mesa-core.p-pendiente{outline-width:1px !important;}
 }
 .ie-total-card{
@@ -496,6 +509,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .badge.mensaje_enviado{background:rgba(154,163,178,0.16); color:#9aa3b2;}
 .badge.lista_espera{background:rgba(232,163,61,0.16); color:#e8a33d;}
 .badge.turno-badge{background:var(--panel-raised); color:var(--text-dim); border:1px solid var(--border);}
+.badge.franja-badge{background:rgba(201,161,90,0.16); color:var(--gold); border:1px solid var(--gold);}
 .vip-tag{
   font-size:10px; font-weight:700; color:var(--gold-bright); border:1px solid var(--gold);
   padding:2px 7px; border-radius:999px;
@@ -1084,6 +1098,24 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   border:1px solid var(--border); background:#fbf8f1; overflow:hidden;
 }
 .plano-canvas-scroll-wrap{ position:relative; width:100%; overflow:hidden; border-radius:10px; border:1px solid var(--border); }
+/* Zoom manual del selector de mesa: en celular el usuario hace zoom con los
+   dedos (pellizcar), pero en computador con mouse no hay ese gesto — estos
+   botones (y la rueda del mouse / arrastrar con el mouse, ver JS) permiten
+   acercar/alejar y moverse por el plano cuando se ve muy chiquito. */
+.plano-zoom-toolbar{
+  position:absolute; top:8px; right:8px; z-index:8; display:flex; align-items:center; gap:4px;
+  background:rgba(10,25,26,0.88); border:1px solid var(--border); border-radius:9px; padding:4px 5px;
+  backdrop-filter:blur(2px);
+}
+.plano-zoom-toolbar button{
+  background:var(--panel-alt); color:var(--text); border:1px solid var(--border-soft); border-radius:6px;
+  width:26px; height:26px; font-size:15px; font-weight:700; line-height:1; cursor:pointer; padding:0;
+}
+.plano-zoom-toolbar button.plano-zoom-reset{width:auto; padding:0 8px; font-size:11px; font-weight:600;}
+.plano-zoom-toolbar button:disabled{opacity:.4; cursor:default;}
+.plano-zoom-toolbar span{font-size:11px; color:var(--text-muted); min-width:34px; text-align:center; font-weight:600;}
+.plano-canvas-scroll-wrap.zoom-activo{cursor:grab;}
+.plano-canvas-scroll-wrap.zoom-activo.arrastrando{cursor:grabbing;}
 .plano-canvas-app.evento{ width:880px; height:640px; min-height:0; aspect-ratio:unset; border:none; border-radius:0; }
 .plano-canvas-app.evento .plano-mesa-core{ left:4%; top:4%; right:4%; bottom:4%; font-size:13px; line-height:1.15; padding:0 1px; }
 .plano-canvas-app.evento .plano-mesa-cap{ font-size:10px; opacity:1; font-weight:600; }
@@ -1452,6 +1484,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .estado-opt.sel-pendiente.on{background:var(--pending-bg); border-color:var(--pending); color:var(--pending);}
 .estado-opt.sel-walkin.on{background:var(--walkin-bg); border-color:var(--walkin); color:var(--walkin);}
 .estado-opt.sel-cancelada.on{background:var(--cancelled-bg); border-color:var(--cancelled); color:var(--cancelled);}
+.estado-opt.sel-franja.on{background:rgba(201,161,90,0.16); border-color:var(--gold); color:var(--gold);}
 .modal-actions{display:flex; gap:10px; margin-top:18px;}
 .canal-nuevo-opts{display:flex; flex-direction:column; gap:10px;}
 .canal-nuevo-btn{
@@ -1694,7 +1727,15 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 @media (max-width: 860px){
   header{padding:12px 14px; gap:10px;}
   .brand span{display:none;}
-  .turnos{margin-left:0; order:3; width:100%; overflow-x:auto;}
+  .turnos{margin-left:0; order:3; width:100%; overflow-x:auto; gap:4px;}
+  /* 5 pestañas (Todos/Desayuno/Almuerzo/Cena 1/Cena 2) tienen que caber
+     sin scroll horizontal en una pantalla de celular normal — más chicas
+     que en computador, sin el puntico de color (ahorra espacio) y sin
+     partir el texto en dos líneas. "Cena" va aparte, arriba, en su propia
+     fila junto a Especiales/Bloquear día (ver .turno-cena-slot). */
+  .turno-pill{padding:6px 8px; font-size:10.5px; gap:0; white-space:nowrap; flex:1 1 auto; justify-content:center;}
+  .turno-pill .dot{display:none;}
+  .turno-cena-slot{min-width:90px;}
   .new-btn span{display:none;}
   .clear-btn span{display:none;}
   .clear-btn{padding:9px 10px;}
