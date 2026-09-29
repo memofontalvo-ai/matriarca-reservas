@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.33">
+<link rel="stylesheet" href="app.css?v=6.34">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -533,7 +533,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.33</div>
+<div class="version-tag">v6.35</div>
 
 
 <div class="overlay" id="overlay">
@@ -934,14 +934,14 @@
       <button type="button" class="mesa-picker-cerrar" onclick="cerrarSelectorMesa()">✕</button>
     </div>
     <div class="mesa-picker-hint">Toca una o varias mesas libres para unirlas a esta reserva. Toca de nuevo una mesa ya elegida para quitarla.</div>
+    <div class="plano-zoom-toolbar">
+    <button type="button" id="mesaPickerZoomMenos" onclick="cambiarZoomMesaPicker(-0.4)" title="Alejar">－</button>
+    <span id="mesaPickerZoomLabel">100%</span>
+    <button type="button" id="mesaPickerZoomMas" onclick="cambiarZoomMesaPicker(0.4)" title="Acercar">＋</button>
+    <button type="button" class="plano-zoom-reset" onclick="restablecerZoomMesaPicker()" title="Ver todo">Ajustar</button>
+  </div>
     <div class="plano-canvas-scroll-wrap" id="mesaPickerScrollWrap">
       <div class="plano-canvas-app" id="mesaPickerCanvas"></div>
-      <div class="plano-zoom-toolbar">
-        <button type="button" id="mesaPickerZoomMenos" onclick="cambiarZoomMesaPicker(-0.4)" title="Alejar">－</button>
-        <span id="mesaPickerZoomLabel">100%</span>
-        <button type="button" id="mesaPickerZoomMas" onclick="cambiarZoomMesaPicker(0.4)" title="Acercar">＋</button>
-        <button type="button" class="plano-zoom-reset" onclick="restablecerZoomMesaPicker()" title="Ver todo">Ajustar</button>
-      </div>
     </div>
     <div class="legend">
       <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Elegida para esta reserva</div>
@@ -1316,6 +1316,6 @@
 </div>
 
 
-<script src="app.js?v=6.33"></script>
+<script src="app.js?v=6.35"></script>
 </body>
 </html>

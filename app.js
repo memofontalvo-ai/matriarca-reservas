@@ -6296,6 +6296,7 @@ function renderPlano(){
 
 /* ============ SELECTOR VISUAL DE MESA (dentro del formulario de reserva) ============ */
 let mesaSeleccionTemp = [];
+let mesaPickerQuitadas = []; // refs de un plano anterior descartadas al abrir el selector
 
 function actualizarBotonMesa(){
   const val = document.getElementById('fMesa').value;
@@ -6371,6 +6372,20 @@ function renderMesaPickerCanvas(){
   }
   const mesas = plano.mesas || {};
   const pref = plano.pref || {};
+  // Plano libre: si la reserva traía mesas de un plano ANTERIOR (que ya no
+  // existen en este plano), se quitan de la selección para que al
+  // confirmar/guardar solo quede lo elegido en el plano nuevo. Solo aplica
+  // al formato libre; los planos de cuadrícula no se tocan.
+  if((usandoPlanoEvento ? (plano.__formato || 'grid') : PLANO_MAESTRO_FORMATO) === 'libre'){
+    const validas = new Set();
+    Object.values(plano.mesas || {}).forEach(m => validas.add(String(libreIdMesa(m)).trim().toLowerCase()));
+    Object.values(plano.zonas || {}).forEach(z => { if(ZONA_KINDS_RESERVABLES.has(z.kind)) validas.add(String(libreIdZona(z)).trim().toLowerCase()); });
+    const quitadas = mesaSeleccionTemp.filter(ref => ref.trim() && !validas.has(ref.trim().toLowerCase()));
+    if(quitadas.length){
+      mesaSeleccionTemp = mesaSeleccionTemp.filter(ref => ref.trim() && validas.has(ref.trim().toLowerCase()));
+      mesaPickerQuitadas = mesaPickerQuitadas.concat(quitadas.map(r => r.trim()));
+    }
+  }
   // Mesas ocupadas por OTRAS reservas del mismo día/turno (no cuenta la
   // reserva que se está editando ahora mismo, para no bloquearse a sí misma).
   // Si esa otra reserva SÍ tiene hora de salida registrada, la mesa se
@@ -6447,6 +6462,9 @@ function renderMesaPickerCanvas(){
   seleccionEl.textContent = mesaSeleccionTemp.length
     ? `Elegidas: ${mesaSeleccionTemp.join(' + ')}`
     : 'Ninguna mesa elegida';
+  if(mesaPickerQuitadas.length){
+    seleccionEl.textContent += ` — se descartaron mesas del plano anterior (${mesaPickerQuitadas.join(', ')}); confirma para guardar solo las del plano nuevo.`;
+  }
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if(usandoPlanoEvento || formatoUsado === 'libre'){
       if(formatoUsado === 'libre') ajustarEscalaPlanoLibre('#mesaPickerScrollWrap', '#mesaPickerCanvas .plano-canvas-libre');
@@ -6474,6 +6492,7 @@ function abrirSelectorMesa(){
   }
   const valorActual = document.getElementById('fMesa').value;
   mesaSeleccionTemp = valorActual ? valorActual.split('+') : [];
+  mesaPickerQuitadas = [];
   document.getElementById('mesaPickerSub').textContent =
     `${modalTurno ? modalTurno.charAt(0).toUpperCase()+modalTurno.slice(1) : ''} · ${modalFecha || ''}`;
   document.getElementById('mesaPickerOverlay').classList.add('open');
