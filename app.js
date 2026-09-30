@@ -5912,6 +5912,19 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
 function libreIdMesa(m){
   return (m.ref && String(m.ref).trim()) ? String(m.ref).trim() : m.num;
 }
+// Total de personas de la RESERVA (no la capacidad de la mesa): si una
+// reserva ocupa varias mesas, en todas se muestra el total de la reserva.
+function librePaxReservaHtml(reserva){
+  const n = Number(reserva && reserva.pax) || 0;
+  return n ? `<div class="plano-res-pax">${n} pers.</div>` : '';
+}
+// Selector de mesa: la mesa/zona ELEGIDA muestra las personas de la reserva
+// que se está editando (campo Personas del formulario) en vez de su capacidad.
+function librePaxElegidaHtml(){
+  const n = Number((document.getElementById('fPax')||{}).value) || 0;
+  const nom = (((document.getElementById('fNombre')||{}).value)||'').trim().split(' ')[0];
+  return (nom ? `<div class="plano-guest">${escapeHtml(nom)}</div>` : '') + (n ? `<div class="plano-res-pax">${n} pers.</div>` : '');
+}
 function libreMesaHtmlDisplay(m, porMesaRef, categorias){
   const idMesa = libreIdMesa(m);
   const idLower = String(idMesa).toLowerCase();
@@ -5931,7 +5944,7 @@ function libreMesaHtmlDisplay(m, porMesaRef, categorias){
   const capHtml = (!reserva && m.cap) ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
   const precioHtml = (!reserva && cat && cat.precio) ? `<div class="plano-mesa-precio">$${Number(cat.precio).toLocaleString('es-CO')}</div>` : '';
   const bg = m.color ? `background:${m.color};` : '';
-  return `<div class="plano-mesa-libre ${estadoCls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}${guestName?' · '+escapeHtml(guestName):''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
+  return `<div class="plano-mesa-libre ${estadoCls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}${guestName?' · '+escapeHtml(guestName):''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}${librePaxReservaHtml(reserva)}</div>`;
 }
 function libreMesaHtmlPicker(m, ocupadasPorOtro, categorias){
   const idMesa = libreIdMesa(m);
@@ -5943,9 +5956,10 @@ function libreMesaHtmlPicker(m, ocupadasPorOtro, categorias){
   const clickJs = ocupada ? '' : `onclick='toggleMesaSeleccion(${JSON.stringify(idMesa)})'`;
   const colorMesa = (!elegida && !ocupada) ? m.color : null;
   const bg = colorMesa ? `background:${colorMesa};` : '';
-  const capHtml = m.cap ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
-  const precioHtml = (cat && cat.precio) ? `<div class="plano-mesa-precio">$${Number(cat.precio).toLocaleString('es-CO')}</div>` : '';
-  return `<div class="plano-mesa-libre ${cls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}</div>`;
+  const capHtml = (!elegida && m.cap) ? `<div class="plano-mesa-cap">${m.cap}p</div>` : '';
+  const precioHtml = (!elegida && cat && cat.precio) ? `<div class="plano-mesa-precio">$${Number(cat.precio).toLocaleString('es-CO')}</div>` : '';
+  const resHtml = elegida ? librePaxElegidaHtml() : '';
+  return `<div class="plano-mesa-libre ${cls} ${m.shape==='circle'?'circulo':''}" style="left:${m.x}px; top:${m.y}px; width:${m.w}px; height:${m.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idMesa))}${m.cap?' · cap '+m.cap:''}">${escapeHtml(String(m.num||''))}${capHtml}${precioHtml}${resHtml}</div>`;
 }
 // Zonas de kind 'vip' o 'lobby' son salones/lobbies completos que SÍ se
 // pueden reservar como si fueran una mesa grande (igual que antes
@@ -5987,7 +6001,7 @@ function libreZonaHtmlDisplay(z, porMesaRef){
   // Igual que con las mesas: con una reserva encima, el nombre del cliente
   // importa más que la capacidad — se prioriza para que quepa sin recortarse.
   const capHtml = reserva ? '' : libreZonaCapHtml(z);
-  return `<div class="plano-zona-libre reservable ${estadoCls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}${guestName?' · '+escapeHtml(guestName):''}">${escapeHtml(label)}${capHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}</div>`;
+  return `<div class="plano-zona-libre reservable ${estadoCls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}${guestName?' · '+escapeHtml(guestName):''}">${escapeHtml(label)}${capHtml}${guestName?`<div class="plano-guest">${escapeHtml(guestName)}</div>`:''}${librePaxReservaHtml(reserva)}</div>`;
 }
 function libreZonaHtmlPicker(z, ocupadasPorOtro){
   if(!ZONA_KINDS_RESERVABLES.has(z.kind)) return libreZonaHtmlDecorativa(z);
@@ -6000,7 +6014,7 @@ function libreZonaHtmlPicker(z, ocupadasPorOtro){
   const colorZona = (!elegida && !ocupada) ? z.color : null;
   const bg = colorZona ? `background:${colorZona};` : '';
   const clickJs = ocupada ? '' : `onclick='toggleMesaSeleccion(${JSON.stringify(idZona)})'`;
-  return `<div class="plano-zona-libre reservable ${cls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}">${escapeHtml(label)}${libreZonaCapHtml(z)}</div>`;
+  return `<div class="plano-zona-libre reservable ${cls}" style="left:${z.x}px; top:${z.y}px; width:${z.w}px; height:${z.h}px; ${bg}" ${clickJs} title="${escapeHtml(String(idZona))}${z.cap?' · cap '+z.cap:''}">${escapeHtml(label)}${elegida ? librePaxElegidaHtml() : libreZonaCapHtml(z)}</div>`;
 }
 function buildLibrePlanoDisplay(plano, porMesaRef){
   const hall = plano.hall || {w:880, h:640};
