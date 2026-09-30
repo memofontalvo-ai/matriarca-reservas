@@ -217,7 +217,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.29</div>
+<div class="version-tag">v3.30</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -311,7 +311,7 @@ button{cursor:pointer}
             </select>
             <input type="tel" id="fCelular" maxlength="20" placeholder="300 000 0000" onblur="buscarClienteExistente()">
           </div>
-          <div id="clienteReconocidoAviso" style="display:none; margin-top:6px; font-size:12.5px; color:#2e8b57;">✓ ¡Qué bueno tenerte de vuelta! Ya completamos tus datos.</div>
+          <div id="clienteReconocidoAviso" class="cliente-reconocido-aviso" style="display:none;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>¡Qué bueno tenerte de vuelta! Completamos tus datos.</span></div>
           <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
         </div>
 
@@ -330,8 +330,14 @@ button{cursor:pointer}
       </div>
     </section>
 
-    <section class="section">
-      <div class="field-subtitulo">● Datos del cliente</div>
+    <section class="card-form" id="cardContacto">
+      <div class="card-head">
+        <div class="card-num">1</div>
+        <div>
+          <div class="card-title">Datos de contacto</div>
+          <div class="card-sub">Para identificar y confirmar tu reserva</div>
+        </div>
+      </div>
 
       <div id="bloqueDatosPostCelularPublico">
       <div class="field">
@@ -339,58 +345,71 @@ button{cursor:pointer}
         <input type="text" id="fNombre" maxlength="100" placeholder="Tu nombre completo">
       </div>
 
-      <div class="field" style="margin-top:9px">
-        <label>Correo electrónico (opcional)</label>
+      <div class="field">
+        <label>Correo <span class="opt">· opcional</span></label>
         <input type="email" id="fCorreo" maxlength="120" placeholder="tucorreo@ejemplo.com">
       </div>
 
-      <div class="field" style="margin-top:9px">
-        <label>Fecha de cumpleaños (opcional)</label>
+      <div class="field">
+        <label>Cumpleaños <span class="opt">· opcional</span></label>
         <input type="date" id="fCumpleanos">
       </div>
-
-      <div class="field-subtitulo">▤ Datos de la reserva</div>
-      <div class="field field-pax-chico">
-        <label>Personas</label>
-        <input type="number" id="fPax" min="1" max="500" inputmode="numeric" placeholder="?">
-      </div>
       </div>
     </section>
 
-    <section class="section" id="seccionVipPublico">
-      <div class="section-title">¿Qué tipo de reserva deseas?</div>
-      <div class="vip-opts" id="vipOpts">
-        <button type="button" class="vip-opt" data-val="si" onclick="elegirVip('si')">♛ Sala VIP</button>
-        <button type="button" class="vip-opt" data-val="no" onclick="elegirVip('no')">🪑 Mesa</button>
+    <section class="card-form" id="cardReserva">
+      <div class="card-head">
+        <div class="card-num">2</div>
+        <div>
+          <div class="card-title">Datos de la reserva</div>
+          <div class="card-sub">Cuéntanos cómo deseas reservar</div>
+        </div>
       </div>
-      <div class="vip-note">✨ La Sala VIP está sujeta a disponibilidad y condiciones del restaurante.</div>
-    </section>
 
-
-
-    <section class="section" id="seccionObsPublico">
-      <div class="section-title">Observaciones (opcional)</div>
       <div class="field">
-        <textarea id="fObs" maxlength="500" placeholder="Ocasión especial, alguna solicitud particular..."></textarea>
+        <label>Número de personas</label>
+        <div class="pax-stepper">
+          <button type="button" class="pax-btn" id="btnPaxMenos" onclick="cambiarPaxPublico(-1)" aria-label="Restar una persona">−</button>
+          <input type="number" id="fPax" min="1" max="500" inputmode="numeric" placeholder="?">
+          <button type="button" class="pax-btn" id="btnPaxMas" onclick="cambiarPaxPublico(1)" aria-label="Sumar una persona">+</button>
+        </div>
+      </div>
+
+      <div class="field" id="seccionVipPublico">
+        <label>Tipo de reserva</label>
+        <div class="vip-opts" id="vipOpts">
+          <button type="button" class="vip-opt" data-val="si" onclick="elegirVip('si')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8z"/></svg><span>Sala VIP</span></button>
+          <button type="button" class="vip-opt" data-val="no" onclick="elegirVip('no')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V8a3 3 0 013-3h8a3 3 0 013 3v3"/><path d="M3 13a2 2 0 014 0v2h10v-2a2 2 0 014 0v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4z"/><path d="M6 19v2M18 19v2"/></svg><span>Mesa</span></button>
+        </div>
+        <div class="vip-note">La Sala VIP está sujeta a disponibilidad y condiciones del restaurante.</div>
+      </div>
+
+      <div class="field" id="seccionObsPublico">
+        <label>Observaciones <span class="opt">· opcional</span></label>
+        <textarea id="fObs" maxlength="500" placeholder="Ej.: cumpleaños, aniversario o alguna solicitud particular"></textarea>
       </div>
     </section>
 
-    <section class="section autorizacion-whatsapp">
-      <div class="section-title">Autorización para recibir información</div>
-      <div class="autorizacion-whatsapp__texto">Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.</div>
-      <div class="vip-opts" id="autorizacionOpts" style="margin-top:10px;">
-        <button type="button" class="vip-opt" data-val="si" onclick="elegirAutorizacionWhatsApp('si')">✅ Sí, autorizo</button>
-        <button type="button" class="vip-opt" data-val="no" onclick="elegirAutorizacionWhatsApp('no')">❌ No autorizo</button>
+    <section class="card-form autorizacion-whatsapp" id="cardWhatsapp">
+      <div class="wa-titulo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 01-12.6 7.4L3 20.5l1.7-5.2A8.5 8.5 0 1121 11.5z"/><path d="M12 15.5s-3-1.9-3-4a1.7 1.7 0 013-1 1.7 1.7 0 013 1c0 2.1-3 4-3 4z"/></svg><span>¿Quieres recibir novedades por WhatsApp?</span></div>
+      <div class="wa-corto">Es voluntario y no afecta tu solicitud. Podremos enviarte eventos, promociones y beneficios.</div>
+      <div class="vip-opts" id="autorizacionOpts" style="margin-top:14px;">
+        <button type="button" class="vip-opt" data-val="si" onclick="elegirAutorizacionWhatsApp('si')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Sí, autorizo</span></button>
+        <button type="button" class="vip-opt" data-val="no" onclick="elegirAutorizacionWhatsApp('no')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>No autorizo</span></button>
       </div>
+      <button type="button" class="wa-leer" id="btnLeerAutorizacion" onclick="toggleAutorizacionDetalle()" aria-expanded="false" aria-controls="autorizacionDetalle">Leer autorización completa y política de datos</button>
+      <div id="autorizacionDetalle" class="wa-detalle" style="display:none;">
+      <div class="autorizacion-whatsapp__texto">Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.</div>
       <div class="autorizacion-whatsapp__nota">Esta autorización es voluntaria y no es necesaria para solicitar una reserva. Los mensajes relacionados directamente con tu solicitud o reserva podrán ser enviados independientemente de esta autorización.</div>
       <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" target="_blank" rel="noopener">Consultar Política de Tratamiento de Datos Personales</a>
+      </div>
     </section>
 
     <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">✈ Enviar solicitud de reserva</button>
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
-    <div class="privacy">🔒 Tu información está protegida y solo se usará para tu reserva.</div>
+    <div class="privacy">🔒 Tus datos están protegidos y se usarán para gestionar tu reserva.</div>
   </div>
 
   <div class="confirmacion" id="confirmacion">
@@ -1588,6 +1607,30 @@ const firebaseConfig = {
 })();
 
 </script>
+<script>
+// v3.30 — helpers de presentación (no tocan la lógica de guardado ni de validación).
+// Selector +/− de personas: escribe en el mismo #fPax de siempre y respeta sus
+// límites actuales (1 a 500, los mismos que valida enviarSolicitud).
+function cambiarPaxPublico(delta){
+  const el = document.getElementById('fPax');
+  if(!el) return;
+  const actual = Number(el.value) || 0;
+  let nuevo = actual + delta;
+  if(nuevo < 1) nuevo = 1;
+  if(nuevo > 500) nuevo = 500;
+  el.value = nuevo;
+  el.dispatchEvent(new Event('input', {bubbles:true}));
+}
+// Muestra u oculta el texto legal completo (el texto en sí no cambia).
+function toggleAutorizacionDetalle(){
+  const det = document.getElementById('autorizacionDetalle');
+  const btn = document.getElementById('btnLeerAutorizacion');
+  if(!det || !btn) return;
+  const abrir = det.style.display === 'none';
+  det.style.display = abrir ? 'block' : 'none';
+  btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+</script>
 </body>
 </html>
 
@@ -1880,4 +1923,94 @@ const firebaseConfig = {
 #fPax{
   text-align:center;
 }
+</style>
+
+<style>
+/* v3.30 — tarjetas de "Datos de contacto", "Datos de la reserva" y WhatsApp */
+.card-form{
+  margin-top:16px; padding:18px 16px 16px;
+  background:linear-gradient(180deg,#15181e,#111318);
+  border:1px solid #2a2f38; border-radius:18px;
+}
+.card-head{display:flex; align-items:center; gap:12px; margin-bottom:16px}
+.card-num{
+  flex:0 0 38px; width:38px; height:38px; border-radius:11px;
+  display:flex; align-items:center; justify-content:center;
+  background:#2b2213; border:1px solid rgba(224,173,63,.32);
+  color:var(--gold-bright); font-size:17px; font-weight:800;
+}
+.card-title{color:#fff; font-size:18px; font-weight:700; line-height:1.2}
+.card-sub{color:var(--muted); font-size:13px; margin-top:3px; line-height:1.3}
+.card-form .field{margin-bottom:16px}
+.card-form .field:last-child{margin-bottom:0}
+.card-form .field label{
+  color:#eceef1; font-size:14.5px; font-weight:600; margin-bottom:8px;
+}
+.card-form .field label .opt{color:#8b919b; font-weight:500}
+/* mínimo 16px en campos editables: evita el zoom automático del iPhone */
+.card-form .field input,
+.card-form .field textarea,
+#fCelular, #fCelularCod{font-size:16px}
+.card-form .field input{padding:14px 14px; border-radius:12px; min-height:52px}
+.card-form .field textarea{padding:14px; border-radius:12px; min-height:112px; line-height:1.4}
+#fCumpleanos{
+  display:block; width:100%; min-width:0; max-width:100%;
+  -webkit-appearance:none; appearance:none; text-align:left;
+}
+#fCumpleanos::-webkit-date-and-time-value{text-align:left}
+#fCelularCod{flex:0 0 96px; width:96px}
+
+/* selector +/− de personas */
+.pax-stepper{display:grid; grid-template-columns:56px 1fr 56px; gap:10px; align-items:stretch}
+.pax-btn{
+  height:56px; border-radius:14px; border:1px solid #343942; background:#1a1e25;
+  color:#fff; font-size:26px; font-weight:600; line-height:1; padding:0;
+}
+.pax-btn:active{background:#232830}
+.card-form .pax-stepper #fPax{
+  width:100% !important; min-height:56px; height:56px !important; font-size:22px; font-weight:800;
+  text-align:center; -moz-appearance:textfield; appearance:textfield;
+}
+#fPax::-webkit-outer-spin-button,#fPax::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+
+/* Sala VIP / Mesa y Sí/No autorizo: mismos botones, presentación nueva */
+.card-form .vip-opts{gap:10px}
+.card-form .vip-opt{
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  min-height:54px; border-radius:14px; font-size:16px; font-weight:600;
+  background:#171a20; border:1px solid #343942; color:#f1f2f4;
+}
+.card-form .vip-opt svg{flex:0 0 auto}
+.card-form .vip-opt.on{
+  background:var(--gold); border-color:var(--gold-bright); color:#17130a; font-weight:700;
+}
+.card-form .vip-note{color:#98a0ab; font-size:13px; margin-top:10px; line-height:1.4}
+
+/* Cliente reconocido: verde con ícono de confirmación */
+.cliente-reconocido-aviso{
+  margin-top:10px; align-items:center; gap:9px; color:#4fbf86;
+  font-size:14px; line-height:1.35;
+}
+.cliente-reconocido-aviso[style*="display: block"],
+.cliente-reconocido-aviso[style*="display:block"]{display:flex !important}
+.cliente-reconocido-aviso svg{flex:0 0 auto}
+
+/* WhatsApp */
+.card-form.autorizacion-whatsapp{background:linear-gradient(180deg,#15181e,#111318); padding:18px 16px}
+.wa-titulo{display:flex; align-items:center; gap:10px; color:#fff; font-size:17px; font-weight:700; line-height:1.25}
+.wa-titulo svg{flex:0 0 auto; color:var(--gold-bright)}
+.wa-corto{color:#b3b8c0; font-size:14px; line-height:1.5; margin-top:10px}
+.wa-leer{
+  display:block; margin-top:14px; padding:0; background:none; border:none;
+  color:var(--gold-bright); font-size:14px; font-weight:500; text-align:left;
+  text-decoration:underline; text-underline-offset:3px;
+}
+.wa-detalle{margin-top:12px; padding-top:12px; border-top:1px solid #2a2f38}
+.wa-detalle .autorizacion-whatsapp__texto{font-size:13px}
+.wa-detalle .autorizacion-whatsapp__nota{font-size:12px}
+.wa-detalle .autorizacion-whatsapp__politica{font-size:13px}
+
+/* botón final */
+.btn-enviar{min-height:56px; font-size:16.5px; border-radius:14px; margin-top:20px}
+.privacy{font-size:12px; margin-top:12px; color:#8b919b}
 </style>
