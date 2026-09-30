@@ -217,7 +217,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.30</div>
+<div class="version-tag">v3.31</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -416,6 +416,35 @@ button{cursor:pointer}
     <div class="check">✓</div>
     <h2 id="confirmacionTitulo">¡Solicitud enviada!</h2>
     <p id="confirmacionTexto">Gracias, recibimos los detalles de tu reserva.<br>El equipo de La Matriarca te va a contactar pronto para confirmarla.</p>
+
+    <div class="tr-wrap" id="tarjetaReservaWrap" style="display:none;">
+      <div class="tr-card" id="tarjetaReserva">
+        <div class="tr-top">
+          <img class="tr-logo" id="trLogo" alt="La Matriarca Barranquilla">
+          <div class="tr-badge">PENDIENTE DE CONFIRMAR</div>
+        </div>
+        <div class="tr-hero">
+          <div class="tr-small">TU RESERVA</div>
+          <div class="tr-fecha" id="trFecha"></div>
+          <div class="tr-hora" id="trHora"></div>
+          <div class="tr-turno" id="trTurno"></div>
+        </div>
+        <div class="tr-grid">
+          <div class="tr-it tr-full"><span>Nombre</span><b id="trNombre"></b></div>
+          <div class="tr-it"><span>Celular</span><b id="trCelular"></b></div>
+          <div class="tr-it"><span>Personas</span><b class="g" id="trPax"></b></div>
+          <div class="tr-it"><span>Tipo de reserva</span><b id="trTipo"></b></div>
+          <div class="tr-it" id="trCorreoBox"><span>Correo</span><b id="trCorreo" class="tr-small-b"></b></div>
+          <div class="tr-it tr-full" id="trObsBox"><span>Observaciones</span><b id="trObs" class="tr-light"></b></div>
+        </div>
+        <div class="tr-cut"></div>
+        <div class="tr-foot">Guarda esta tarjeta como imagen.<br>Te escribiremos por <b>WhatsApp</b> para confirmar tu reserva.</div>
+      </div>
+      <div class="tr-btns">
+        <button type="button" class="tr-btn tr-p" id="btnGuardarTarjeta" onclick="guardarTarjetaImagen()">Guardar imagen</button>
+        <button type="button" class="tr-btn" onclick="cerrarFormularioSolicitud()">Salir</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1091,6 +1120,7 @@ const firebaseConfig = {
       // si falla (por ejemplo, si aún no están puestos los permisos en
       // Firebase), así que los errores solo quedan en consola.
       upsertCliente(datos).catch(err => console.error('No se pudo registrar el cliente:', err));
+      try{ llenarTarjetaReserva(datos); }catch(errTarjeta){ console.error('No se pudo armar la tarjeta de reserva:', errTarjeta); }
       document.getElementById('formulario').style.display = 'none';
       document.getElementById('confirmacion').style.display = 'block';
     }).catch(err => {
@@ -1631,6 +1661,192 @@ function toggleAutorizacionDetalle(){
   btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
 }
 </script>
+<script>
+// v3.31 — tarjeta de confirmación de la reserva (solo presentación: lee los
+// datos que ya se guardaron; no cambia el envío ni lo que se guarda).
+(function(){
+  const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const TURNOS = {desayuno:'DESAYUNO', almuerzo:'ALMUERZO', cena:'CENA'};
+  let tarjetaDatos = null;
+
+  function fechaLarga(iso){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');
+    if(!m) return iso || '';
+    const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+    const t = DIAS[d.getDay()] + ' ' + d.getDate() + ' de ' + MESES[d.getMonth()];
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function hora12(hhmm){
+    const m = /^(\d{1,2}):(\d{2})/.exec(hhmm||'');
+    if(!m) return hhmm || '';
+    let h = Number(m[1]); const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if(h === 0) h = 12;
+    return h + ':' + m[2] + ' ' + ampm;
+  }
+
+  window.llenarTarjetaReserva = function(datos){
+    const logoSrc = document.querySelector('.logo-header-img')?.src || '';
+    const logo = document.getElementById('trLogo');
+    if(logo && logoSrc) logo.src = logoSrc;
+    tarjetaDatos = {
+      fecha: fechaLarga(datos.fecha),
+      hora: hora12(datos.hora),
+      turno: TURNOS[datos.turno] || String(datos.turno||'').toUpperCase(),
+      nombre: datos.nombre || '',
+      celular: datos.celular || '',
+      pax: datos.pax + (Number(datos.pax) === 1 ? ' persona' : ' personas'),
+      tipo: datos.vipSolicitada ? 'Sala VIP' : 'Mesa',
+      correo: datos.correo || '',
+      obs: datos.obs || ''
+    };
+    const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    set('trFecha', tarjetaDatos.fecha); set('trHora', tarjetaDatos.hora); set('trTurno', tarjetaDatos.turno);
+    set('trNombre', tarjetaDatos.nombre); set('trCelular', tarjetaDatos.celular); set('trPax', tarjetaDatos.pax);
+    set('trTipo', tarjetaDatos.tipo); set('trCorreo', tarjetaDatos.correo); set('trObs', tarjetaDatos.obs);
+    document.getElementById('trCorreoBox').style.display = tarjetaDatos.correo ? '' : 'none';
+    document.getElementById('trCorreoBox').classList.toggle('tr-full', tarjetaDatos.correo.length > 16);
+    document.getElementById('trObsBox').style.display = tarjetaDatos.obs ? '' : 'none';
+    document.getElementById('tarjetaReservaWrap').style.display = 'block';
+  };
+
+  function ajustarTexto(ctx, texto, maxW){
+    const palabras = String(texto).split(/\s+/); const lineas = []; let l = '';
+    palabras.forEach(w => { const t = l ? l + ' ' + w : w; if(ctx.measureText(t).width > maxW && l){ lineas.push(l); l = w; } else l = t; });
+    if(l) lineas.push(l); return lineas;
+  }
+  function rr(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+  function dibujar(d, logoImg){
+    const S = 2, W = 430, pad = 22, inner = W - pad*2;
+    const items = [];
+    items.push({full:true,l:'NOMBRE',v:d.nombre});
+    items.push({l:'CELULAR',v:d.celular}); items.push({l:'PERSONAS',v:d.pax,g:true});
+    items.push({l:'TIPO DE RESERVA',v:d.tipo});
+    if(d.correo) items.push({l:'CORREO',v:d.correo,small:true});
+    if(d.obs) items.push({full:true,l:'OBSERVACIONES',v:d.obs,light:true});
+    const c = document.createElement('canvas'); const ctx = c.getContext('2d');
+    c.width = W*S;
+    // altura: se calcula en una pasada de medición
+    ctx.scale(S,S);
+    const gap = 10, cw = (inner-gap)/2;
+    const filas = []; let fila = [];
+    items.forEach(it => {
+      if(it.full){ if(fila.length){ filas.push(fila); fila = []; } filas.push([it]); }
+      else { fila.push(it); if(fila.length === 2){ filas.push(fila); fila = []; } }
+    });
+    if(fila.length) filas.push(fila);
+    ctx.font = '16px -apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    const altos = filas.map(f => {
+      let maxL = 1;
+      f.forEach(it => { const w = it.full ? inner-24 : cw-24; ctx.font = (it.light?'400 ':'600 ') + (it.small?14:16) + 'px Arial'; maxL = Math.max(maxL, ajustarTexto(ctx, it.v, w).length); });
+      return 38 + maxL*21 - 4;
+    });
+    const topH = 122, heroH = 190, footH = 88;
+    const H = topH + heroH + 10 + altos.reduce((a,b)=>a+b,0) + gap*altos.length + 20 + footH + 18;
+    c.height = H*S; ctx.setTransform(S,0,0,S,0,0);
+    const FONT = 'Arial, Helvetica, sans-serif';
+    // fondo + tarjeta
+    ctx.fillStyle = '#f4efe6'; ctx.fillRect(0,0,W,H);
+    const cx = 12, cy = 12, cwid = W-24, chei = H-24;
+    ctx.save(); rr(ctx,cx,cy,cwid,chei,20); ctx.fillStyle = '#fffdf8'; ctx.fill(); ctx.clip();
+    // franja oscura con logo
+    ctx.fillStyle = '#14110a'; ctx.fillRect(cx,cy,cwid,topH);
+    ctx.fillStyle = '#e0ae40'; ctx.fillRect(cx,cy+topH-3,cwid,3);
+    if(logoImg && logoImg.naturalWidth){
+      // el PNG del logo trae margen transparente: se recorta a la zona visible
+      const sx = 256, sy = 196, sw = 1277, sh = 353;
+      const lw = 215, lh = lw*sh/sw; ctx.drawImage(logoImg, sx, sy, sw, sh, (W-lw)/2, cy+16, lw, lh);
+    }
+    // badge
+    const bt = 'PENDIENTE DE CONFIRMAR'; ctx.font = '700 11px '+FONT; const bw = ctx.measureText(bt).width + 28, bx = (W-bw)/2, by = cy+topH-42;
+    rr(ctx,bx,by,bw,24,12); ctx.fillStyle = '#e0ae40'; ctx.fill(); ctx.fillStyle = '#14110a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(bt, W/2, by+12.5);
+    ctx.restore();
+    // hero
+    let y = cy + topH + 28; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#7d7463'; ctx.font = '13px '+FONT; ctx.fillText('T U   R E S E R V A', W/2, y);
+    y += 32; ctx.fillStyle = '#1d1810'; ctx.font = '800 24px '+FONT; ctx.fillText(d.fecha, W/2, y);
+    y += 14; ctx.font = '800 40px '+FONT; const tw = ctx.measureText(d.hora).width + 60;
+    rr(ctx,(W-tw)/2,y,tw,62,16); ctx.fillStyle = '#14110a'; ctx.fill(); ctx.fillStyle = '#e0ae40'; ctx.fillText(d.hora, W/2, y+45);
+    y += 62 + 34; ctx.fillStyle = '#9a6b12'; ctx.font = '800 22px '+FONT;
+    ctx.fillText(d.turno.split('').join(String.fromCharCode(8202)+String.fromCharCode(8202)), W/2, y);
+    y += 26;
+    // campos
+    ctx.textAlign = 'left';
+    filas.forEach((f, i) => {
+      const h = altos[i];
+      f.forEach((it, j) => {
+        const x = pad + (it.full ? 0 : j*(cw+gap)), w = it.full ? inner : cw;
+        rr(ctx,x,y,w,h,12); ctx.fillStyle = '#f7f1e3'; ctx.fill(); ctx.strokeStyle = '#e9dcc0'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = '#7d7463'; ctx.font = '11px '+FONT; ctx.fillText(it.l, x+12, y+19);
+        ctx.fillStyle = it.g ? '#9a6b12' : '#1d1810'; ctx.font = (it.light?'400 ':'600 ') + (it.small?14:16) + 'px '+FONT;
+        ajustarTexto(ctx, it.v, w-24).forEach((ln,k) => ctx.fillText(ln, x+12, y+40+k*21));
+      });
+      y += h + gap;
+    });
+    // corte + pie
+    y += 6; ctx.strokeStyle = '#d8c79b'; ctx.setLineDash([6,5]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx+18,y); ctx.lineTo(cx+cwid-18,y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#6b6252'; ctx.font = '13px '+FONT;
+    ctx.fillText('Guarda esta tarjeta como imagen.', W/2, y+30);
+    ctx.fillText('Te escribiremos por WhatsApp para confirmar tu reserva.', W/2, y+50);
+    return c;
+  }
+
+  window.guardarTarjetaImagen = function(){
+    if(!tarjetaDatos) return;
+    const btn = document.getElementById('btnGuardarTarjeta');
+    const nombreArchivo = 'reserva-la-matriarca.png';
+    const img = new Image();
+    img.onload = hacer; img.onerror = hacer;
+    img.src = document.getElementById('trLogo').src || '';
+    function hacer(){
+      let canvas;
+      try{ canvas = dibujar(tarjetaDatos, img); }catch(e){ console.error(e); alert('No se pudo generar la imagen. Toma una captura de pantalla de la tarjeta.'); return; }
+      canvas.toBlob(blob => {
+        if(!blob){ alert('No se pudo generar la imagen. Toma una captura de pantalla de la tarjeta.'); return; }
+        const file = new File([blob], nombreArchivo, {type:'image/png'});
+        if(navigator.canShare && navigator.canShare({files:[file]})){
+          navigator.share({files:[file], title:'Mi reserva en La Matriarca'}).catch(()=>{});
+          return;
+        }
+        const url = URL.createObjectURL(blob); const a = document.createElement('a');
+        a.href = url; a.download = nombreArchivo; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      }, 'image/png');
+    }
+  };
+})();
+</script>
+
+<style>
+/* v3.31 — tarjeta de confirmación de reserva */
+.confirmacion{padding:26px 6px 34px}
+.confirmacion .tr-wrap{margin:22px auto 0;max-width:430px;text-align:left}
+.tr-card{background:#fffdf8;border:1px solid #e4d6b4;border-radius:20px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.45);color:#1d1810}
+.tr-top{background:#14110a;border-bottom:3px solid #e0ae40;padding:16px 18px 18px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.tr-logo{height:62px;width:auto;max-width:100%;object-fit:contain}
+.tr-badge{background:#e0ae40;color:#14110a;font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;letter-spacing:.5px}
+.tr-hero{padding:20px 18px 6px;text-align:center}
+.tr-small{font-size:13px;color:#7d7463;letter-spacing:1.5px}
+.tr-fecha{font-size:24px;font-weight:800;margin:4px 0;color:#1d1810}
+.tr-hora{display:inline-block;margin-top:8px;background:#14110a;color:#e0ae40;font-weight:800;font-size:40px;padding:8px 30px;border-radius:16px;letter-spacing:1px}
+.tr-turno{color:#9a6b12;font-size:22px;font-weight:800;letter-spacing:3px;margin-top:12px;padding-bottom:6px}
+.tr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 18px 6px}
+.tr-it{background:#f7f1e3;border:1px solid #e9dcc0;border-radius:12px;padding:10px 12px;min-width:0}
+.tr-it.tr-full{grid-column:1/-1}
+.tr-it span{display:block;font-size:11px;color:#7d7463;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.tr-it b{display:block;font-size:16px;font-weight:600;color:#1d1810;word-break:break-word}
+.tr-it b.g{color:#9a6b12}
+.tr-it b.tr-small-b{font-size:13px;overflow-wrap:anywhere;word-break:normal}
+#trCelular{font-size:14px;white-space:nowrap}
+.tr-it b.tr-light{font-weight:400}
+.tr-cut{margin:14px 18px 0;border-top:2px dashed #d8c79b}
+.tr-foot{padding:14px 18px 18px;text-align:center;color:#6b6252;font-size:13px;line-height:1.45}
+.tr-foot b{color:#1f8a4c}
+.tr-btns{display:flex;gap:10px;margin-top:16px}
+.tr-btn{flex:1;padding:14px 8px;border-radius:14px;font-weight:700;font-size:16px;border:1px solid #d8c79b;background:#fffdf8;color:#2a2418;cursor:pointer;font-family:inherit}
+.tr-btn.tr-p{background:#e0ae40;color:#14110a;border-color:#e0ae40}
+</style>
 </body>
 </html>
 
