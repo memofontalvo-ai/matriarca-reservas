@@ -4789,9 +4789,18 @@ function renderResumenTurnoHTML(rsTodas){
   // Pequeña") que ya no existe en el plano actual, así que las reservas de
   // estos salones no se contaban en ningún lado. Se muestran siempre en
   // este orden.
-  const vipPorSalon = Object.entries(SALON_ESPECIAL_LABELS).map(([salonId, nombre]) => {
+  // v6.37: además del id viejo, se reconoce el nombre de la zona del plano
+  // libre (ver claveSalonVipRef) y se agregan filas para otras zonas VIP
+  // libres que tengan reservas ese turno.
+  const clavesVipResumen = Object.keys(SALON_ESPECIAL_LABELS);
+  rsTodas.forEach(r => (r.mesa||'').split('+').forEach(ref => {
+    const k = claveSalonVipRef(ref);
+    if(k && !clavesVipResumen.includes(k)) clavesVipResumen.push(k);
+  }));
+  const vipPorSalon = clavesVipResumen.map(salonId => {
+    const nombre = nombreSalonVipPorClave(salonId);
     const reservasDeEsteSalon = rsTodas
-      .filter(r => r.mesa && r.mesa.split('+').map(p=>p.trim()).includes(salonId))
+      .filter(r => r.mesa && r.mesa.split('+').some(p => claveSalonVipRef(p) === salonId))
       .sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
     const pax = reservasDeEsteSalon.reduce((a,r)=>a+Number(r.pax||0),0);
     return { salon:{nombre}, reservas: reservasDeEsteSalon, pax };
@@ -4850,7 +4859,12 @@ function renderResumenTurnoHTML(rsTodas){
       <div class="rdd-row-val ${reservas.length===0?'cero':''}">${reservas.length}</div>
       <div class="rdd-row-val ${pax===0?'cero':''}">${pax}</div>
     </div>`;
-  }).join('');
+  }).join('') + `<div class="rdd-row" style="border-top:1px solid var(--gold); margin-top:6px; padding-top:10px; font-weight:800;">
+      <div class="rdd-row-icon ok">${RDD_ICONS.check}</div>
+      <div class="rdd-row-label" style="font-weight:800;">Total salones VIP<div style="font-size:10.5px; color:var(--text-dim); font-weight:400; margin-top:2px;">reservas · personas</div></div>
+      <div class="rdd-row-val ${vipReservasCount===0?'cero':''}" style="font-weight:800;">${vipReservasCount}</div>
+      <div class="rdd-row-val ${vipPax===0?'cero':''}" style="font-weight:800;">${vipPax}</div>
+    </div>`;
 
   // Abonos y cover van en paneles SEPARADOS — son dos cosas distintas con
   // unidades distintas (abono = por mesa/reserva; cover = por persona), y
@@ -5036,10 +5050,56 @@ const SALON_ESPECIAL_LABELS = {
   'SALON-CURRAMBA': 'Salón Curramba',
   'SALON-ARENOSA': 'Salón La Arenosa',
 };
+// v6.37 — En un plano de formato libre las reservas guardan el NOMBRE de la
+// zona (ej. "SALÓN PUERTA DE ORO", "SALON CURRAMBA"), no el id viejo de la
+// cuadrícula (SALON-ORO...). Por eso Resumen / tarjetas no los reconocían
+// como VIP. Estas funciones reconocen la zona por su nombre (sin importar
+// mayúsculas ni tildes) mirando las zonas kind 'vip' del plano General libre
+// y de los planos de evento libres ya descargados. Lo lobby sigue como antes.
+function normNombreZona(t){
+  return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+}
+function zonasVipLibresConocidas(){
+  const mapa = {}; // nombre normalizado -> nombre original
+  const planos = [];
+  if(PLANO_MAESTRO_FORMATO === 'libre' && PLANO_MAESTRO) planos.push(PLANO_MAESTRO);
+  Object.values(planoEventoCacheById || {}).forEach(pl => { if(pl && pl.__formato === 'libre') planos.push(pl); });
+  planos.forEach(pl => Object.values(pl.zonas || {}).forEach(z => {
+    if(z && z.kind === 'vip'){ const n = libreIdZona(z); mapa[normNombreZona(n)] = String(n).trim(); }
+  }));
+  return mapa;
+}
+// Devuelve la "clave" del salón VIP al que corresponde una referencia de
+// mesa: el id viejo (SALON-ORO...) si es uno de los 3 de siempre, o
+// 'LIBRE:<nombre normalizado>' si es otra zona VIP del plano libre.
+function claveSalonVipRef(ref){
+  ref = String(ref||'').trim();
+  if(!ref) return null;
+  if(SALON_ESPECIAL_LABELS[ref]) return ref;
+  const n = normNombreZona(ref);
+  // Los 3 salones de siempre se reconocen SOLO por su nombre (no dependen
+  // de cómo esté marcada la zona en el plano): Curramba, La Arenosa y
+  // Puerta de Oro, con o sin tilde, con o sin "La", en mayúsculas o no.
+  if(/\bsalon\b/.test(n) || /^(puerta de oro|curramba|la arenosa|arenosa)$/.test(n)){
+    if(n.includes('curramba')) return 'SALON-CURRAMBA';
+    if(n.includes('arenosa')) return 'SALON-ARENOSA';
+    if(n.includes('puerta de oro') || /\boro\b/.test(n)) return 'SALON-ORO';
+  }
+  // Cualquier otra zona VIP del plano libre tiene su propia fila.
+  const conocidas = zonasVipLibresConocidas();
+  if(!conocidas[n]) return null;
+  return 'LIBRE:' + n;
+}
+function nombreSalonVipPorClave(clave){
+  if(SALON_ESPECIAL_LABELS[clave]) return SALON_ESPECIAL_LABELS[clave];
+  const n = String(clave).replace(/^LIBRE:/,'');
+  return zonasVipLibresConocidas()[n] || n;
+}
 function esSalonVipEspecial(mesaId){
   if(!mesaId) return null;
   const partes = mesaId.split('+').map(p=>p.trim());
   for(const p of partes) if(SALON_ESPECIAL_LABELS[p]) return SALON_ESPECIAL_LABELS[p];
+  for(const p of partes){ const k = claveSalonVipRef(p); if(k) return nombreSalonVipPorClave(k); }
   return null;
 }
 function findMesa(id){
