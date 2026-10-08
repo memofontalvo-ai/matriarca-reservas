@@ -1815,3 +1815,12 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
    pantallas angostas — esta regla, más específica, gana sobre la genérica
    de arriba. */
 @media(max-width:390px){.field-row-celular{display:flex !important;}}
+
+
+/* v6.40 — Estado "Proceso comercial" (reserva en negociación, aún no aprobada) */
+:root{--comercial:#b79bf0; --comercial-bg:rgba(155,120,230,0.16);}
+.badge.proceso_comercial{background:var(--comercial-bg); color:var(--comercial);}
+.estado-opt.sel-comercial.on{background:var(--comercial-bg); border-color:var(--comercial); color:var(--comercial);}
+.res-card.comercial-card{border-color:var(--comercial); border-left:4px solid var(--comercial);}
+.solicitud-hint.comercial-hint, .comercial-hint{color:var(--comercial); font-size:12.5px; padding:6px 0;}
+.solicitud-card-global.comercial-card{border-color:var(--comercial);}

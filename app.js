@@ -3616,6 +3616,10 @@ window.addEventListener('resize', ()=>{
 
 /* ============ RENDER: STATS ============ */
 let filtroEspecialesPorDia = false;
+// v6.40 — Filtro "Proceso comercial" en Reservas por día: muestra solo las
+// reservas en negociación (estado proceso_comercial) y el calendario marca
+// los días que las tienen. No toca ninguna otra lógica.
+let filtroComercialPorDia = false;
 let filtroEspecialesSolicitudes = false;
 // v6.39 — Al entrar a un día desde el aviso "solicitudes atrasadas", la
 // pantalla muestra SOLO las que siguen sin gestionar/aprobar de ese día
@@ -3636,9 +3640,16 @@ function reservasDelTurno(){
   let rs = reservas.filter(r=>r.fecha===iso && r.estado!=='solicitud' && r.estado!=='pendiente_aprobacion' && r.estado!=='lista_espera');
   if(turnoActivo !== 'todos') rs = rs.filter(r=>reservaCoincideConTurnoActivo(r, turnoActivo));
   if(filtroEspecialesPorDia) rs = rs.filter(r=>Number(r.pax)>=30);
+  if(filtroComercialPorDia) rs = rs.filter(r=>r.estado==='proceso_comercial');
   return rs;
 }
 
+function toggleFiltroComercialDia(){
+  filtroComercialPorDia = !filtroComercialPorDia;
+  const b = document.getElementById('btnFiltroComercialDia');
+  if(b) b.classList.toggle('activo', filtroComercialPorDia);
+  renderAll();
+}
 function toggleFiltroEspecialesDia(){
   filtroEspecialesPorDia = !filtroEspecialesPorDia;
   document.getElementById('btnFiltroEspecialesDia').classList.toggle('activo', filtroEspecialesPorDia);
@@ -4315,7 +4326,7 @@ function renderCalendarioInline(){
   // calendario respeta ese filtro y solo suma ese turno — así el número de
   // cada día refleja exactamente lo que se está viendo, no siempre el total.
   const reservasDelMes = reservas.filter(r => {
-    if(r.estado!=='confirmada') return false;
+    if(r.estado !== (filtroComercialPorDia ? 'proceso_comercial' : 'confirmada')) return false;
     if(turnoActivo !== 'todos' && !reservaCoincideConTurnoActivo(r, turnoActivo)) return false;
     const [y,m] = r.fecha.split('-').map(Number);
     return y===calInlineAno && m===(calInlineMes+1);
@@ -4681,7 +4692,7 @@ function tarjetaReservaHTML(r, mostrarFecha){
   const salonVipNombre = esSalonVipEspecial(r.mesa);
   const isVip = mesaEsVip(r.mesa) || !!salonVipNombre;
   const turnoLabels = {desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena'};
-  return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
+  return `<div class="res-card ${r.estado==='cancelada'?'cancelada-card':''} ${r.estado==='solicitud'?'solicitud-card':''} ${r.estado==='lista_espera'?'lista-espera-card':''} ${r.estado==='proceso_comercial'?'comercial-card':''}" onclick='abrirModal(${JSON.stringify(r.id)})'>
     ${r.eventoNombre ? `<div style="background:var(--gold); color:#1a1a1a; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px;">🎤 Evento: ${escapeHtml(r.eventoNombre)}</div>` : ''}
     ${r.solicitudMusico ? `<div style="background:#6d4fc9; color:#fff; font-weight:700; font-size:11.5px; padding:3px 8px; border-radius:6px; display:inline-block; margin-bottom:6px; line-height:1.4;" title="${escapeHtml(r.obsMusico||'')}">🎵 Solicitud especial de músicos${r.obsMusico ? ': '+escapeHtml(r.obsMusico) : ''}${r.fechaSolicitudMusico ? `<br><span style="font-weight:600; font-size:10px; opacity:.85;">Pedido el ${escapeHtml(formatearFechaCorta(r.fechaSolicitudMusico))}</span>` : ''}</div>` : ''}
     <div class="res-top">
@@ -4994,7 +5005,7 @@ function verObservacionesDeReserva(id){
 }
 
 function estadoLabel(e){
-  return {confirmada:'Confirmada', pendiente:'Pendiente', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar', lista_espera:'Lista de espera'}[e]||e;
+  return {confirmada:'Confirmada', pendiente:'Pendiente', proceso_comercial:'Proceso comercial', walkin:'Walk-in', cancelada:'Cancelada', mensaje_enviado:'Mensaje enviado', solicitud:'En proceso', pendiente_aprobacion:'Por aprobar', lista_espera:'Lista de espera'}[e]||e;
 }
 // ===== Vencimiento automático de solicitudes/reservas atrasadas =====
 // Si una solicitud o reserva sigue en un estado "por gestionar" (en
@@ -5931,7 +5942,7 @@ function buildZoneGridPlano(key, cfg, mesas, pref, porMesaRef, categorias, color
         let estadoCls = 'p-libre';
         let guestName = '';
         if(reserva){
-          estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
+          estadoCls = (reserva.estado==='pendiente' || reserva.estado==='proceso_comercial') ? 'p-pendiente' : 'p-ocupada';
           guestName = (reserva.nombre||'').split(' ')[0];
         }
         const clickJs = reserva ? `abrirModal(${JSON.stringify(reserva.id)})` : `abrirModal(null,${JSON.stringify(idMesa)})`;
@@ -5997,7 +6008,7 @@ function libreMesaHtmlDisplay(m, porMesaRef, categorias){
   let guestName = '';
   const reserva = porMesaRef ? porMesaRef[idLower] : null;
   if(reserva){
-    estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
+    estadoCls = (reserva.estado==='pendiente' || reserva.estado==='proceso_comercial') ? 'p-pendiente' : 'p-ocupada';
     guestName = (reserva.nombre||'').split(' ')[0];
   }
   const clickJs = reserva ? `onclick='abrirModal(${JSON.stringify(reserva.id)})'` : `onclick='abrirModal(null,${JSON.stringify(idMesa)})'`;
@@ -6056,7 +6067,7 @@ function libreZonaHtmlDisplay(z, porMesaRef){
   let estadoCls = 'p-libre';
   let guestName = '';
   if(reserva){
-    estadoCls = reserva.estado==='pendiente' ? 'p-pendiente' : 'p-ocupada';
+    estadoCls = (reserva.estado==='pendiente' || reserva.estado==='proceso_comercial') ? 'p-pendiente' : 'p-ocupada';
     guestName = (reserva.nombre||'').split(' ')[0];
   }
   const colorZona = !reserva ? z.color : null;
@@ -7266,14 +7277,16 @@ function renderSolicitudesScreen(){
     // atención que una solicitud sin gestionar, aunque llegó por otra vía.
     const esPendienteInterno = r.estado === 'pendiente';
     const esListaEspera = r.estado === 'lista_espera';
+    const esProcesoComercial = r.estado === 'proceso_comercial';
     const yaAprobada = r.aprobadaPorCliente === true;
-    const claseColor = esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : (esListaEspera ? 'card-lista-espera' : ((esSinGestionar || esPendienteInterno) ? 'card-solicitud' : 'card-aprobada')));
+    const claseColor = esProcesoComercial ? 'comercial-card' : esMensajeEnviado ? 'card-mensaje-enviado' : (esPorAprobar ? 'card-por-aprobar' : (esListaEspera ? 'card-lista-espera' : ((esSinGestionar || esPendienteInterno) ? 'card-solicitud' : 'card-aprobada')));
     let hint = '';
     if(esMensajeEnviado) hint = `<div class="mensaje-enviado-hint">📨 Le mandamos el link — esperando que el cliente llene el formulario</div>`;
     else if(esSinGestionar) hint = `<div class="solicitud-hint">⚠ Sin mesa asignada — revisar y gestionar</div>`;
     else if(esPorAprobar) hint = `<div class="aprobacion-hint">📤 Enviada al cliente, esperando que la apruebe</div>`;
     else if(esPendienteInterno) hint = `<div class="solicitud-hint">⏳ Pendiente por confirmar</div>`;
     else if(esListaEspera) hint = `<div class="solicitud-hint">🕒 En lista de espera — avísale si se libera cupo</div>`;
+    else if(esProcesoComercial) hint = `<div class="comercial-hint">🤝 Proceso comercial — en negociación (ya aparece en Reservas por día)</div>`;
     else if(yaAprobada) hint = `<div class="historial-aprobada-hint">✓ Aprobada por el cliente — ya está en Reservas por día</div>`;
     // Si todavía no hay respuesta del cliente, no hay fecha/turno/hora que
     // mostrar — solo el contacto al que se le escribió.
@@ -7359,7 +7372,7 @@ function renderSolicitudesScreen(){
   const pendientesSol = delDia.filter(r => r.estado==='pendiente');
   const pendientesSolPax = pendientesSol.reduce((a,r)=>a+Number(r.pax||0),0);
   const enProceso = delDia.filter(r =>
-    r.estado!=='cancelada' && r.estado!=='pendiente' && !(r.aprobadaPorCliente===true || r.estado==='confirmada')
+    r.estado!=='cancelada' && r.estado!=='pendiente' && r.estado!=='proceso_comercial' && !(r.aprobadaPorCliente===true || r.estado==='confirmada')
   );
   const enProcesoPax = enProceso.reduce((a,r)=>a+Number(r.pax||0),0);
 
@@ -8242,7 +8255,7 @@ function guardarReserva(){
   // reserva "Pendiente" puede estar todavía en gestión (esperando datos,
   // ya se llamó al cliente, etc.) sin que eso signifique ocupar una mesa
   // de una vez. La mesa se asigna cuando de verdad se activa/aprueba.
-  if(!mesaNueva && estadoSeleccionado !== 'cancelada' && estadoSeleccionado !== 'pendiente'){ alert('Asigna una mesa en el plano antes de guardar — es indispensable para poder recibir al cliente ese día.'); return; }
+  if(!mesaNueva && estadoSeleccionado !== 'cancelada' && estadoSeleccionado !== 'pendiente' && estadoSeleccionado !== 'proceso_comercial'){ alert('Asigna una mesa en el plano antes de guardar — es indispensable para poder recibir al cliente ese día.'); return; }
   // Ninguna reserva se puede cancelar sin dejar constancia del motivo —
   // así siempre se puede dar seguimiento a por qué se cayó, sin importar
   // desde dónde se esté cancelando (Solicitudes, Por día, etc.).

@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.39">
+<link rel="stylesheet" href="app.css?v=6.40">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -176,6 +176,7 @@
       </div>
       <div class="dia-acciones-row">
         <button class="especial-btn" id="btnFiltroEspecialesDia" onclick="toggleFiltroEspecialesDia()"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg> <span>Especiales (30+)</span></button>
+        <button class="especial-btn" id="btnFiltroComercialDia" onclick="toggleFiltroComercialDia()" title="Ver solo las reservas en proceso comercial (en negociación)">🤝 <span>Proceso comercial</span></button>
         <button class="clear-btn" id="btnBloquearDia" onclick="abrirModalBloqueoDia()" title="Bloquear este día para que los clientes no puedan reservar">🔒 <span>Bloquear día</span></button>
         <div class="turno-cena-slot" id="turnoCenaBar"></div>
       </div>
@@ -533,7 +534,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.39</div>
+<div class="version-tag">v6.40</div>
 
 
 <div class="overlay" id="overlay">
@@ -735,6 +736,7 @@
           <button type="button" class="estado-opt sel-confirmada" data-val="confirmada">✓ <span>Aprobada</span></button>
           <button type="button" class="estado-opt sel-pendiente" data-val="pendiente">◷ <span>Pendiente</span></button>
           <button type="button" class="estado-opt sel-cancelada" data-val="cancelada">× <span>Cancelada</span></button>
+          <button type="button" class="estado-opt sel-comercial" data-val="proceso_comercial" style="grid-column:1/-1;">🤝 <span>Proceso comercial</span></button>
         </div>
         <div class="field" id="motivoCancelacionWrap" style="display:none; margin-top:8px;">
           <label>Motivo de la cancelación (para el seguimiento en los informes)</label>
@@ -1316,6 +1318,6 @@
 </div>
 
 
-<script src="app.js?v=6.39"></script>
+<script src="app.js?v=6.40"></script>
 </body>
 </html>
