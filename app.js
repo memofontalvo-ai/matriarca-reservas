@@ -8472,7 +8472,14 @@ function guardarReserva(){
       alert('⚠️ Justo en este instante se acaba de crear otra reserva para este mismo celular, fecha y turno (probablemente desde otro canal). No se guardó para evitar el duplicado — revisa la reserva que ya quedó registrada.');
       return;
     }
-    alert('No se pudo guardar la reserva. Revisa tu conexión e intenta de nuevo.');
+    // v6.41 — antes este aviso era siempre el mismo y escondía la causa real
+    // (cuota diaria de Firebase agotada, permisos, conexión...). Ahora dice
+    // el código del error para poder saber de verdad qué está pasando.
+    const codigoErr = (err && (err.code || err.name)) ? String(err.code || err.name) : 'desconocido';
+    const pistaErr = codigoErr.includes('resource-exhausted') ? '\n\n⚠ Parece que se agotó la cuota diaria de Firebase (se renueva de madrugada).'
+      : codigoErr.includes('permission-denied') ? '\n\n⚠ Firebase rechazó el permiso para guardar (revisar reglas de seguridad).'
+      : (codigoErr.includes('unavailable') || codigoErr.includes('deadline')) ? '\n\nSin conexión estable con Firebase en este momento.' : '';
+    alert('No se pudo guardar la reserva. Revisa tu conexión e intenta de nuevo.\n\nCódigo del error: ' + codigoErr + pistaErr);
   });
 }
 
