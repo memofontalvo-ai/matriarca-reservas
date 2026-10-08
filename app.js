@@ -3617,6 +3617,10 @@ window.addEventListener('resize', ()=>{
 /* ============ RENDER: STATS ============ */
 let filtroEspecialesPorDia = false;
 let filtroEspecialesSolicitudes = false;
+// v6.39 — Al entrar a un día desde el aviso "solicitudes atrasadas", la
+// pantalla muestra SOLO las que siguen sin gestionar/aprobar de ese día
+// (no las ya resueltas). Se apaga al cambiar de día o al tocar "Ver todas".
+let filtroSoloAtrasadasSolicitudes = false;
 // Filtro adicional por la fecha PARA LA QUE se pidió la reserva. No cambia
 // fechaSolicitudes, que sigue representando el día EN QUE llegó la solicitud.
 let filtroFechaReservaSolicitudes = '';
@@ -6833,6 +6837,7 @@ function renderCalendarioSolInline(){
 }
 
 function seleccionarDiaSolInline(d){
+  filtroSoloAtrasadasSolicitudes = false;
   fechaSolicitudes = new Date(calSolInlineAno, calSolInlineMes, d, 12);
   renderSolicitudesScreen();
 }
@@ -6909,6 +6914,7 @@ function renderCalendario(){
 function seleccionarDiaCal(d){
   const nuevaFecha = new Date(calAno, calMes, d, 12);
   if(calTarget === 'solicitudes'){
+    filtroSoloAtrasadasSolicitudes = false;
     fechaSolicitudes = nuevaFecha;
     cerrarCalendario();
     renderSolicitudesScreen();
@@ -6924,6 +6930,7 @@ function seleccionarDiaCal(d){
 }
 function irHoy(){
   if(calTarget === 'solicitudes'){
+    filtroSoloAtrasadasSolicitudes = false;
     fechaSolicitudes = new Date();
     calMes = fechaSolicitudes.getMonth();
     calAno = fechaSolicitudes.getFullYear();
@@ -6938,6 +6945,7 @@ function irHoy(){
   renderAll();
 }
 function cambiarDiaSolicitudes(delta){
+  filtroSoloAtrasadasSolicitudes = false;
   fechaSolicitudes.setDate(fechaSolicitudes.getDate()+delta);
   // Igual que en "Por día": si el usuario mueve la fecha con las flechitas,
   // el calendario embebido salta a mostrar ese mes.
@@ -7221,6 +7229,7 @@ function renderSolicitudesScreen(){
   } else {
     delDia = delDiaTotal;
     if(filtroEspecialesSolicitudes) delDia = delDia.filter(r=>Number(r.pax)>=30);
+    if(filtroSoloAtrasadasSolicitudes) delDia = delDia.filter(requiereGestion);
   }
   // Se aplica al final para que pueda combinarse tanto con el día de
   // llegada visible como con una búsqueda por nombre/celular. Solo compara
@@ -7230,13 +7239,18 @@ function renderSolicitudesScreen(){
   }
 
   const el = document.getElementById('panelSolicitudes');
+  const bannerAtrasadasHtml = (filtroSoloAtrasadasSolicitudes && !textoBusquedaSol) ? `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; margin-bottom:10px; border:1px solid #e8a33d; border-radius:12px; background:rgba(232,163,61,.10);">
+      <span style="font-size:13px; color:#f0c27a; line-height:1.35;">⚠ Mostrando solo las <b>${delDia.length}</b> solicitud${delDia.length===1?'':'es'} atrasada${delDia.length===1?'':'s'} sin gestionar de este día.</span>
+      <button type="button" onclick="quitarFiltroSoloAtrasadas()" style="flex:0 0 auto; padding:7px 10px; border-radius:9px; border:1px solid #e8a33d; background:transparent; color:#f0c27a; font-weight:700; font-size:12.5px; cursor:pointer;">Ver todas</button>
+    </div>` : '';
   if(delDia.length === 0){
     if(filtroFechaReservaSolicitudes){
-      el.innerHTML = `<div class="solicitudes-empty">No hay solicitudes para la fecha de reserva <b>${escapeHtml(etiquetaFechaFiltroReserva(filtroFechaReservaSolicitudes))}</b>${textoBusquedaSol ? ` que coincidan con "${escapeHtml(textoBusquedaSol)}"` : ''}.<br>Toca <b>Ver todas</b> en el filtro para quitarlo.</div>`;
+      el.innerHTML = bannerAtrasadasHtml + `<div class="solicitudes-empty">No hay solicitudes para la fecha de reserva <b>${escapeHtml(etiquetaFechaFiltroReserva(filtroFechaReservaSolicitudes))}</b>${textoBusquedaSol ? ` que coincidan con "${escapeHtml(textoBusquedaSol)}"` : ''}.<br>Toca <b>Ver todas</b> en el filtro para quitarlo.</div>`;
     } else {
-      el.innerHTML = textoBusquedaSol
+      el.innerHTML = bannerAtrasadasHtml + (textoBusquedaSol
         ? `<div class="solicitudes-empty">No se encontró ningún cliente que coincida con "${escapeHtml(textoBusquedaSol)}" en ninguna fecha.</div>`
-        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (30+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`;
+        : `<div class="solicitudes-empty">${filtroEspecialesSolicitudes ? '⭐ No hay solicitudes especiales (30+ personas) para este día.' : '✓ No hay solicitudes para este día.<br>Usa el calendario de arriba para revisar otras fechas.'}</div>`);
     }
     renderCalendarioSolInline();
     if(document.getElementById('panelFiltroFechaReserva')?.classList.contains('abierto')) renderCalendarioFiltroFechaReserva();
@@ -7371,7 +7385,7 @@ function renderSolicitudesScreen(){
     mesaVip: {count:vipSols.length, pax:vipPax},
   });
 
-  el.innerHTML = cardsHtml + resumenHtml;
+  el.innerHTML = bannerAtrasadasHtml + cardsHtml + resumenHtml;
 
   // Mantenemos el calendario embebido de arriba sincronizado con los datos
   // (mismo cuidado que en "Por día": no reseteamos el mes que se está
@@ -7380,7 +7394,12 @@ function renderSolicitudesScreen(){
   if(document.getElementById('panelFiltroFechaReserva')?.classList.contains('abierto')) renderCalendarioFiltroFechaReserva();
 }
 
+function quitarFiltroSoloAtrasadas(){
+  filtroSoloAtrasadasSolicitudes = false;
+  renderSolicitudesScreen();
+}
 function irAFechaAtrasada(fechaIso){
+  filtroSoloAtrasadasSolicitudes = true;
   const [y,m,d] = fechaIso.split('-').map(Number);
   fechaSolicitudes = new Date(y, m-1, d, 12);
   calSolInlineMes = fechaSolicitudes.getMonth();
