@@ -634,7 +634,8 @@ auth.onAuthStateChanged(user => {
 // siempre.
 let intervaloPresencia = null;
 let listenerPresenciaAdmin = null;
-const VENTANA_EN_LINEA_MS = 50000;
+const INTERVALO_PRESENCIA_MS = 180000; // v6.42: antes 25 s (ahorro de cuota/costo Firebase)
+const VENTANA_EN_LINEA_MS = 240000;
 
 function refPresenciaMia(){
   return db.collection('configuracion').doc('presencia').collection('usuarios').doc(usuarioActual.uid);
@@ -642,6 +643,8 @@ function refPresenciaMia(){
 
 function avisarPresencia(){
   if(!usuarioActual) return;
+  // v6.42: con la pestaña en segundo plano no se escribe (ahorra cuota).
+  if(document.visibilityState === 'hidden') return;
   refPresenciaMia().set({
     nombre: usuarioActual.nombre,
     iniciales: usuarioActual.iniciales,
@@ -653,7 +656,7 @@ function avisarPresencia(){
 function iniciarPresencia(){
   detenerPresencia();
   avisarPresencia();
-  intervaloPresencia = setInterval(avisarPresencia, 25000);
+  intervaloPresencia = setInterval(avisarPresencia, INTERVALO_PRESENCIA_MS);
   // Si vuelve a la pestaña después de tenerla en segundo plano, avisa de
   // una vez en vez de esperar hasta 25 segundos.
   document.addEventListener('visibilitychange', avisarPresenciaSiVisible);
