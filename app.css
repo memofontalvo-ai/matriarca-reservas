@@ -1932,3 +1932,30 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .host-grupo-fila button{padding:7px 12px; border-radius:10px; border:1px solid var(--cancelled); background:transparent; color:var(--cancelled); font-size:12.5px; font-weight:700; cursor:pointer;}
 .host-sinreserva{flex-direction:column; align-items:stretch;}
 .host-sinreserva .host-bloquear{margin-top:12px; width:100%;}
+
+/* v6.48 — Registrar entrada (botones 1–10, ajuste y confirmación) */
+.host-comp{margin-top:6px;}
+.host-comp-titulo{font-size:13px; font-weight:700; margin:4px 0 8px; color:inherit;}
+.host-num-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px;}
+.host-num-btn{height:52px; border-radius:12px; border:1px solid var(--gold); background:rgba(214,170,85,0.14); color:var(--gold-bright); font-size:20px; font-weight:800; cursor:pointer;}
+.host-num-btn.sel{background:var(--gold-bright); color:#2b2418; border-color:#fff;}
+.host-stepper{display:grid; grid-template-columns:64px 1fr 64px 64px; gap:8px; align-items:center; margin-top:8px;}
+.host-stepper button{height:50px; border-radius:12px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:16px; font-weight:800; cursor:pointer;}
+.host-stepper button:disabled{opacity:.35;}
+.host-n{text-align:center; line-height:1.1;}
+.host-n b{display:block; font-size:30px; font-variant-numeric:tabular-nums;}
+.host-n span{font-size:11px; opacity:.75;}
+.host-n-resto{width:100%; height:44px; margin-top:8px; border-radius:12px; border:1px dashed var(--confirmed); background:transparent; color:var(--confirmed); font-size:14px; font-weight:700; cursor:pointer;}
+.host-registrar{width:100%; height:54px; margin-top:10px; border-radius:12px; border:1px solid var(--gold); background:linear-gradient(180deg,#e8c675,#c99a3e); color:#2b2418; font-size:15px; font-weight:800; cursor:pointer;}
+.host-registrar:disabled{opacity:.45; cursor:not-allowed;}
+/* dentro de una tarjeta de color */
+.host-card .host-comp-titulo{color:#fff;}
+.host-card .host-num-btn{background:rgba(0,0,0,0.28); border-color:rgba(255,255,255,0.5); color:#fff;}
+.host-card .host-num-btn.sel{background:#fff; color:#1b2330; border-color:#fff;}
+.host-card .host-stepper button{background:rgba(0,0,0,0.28); border-color:rgba(255,255,255,0.5); color:#fff;}
+.host-card .host-n{color:#fff;}
+.host-card .host-n-resto{border-color:#fff; color:#fff;}
+.host-card .host-registrar{background:#fff; border-color:#fff; color:#1b2330;}
+.host-card .host-sr-titulo{color:rgba(255,255,255,0.85);}
+.host-card .host-grupo-fila{color:#fff; border-bottom-color:rgba(255,255,255,0.25);}
+.host-card .host-grupo-fila button{border-color:#fff; color:#fff;}
