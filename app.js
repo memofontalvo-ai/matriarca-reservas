@@ -7140,8 +7140,10 @@ function hostCalcularTotales(){
     const pax = Number(r.pax)||0, ll = hostLlegaron(r);
     esperadas += pax; llegadas += ll; faltan += Math.max(pax - ll, 0);
   });
-  const sinRes = hostSinReservaVista();
-  return { rs, esperadas, llegadas, faltan, sinRes, total: llegadas + sinRes };
+  const det = hostSinReservaDetalle();
+  const sinRes = det.personas;
+  const reservasLlegaron = rs.filter(r => hostLlegaron(r) > 0).length;
+  return { rs, esperadas, llegadas, faltan, sinRes, total: llegadas + sinRes, det, reservasLlegaron };
 }
 function hostHoraCorta(ms){
   try { return new Date(ms).toLocaleTimeString('es-CO', { hour:'numeric', minute:'2-digit' }); } catch(e){ return ''; }
@@ -7160,7 +7162,7 @@ function renderHostAforo(tot){
     if(!g){
       estado = `<div class="host-aforo-estado sin">Aforo de ${etiqueta} sin guardar</div>`;
       textoBtn = '💾 Guardar aforo — ' + etiqueta;
-    } else if(Number(g.esperadas) === tot.esperadas && Number(g.llegaron) === tot.llegadas && Number(g.sinReserva) === tot.sinRes){
+    } else if(Number(g.esperadas) === tot.esperadas && Number(g.llegaron) === tot.llegadas && Number(g.sinReserva) === tot.sinRes && (Number(g.cantidadGruposSinReserva)||0) === tot.det.nGrupos){
       estado = `<div class="host-aforo-estado ok">✓ Aforo de ${etiqueta} guardado a las ${hostHoraCorta(g.guardadoEn)} por ${escapeHtml(g.guardadoPor||'')}</div>`;
       textoBtn = '💾 Guardar de nuevo';
     } else {
@@ -7175,7 +7177,7 @@ function renderHostAforo(tot){
   const guardados = hostAforoDocs.slice().sort((a,b) => HOST_ORDEN_TURNOS.indexOf(a.turno) - HOST_ORDEN_TURNOS.indexOf(b.turno));
   if(guardados.length){
     html += `<div class="host-aforo-dia"><div class="host-aforo-dia-titulo">Aforos guardados de este día</div>` +
-      guardados.map(g => `<div class="host-aforo-fila"><span>${escapeHtml(HOST_ETIQUETA_TURNO[g.turno]||g.turno||'')}</span><span>${Number(g.llegaron)||0} con reserva + ${Number(g.sinReserva)||0} sin reserva = <b>${Number(g.totalLocal)||0}</b></span></div>`).join('') + `</div>`;
+      guardados.map(g => `<div class="host-aforo-fila"><span>${escapeHtml(HOST_ETIQUETA_TURNO[g.turno]||g.turno||'')}</span><span>${Number(g.llegaron)||0} con reserva${g.reservasQueLlegaron!=null?` (${Number(g.reservasQueLlegaron)||0} res.)`:''} + ${Number(g.sinReserva)||0} sin reserva${g.cantidadGruposSinReserva!=null?` (${Number(g.cantidadGruposSinReserva)||0} gr.)`:''} = <b>${Number(g.totalLocal)||0}</b></span></div>`).join('') + `</div>`;
   }
   cont.innerHTML = html;
 }
@@ -7197,6 +7199,10 @@ function hostGuardarAforo(){
     llegaron: tot.llegadas,
     faltan: tot.faltan,
     sinReserva: tot.sinRes,
+    gruposSinReserva: tot.det.mapa,
+    cantidadGruposSinReserva: tot.det.nGrupos,
+    sinReservaSinDetalle: tot.det.legacy,
+    reservasQueLlegaron: tot.reservasLlegaron,
     totalLocal: tot.total,
     cantidadReservas: tot.rs.length,
     detalle: tot.rs.map(r => ({ id: r.id, nombre: r.nombre || '', hora: r.hora || '', pax: Number(r.pax)||0, llegaron: hostLlegaron(r) })),
@@ -7210,10 +7216,25 @@ function hostGuardarAforo(){
     if(vistaApp === 'host') renderHost();
   });
 }
-function hostSinReservaVista(){
+// v6.47 — Los clientes sin reserva se registran POR GRUPO (un grupo de 2,
+// uno de 3...). El documento del turno guarda `personas` (total), `grupos`
+// (mapa tamaño → cuántos grupos de ese tamaño) y `cantidadGrupos`. Los
+// números viejos (v6.43–v6.46) solo tienen `personas`: se muestran como
+// "sin detalle de grupo" y se pueden quitar con el botón ✕.
+function hostSinReservaDetalle(){
   const d = hostSinReservaDocs.find(x => x.id === fechaISO(hostFecha) + '_' + hostTurno);
-  return d ? (Number(d.personas)||0) : 0;
+  const personas = d ? Math.max(0, Number(d.personas)||0) : 0;
+  const mapa = {};
+  let enGrupos = 0, nGrupos = 0;
+  if(d && d.grupos && typeof d.grupos === 'object'){
+    Object.keys(d.grupos).forEach(k => {
+      const n = Math.max(0, Number(d.grupos[k])||0), tam = Number(k);
+      if(n > 0 && tam > 0){ mapa[tam] = n; enGrupos += n*tam; nGrupos += n; }
+    });
+  }
+  return { personas, mapa, nGrupos, enGrupos, legacy: Math.max(0, personas - enGrupos) };
 }
+function hostSinReservaVista(){ return hostSinReservaDetalle().personas; }
 
 function hostCambiarDia(delta){
   hostSoltarCandados();
@@ -7249,24 +7270,39 @@ function renderHost(){
   const { esperadas, llegadas, faltan, sinRes } = tot;
   document.getElementById('hostResumen').innerHTML = `
     <div class="host-stat"><b>${esperadas}</b><span>Esperadas</span></div>
-    <div class="host-stat llegaron"><b>${llegadas}</b><span>Llegaron</span></div>
+    <div class="host-stat llegaron"><b>${llegadas}</b><span>Llegaron</span><i>${tot.reservasLlegaron} reserva${tot.reservasLlegaron===1?'':'s'}</i></div>
     <div class="host-stat faltan"><b>${faltan}</b><span>Faltan</span></div>
-    <div class="host-stat"><b>${sinRes}</b><span>Sin reserva</span></div>
+    <div class="host-stat"><b>${sinRes}</b><span>Sin reserva</span><i>${tot.det.nGrupos} grupo${tot.det.nGrupos===1?'':'s'}</i></div>
     <div class="host-stat total"><b>${llegadas + sinRes}</b><span>En el local</span></div>`;
 
   const puedeSumar = hostTurno !== 'cenaSinFranja';
   const etiquetaTurno = (hostTurnosDelDia().find(t => t[0] === hostTurno) || ['',''])[1];
+  const det = tot.det;
+  const resumenGrupos = Object.keys(det.mapa).map(Number).sort((x,y) => x-y)
+    .map(t => `${det.mapa[t]} × grupo de ${t}`).join(' · ');
+  let cuerpoEdicion = '';
+  if(puedeSumar && hostSinReservaEditando){
+    cuerpoEdicion = `
+      <div class="host-sr-titulo">Toca el tamaño del grupo que llegó:</div>
+      <div class="host-grupos-grid">
+        ${[1,2,3,4,5,6,7,8].map(t => `<button type="button" class="host-grupo-btn" onclick="hostSumarGrupo(${t})"><b>${t}</b><span>${t===1?'persona':'personas'}</span></button>`).join('')}
+        <button type="button" class="host-grupo-btn otro" onclick="hostSumarGrupoOtro()"><b>+</b><span>otro</span></button>
+      </div>
+      ${(Object.keys(det.mapa).length || det.legacy > 0) ? `<div class="host-sr-titulo">Registrados (toca ✕ para quitar uno por error):</div>
+      <div class="host-grupos-lista">
+        ${Object.keys(det.mapa).map(Number).sort((x,y) => x-y).map(t => `<div class="host-grupo-fila"><span>${det.mapa[t]} grupo${det.mapa[t]===1?'':'s'} de ${t}</span><button type="button" onclick="hostQuitarGrupo(${t})">✕ quitar 1</button></div>`).join('')}
+        ${det.legacy > 0 ? `<div class="host-grupo-fila"><span>${det.legacy} persona${det.legacy===1?'':'s'} sin detalle de grupo</span><button type="button" onclick="hostQuitarSinDetalle()">✕ quitar</button></div>` : ''}
+      </div>` : ''}
+      <button type="button" class="host-bloquear" onclick="hostToggleEditarSR()">🔒 Listo</button>`;
+  }
   document.getElementById('hostSinReserva').innerHTML = `
-    <div class="host-sr-info"><b>${sinRes}</b><span>clientes sin reserva</span>
-      <small>${puedeSumar ? 'Turno: ' + etiquetaTurno : 'Para sumar clientes sin reserva elige Cena 1 o Cena 2'}</small></div>
-    <div class="host-sr-btns">
-      ${!puedeSumar ? '' : hostSinReservaEditando ? `
-      <button type="button" onclick="hostSumarSinReserva(-1)" ${sinRes<=0?'disabled':''}>−1</button>
-      <button type="button" class="mas" onclick="hostSumarSinReserva(1)">+1</button>
-      <button type="button" class="mas" onclick="hostSumarSinReserva(2)">+2</button>
-      <button type="button" class="host-bloquear" onclick="hostToggleEditarSR()">🔒 Listo</button>` : `
-      <button type="button" class="host-editar" onclick="hostToggleEditarSR()">✎ Editar</button>`}
+    <div class="host-sr-fila">
+      <div class="host-sr-info"><b>${sinRes}</b><span>clientes sin reserva · ${det.nGrupos} grupo${det.nGrupos===1?'':'s'}</span>
+        <small>${puedeSumar ? 'Turno: ' + etiquetaTurno : 'Para sumar clientes sin reserva elige Cena 1 o Cena 2'}</small>
+        ${resumenGrupos ? `<small class="host-sr-grupos">${resumenGrupos}${det.legacy>0?` · ${det.legacy} sin detalle`:''}</small>` : (det.legacy>0 ? `<small class="host-sr-grupos">${det.legacy} sin detalle de grupo</small>` : '')}</div>
+      ${puedeSumar && !hostSinReservaEditando ? `<div class="host-sr-btns"><button type="button" class="host-editar" onclick="hostToggleEditarSR()">✎ Editar</button></div>` : ''}
     </div>
+    ${cuerpoEdicion}
     ${hostSinReservaError ? `<div class="host-sr-error">No se pudo usar el contador (${escapeHtml(String(hostSinReservaError))}).${String(hostSinReservaError).includes('permission') ? ' Falta la regla "hostSinReserva" en Firestore.' : ''}</div>` : ''}`;
 
   renderHostAforo(tot);
@@ -7367,14 +7403,46 @@ function hostGrupoCompleto(id){
   const falta = (Number(r.pax)||0) - hostLlegaron(r);
   if(falta > 0) hostMarcar(id, falta);
 }
-function hostSumarSinReserva(n){
+// Registra (o quita) UN grupo de `tam` personas. Se usa "increment" para que
+// dos hosts a la vez no se pisen entre sí.
+function hostEscribirGrupo(tam, signo){
   if(!hostTurno || hostTurno === 'cenaSinFranja' || !usuarioActual || !hostSinReservaEditando) return;
-  if(n < 0 && hostSinReservaVista() <= 0) return;
+  tam = Math.floor(Number(tam));
+  if(!isFinite(tam) || tam < 1 || tam > 99) return;
+  const inc = firebase.firestore.FieldValue.increment;
+  if(signo < 0 && !(hostSinReservaDetalle().mapa[tam] > 0)) return;
   const iso = fechaISO(hostFecha);
   hostSinReservaRef.doc(iso + '_' + hostTurno).set({
     fecha: iso,
     turno: hostTurno,
-    personas: firebase.firestore.FieldValue.increment(n),
+    personas: inc(signo * tam),
+    cantidadGrupos: inc(signo),
+    grupos: { [String(tam)]: inc(signo) },
+    actualizadoPor: usuarioActual.iniciales,
+    actualizadoEn: Date.now(),
+  }, { merge: true }).catch(hostErrorGuardar);
+}
+function hostSumarGrupo(tam){ hostEscribirGrupo(tam, 1); }
+function hostQuitarGrupo(tam){ hostEscribirGrupo(tam, -1); }
+function hostSumarGrupoOtro(){
+  const v = prompt('¿De cuántas personas es el grupo? (1 a 99)');
+  if(v === null) return;
+  const n = Math.floor(Number(String(v).trim()));
+  if(!isFinite(n) || n < 1 || n > 99){ alert('Escribe un número entre 1 y 99.'); return; }
+  hostSumarGrupo(n);
+}
+// Quita los números que se registraron antes de que existieran los grupos
+// (solo tenían el total de personas, sin saber de qué tamaño eran).
+function hostQuitarSinDetalle(){
+  if(!hostTurno || !usuarioActual || !hostSinReservaEditando) return;
+  const det = hostSinReservaDetalle();
+  if(det.legacy <= 0) return;
+  if(!confirm('Esto quita ' + det.legacy + ' persona(s) que se contaron sin saber de qué grupo eran. ¿Quitarlas?')) return;
+  const iso = fechaISO(hostFecha);
+  hostSinReservaRef.doc(iso + '_' + hostTurno).set({
+    fecha: iso,
+    turno: hostTurno,
+    personas: firebase.firestore.FieldValue.increment(-det.legacy),
     actualizadoPor: usuarioActual.iniciales,
     actualizadoEn: Date.now(),
   }, { merge: true }).catch(hostErrorGuardar);

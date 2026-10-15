@@ -1916,3 +1916,19 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .host-aforo-dia-titulo{font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dim); margin-bottom:6px;}
 .host-aforo-fila{display:flex; justify-content:space-between; gap:10px; font-size:13px; color:var(--text-muted); padding:4px 0;}
 .host-aforo-fila b{color:var(--gold-bright);}
+
+/* v6.47 — clientes sin reserva por grupo */
+.host-sr-fila{display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;}
+.host-sr-grupos{color:var(--gold-bright) !important;}
+.host-stat i{display:block; font-style:normal; font-size:10.5px; color:var(--text-muted); margin-top:2px;}
+.host-sr-titulo{width:100%; font-size:12.5px; color:var(--text-muted); margin:12px 0 8px;}
+.host-grupos-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; width:100%;}
+.host-grupo-btn{height:58px; border-radius:12px; border:1px solid var(--gold); background:rgba(214,170,85,0.14); color:var(--gold-bright); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+.host-grupo-btn b{font-size:22px; line-height:1;}
+.host-grupo-btn span{font-size:11px; color:var(--text-muted);}
+.host-grupo-btn.otro{border-style:dashed;}
+.host-grupos-lista{width:100%;}
+.host-grupo-fila{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; font-size:13.5px; color:var(--text); border-bottom:1px solid var(--border);}
+.host-grupo-fila button{padding:7px 12px; border-radius:10px; border:1px solid var(--cancelled); background:transparent; color:var(--cancelled); font-size:12.5px; font-weight:700; cursor:pointer;}
+.host-sinreserva{flex-direction:column; align-items:stretch;}
+.host-sinreserva .host-bloquear{margin-top:12px; width:100%;}
