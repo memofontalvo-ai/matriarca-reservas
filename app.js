@@ -7029,8 +7029,26 @@ function renderAll(){
 // la tarjeta marca "+N de más".
 let hostFecha = new Date();
 hostFecha.setHours(12,0,0,0);
-let hostTurno = 'todos';
+let hostTurno = null; // siempre un turno concreto (nunca "todos"): el aforo se controla por turno
 let hostFiltro = 'todas'; // todas | faltan | llegaron
+// v6.45 — Candado anti-errores: por defecto todo está BLOQUEADO. Para sumar
+// o restar personas hay que tocar "Editar" en esa tarjeta (o en el contador
+// de sin reserva); al terminar se vuelve a bloquear con "Listo".
+const hostEditando = new Set();
+let hostSinReservaEditando = false;
+function hostSoltarCandados(){ hostEditando.clear(); hostSinReservaEditando = false; }
+// v6.46 — "Guardar aforo": foto del movimiento de UN turno (reservas que
+// llegaron + clientes sin reserva) guardada en la colección `aforoTurnos`,
+// un documento por día+turno (id "AAAA-MM-DD_turno"). Guardar de nuevo el
+// mismo turno actualiza ese mismo documento.
+const hostAforoRef = db.collection('aforoTurnos');
+let hostUnsubAforo = null;
+let hostAforoFecha = null;
+let hostAforoDocs = [];
+let hostAforoError = null;
+let hostGuardandoAforo = false;
+const HOST_ORDEN_TURNOS = ['desayuno','almuerzo','cena','cena1','cena2'];
+const HOST_ETIQUETA_TURNO = { desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena', cena1:'Cena 1', cena2:'Cena 2' };
 const hostSinReservaRef = db.collection('hostSinReserva');
 let hostUnsubSinReserva = null;
 let hostSinReservaFecha = null;
@@ -7044,13 +7062,35 @@ function hostNorm(t){
 function hostLlegaron(r){ return Math.max(0, Number(r.llegaron)||0); }
 function hostEsFinDeSemanaCena(){ return diaEsFinDeSemanaCena(fechaISO(hostFecha)); }
 function hostTurnosDelDia(){
-  return hostEsFinDeSemanaCena()
-    ? [['todos','Todos'],['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']]
-    : [['todos','Todos'],['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
+  const fin = hostEsFinDeSemanaCena();
+  const lista = fin
+    ? [['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']]
+    : [['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
+  // Viernes/sábado: si hay reservas confirmadas de cena a las que nunca se
+  // les asignó Cena 1 o Cena 2, no pueden quedar invisibles para el host —
+  // aparece un turno extra SOLO cuando existen, para que las pueda ver.
+  if(fin){
+    const iso = fechaISO(hostFecha);
+    const n = reservas.filter(r => r.fecha === iso && r.estado === 'confirmada' && r.turno === 'cena' && !r.franjaCena).length;
+    if(n > 0) lista.push(['cenaSinFranja', 'Cena sin franja (' + n + ')']);
+  }
+  return lista;
+}
+// Turno que se abre por defecto según la hora actual (el host puede cambiarlo).
+function hostTurnoPorDefecto(){
+  const h = new Date().getHours();
+  if(h < 11) return 'desayuno';
+  if(h < 18) return 'almuerzo';
+  if(hostEsFinDeSemanaCena()) return h < 21 ? 'cena1' : 'cena2';
+  return 'cena';
 }
 function hostReservasDelDia(){
   const iso = fechaISO(hostFecha);
-  return reservas.filter(r => r.fecha === iso && r.estado === 'confirmada' && reservaCoincideConTurnoActivo(r, hostTurno));
+  return reservas.filter(r => {
+    if(r.fecha !== iso || r.estado !== 'confirmada') return false;
+    if(hostTurno === 'cenaSinFranja') return r.turno === 'cena' && !r.franjaCena;
+    return reservaCoincideConTurnoActivo(r, hostTurno);
+  });
 }
 function suscribirHostSinReserva(){
   const iso = fechaISO(hostFecha);
@@ -7072,31 +7112,131 @@ function suscribirHostSinReserva(){
 function detenerHostSinReserva(){
   if(hostUnsubSinReserva){ hostUnsubSinReserva(); hostUnsubSinReserva = null; }
   hostSinReservaFecha = null;
+  if(hostUnsubAforo){ hostUnsubAforo(); hostUnsubAforo = null; }
+  hostAforoFecha = null;
+}
+function suscribirHostAforo(){
+  const iso = fechaISO(hostFecha);
+  if(hostUnsubAforo && hostAforoFecha === iso) return;
+  if(hostUnsubAforo){ hostUnsubAforo(); hostUnsubAforo = null; }
+  hostAforoFecha = iso;
+  hostAforoDocs = [];
+  hostAforoError = null;
+  hostUnsubAforo = hostAforoRef.where('fecha','==',iso).onSnapshot(snap => {
+    hostAforoDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    hostAforoError = null;
+    if(vistaApp === 'host') renderHost();
+  }, err => {
+    console.warn('Host: no se pudo leer aforos guardados:', err);
+    hostAforoError = (err && err.code) ? err.code : 'error';
+    if(vistaApp === 'host') renderHost();
+  });
+}
+// Totales del turno que se está viendo (los mismos números del resumen).
+function hostCalcularTotales(){
+  const rs = hostReservasDelDia();
+  let esperadas = 0, llegadas = 0, faltan = 0;
+  rs.forEach(r => {
+    const pax = Number(r.pax)||0, ll = hostLlegaron(r);
+    esperadas += pax; llegadas += ll; faltan += Math.max(pax - ll, 0);
+  });
+  const sinRes = hostSinReservaVista();
+  return { rs, esperadas, llegadas, faltan, sinRes, total: llegadas + sinRes };
+}
+function hostHoraCorta(ms){
+  try { return new Date(ms).toLocaleTimeString('es-CO', { hour:'numeric', minute:'2-digit' }); } catch(e){ return ''; }
+}
+function renderHostAforo(tot){
+  const cont = document.getElementById('hostAforoBar');
+  if(!cont) return;
+  const iso = fechaISO(hostFecha);
+  const etiqueta = HOST_ETIQUETA_TURNO[hostTurno] || '';
+  let html = '';
+  if(hostTurno === 'cenaSinFranja'){
+    html += `<div class="host-aforo-estado">El aforo se guarda por turno: elige Cena 1 o Cena 2 para guardarlo.</div>`;
+  } else {
+    const g = hostAforoDocs.find(d => d.id === iso + '_' + hostTurno);
+    let estado, textoBtn;
+    if(!g){
+      estado = `<div class="host-aforo-estado sin">Aforo de ${etiqueta} sin guardar</div>`;
+      textoBtn = '💾 Guardar aforo — ' + etiqueta;
+    } else if(Number(g.esperadas) === tot.esperadas && Number(g.llegaron) === tot.llegadas && Number(g.sinReserva) === tot.sinRes){
+      estado = `<div class="host-aforo-estado ok">✓ Aforo de ${etiqueta} guardado a las ${hostHoraCorta(g.guardadoEn)} por ${escapeHtml(g.guardadoPor||'')}</div>`;
+      textoBtn = '💾 Guardar de nuevo';
+    } else {
+      estado = `<div class="host-aforo-estado cambio">⚠ Hay cambios desde el último guardado (${hostHoraCorta(g.guardadoEn)}). Falta actualizar.</div>`;
+      textoBtn = '💾 Actualizar aforo — ' + etiqueta;
+    }
+    html += estado + `<button type="button" class="host-guardar-aforo" onclick="hostGuardarAforo()" ${hostGuardandoAforo?'disabled':''}>${hostGuardandoAforo ? 'Guardando…' : textoBtn}</button>`;
+  }
+  if(hostAforoError){
+    html += `<div class="host-sr-error">No se pudo usar el aforo guardado (${escapeHtml(String(hostAforoError))}).${String(hostAforoError).includes('permission') ? ' Falta la regla "aforoTurnos" en Firestore.' : ''}</div>`;
+  }
+  const guardados = hostAforoDocs.slice().sort((a,b) => HOST_ORDEN_TURNOS.indexOf(a.turno) - HOST_ORDEN_TURNOS.indexOf(b.turno));
+  if(guardados.length){
+    html += `<div class="host-aforo-dia"><div class="host-aforo-dia-titulo">Aforos guardados de este día</div>` +
+      guardados.map(g => `<div class="host-aforo-fila"><span>${escapeHtml(HOST_ETIQUETA_TURNO[g.turno]||g.turno||'')}</span><span>${Number(g.llegaron)||0} con reserva + ${Number(g.sinReserva)||0} sin reserva = <b>${Number(g.totalLocal)||0}</b></span></div>`).join('') + `</div>`;
+  }
+  cont.innerHTML = html;
+}
+function hostGuardarAforo(){
+  if(!usuarioActual || !hostTurno || hostTurno === 'cenaSinFranja' || hostGuardandoAforo) return;
+  if(hostEditando.size > 0 || hostSinReservaEditando){
+    if(!confirm('Todavía hay tarjetas abiertas en modo Editar. ¿Guardar el aforo de todas formas?')) return;
+  }
+  const tot = hostCalcularTotales();
+  const iso = fechaISO(hostFecha);
+  const etiqueta = HOST_ETIQUETA_TURNO[hostTurno] || hostTurno;
+  hostGuardandoAforo = true;
+  renderHost();
+  hostAforoRef.doc(iso + '_' + hostTurno).set({
+    fecha: iso,
+    turno: hostTurno,
+    turnoEtiqueta: etiqueta,
+    esperadas: tot.esperadas,
+    llegaron: tot.llegadas,
+    faltan: tot.faltan,
+    sinReserva: tot.sinRes,
+    totalLocal: tot.total,
+    cantidadReservas: tot.rs.length,
+    detalle: tot.rs.map(r => ({ id: r.id, nombre: r.nombre || '', hora: r.hora || '', pax: Number(r.pax)||0, llegaron: hostLlegaron(r) })),
+    guardadoPor: usuarioActual.iniciales,
+    guardadoPorNombre: usuarioActual.nombre,
+    guardadoEn: Date.now(),
+  }).then(() => {
+    hostSoltarCandados();
+  }).catch(hostErrorGuardar).finally(() => {
+    hostGuardandoAforo = false;
+    if(vistaApp === 'host') renderHost();
+  });
 }
 function hostSinReservaVista(){
-  if(hostTurno === 'todos') return hostSinReservaDocs.reduce((a,d) => a + (Number(d.personas)||0), 0);
   const d = hostSinReservaDocs.find(x => x.id === fechaISO(hostFecha) + '_' + hostTurno);
   return d ? (Number(d.personas)||0) : 0;
 }
 
 function hostCambiarDia(delta){
+  hostSoltarCandados();
   hostFecha.setDate(hostFecha.getDate() + delta);
   renderHost();
 }
 function hostIrHoy(){
+  hostSoltarCandados();
   hostFecha = new Date();
   hostFecha.setHours(12,0,0,0);
   renderHost();
 }
-function hostSetTurno(t){ hostTurno = t; renderHost(); }
+function hostSetTurno(t){ hostSoltarCandados(); hostTurno = t; renderHost(); }
 function hostSetFiltro(f){ hostFiltro = f; renderHost(); }
 
 function renderHost(){
   const cont = document.getElementById('hostLista');
   if(!cont) return;
-  // Si el turno elegido no existe ese día (p. ej. Cena 1 en un martes), vuelve a "Todos".
-  if(!hostTurnosDelDia().some(t => t[0] === hostTurno)) hostTurno = 'todos';
+  // Si todavía no hay turno elegido, o el elegido no existe ese día (p. ej.
+  // Cena 1 en un martes), se abre el turno que corresponde a la hora actual.
+  if(!hostTurno || !hostTurnosDelDia().some(t => t[0] === hostTurno)) hostTurno = hostTurnoPorDefecto();
   suscribirHostSinReserva();
+  suscribirHostAforo();
 
   const d = hostFecha;
   const esHoy = fechaISO(d) === fechaISO(new Date());
@@ -7105,13 +7245,8 @@ function renderHost(){
   document.getElementById('hostTurnos').innerHTML = hostTurnosDelDia().map(([k,l]) =>
     `<button type="button" class="host-pill ${hostTurno===k?'activo':''}" onclick="hostSetTurno('${k}')">${l}</button>`).join('');
 
-  const rs = hostReservasDelDia();
-  let esperadas = 0, llegadas = 0, faltan = 0;
-  rs.forEach(r => {
-    const pax = Number(r.pax)||0, ll = hostLlegaron(r);
-    esperadas += pax; llegadas += ll; faltan += Math.max(pax - ll, 0);
-  });
-  const sinRes = hostSinReservaVista();
+  const tot = hostCalcularTotales();
+  const { esperadas, llegadas, faltan, sinRes } = tot;
   document.getElementById('hostResumen').innerHTML = `
     <div class="host-stat"><b>${esperadas}</b><span>Esperadas</span></div>
     <div class="host-stat llegaron"><b>${llegadas}</b><span>Llegaron</span></div>
@@ -7119,17 +7254,22 @@ function renderHost(){
     <div class="host-stat"><b>${sinRes}</b><span>Sin reserva</span></div>
     <div class="host-stat total"><b>${llegadas + sinRes}</b><span>En el local</span></div>`;
 
-  const puedeSumar = hostTurno !== 'todos';
-  const etiquetaTurno = (hostTurnosDelDia().find(t => t[0] === hostTurno) || ['','Todos'])[1];
+  const puedeSumar = hostTurno !== 'cenaSinFranja';
+  const etiquetaTurno = (hostTurnosDelDia().find(t => t[0] === hostTurno) || ['',''])[1];
   document.getElementById('hostSinReserva').innerHTML = `
     <div class="host-sr-info"><b>${sinRes}</b><span>clientes sin reserva</span>
-      <small>${puedeSumar ? 'Turno: ' + etiquetaTurno : 'Elige un turno arriba para sumar o restar'}</small></div>
+      <small>${puedeSumar ? 'Turno: ' + etiquetaTurno : 'Para sumar clientes sin reserva elige Cena 1 o Cena 2'}</small></div>
     <div class="host-sr-btns">
-      <button type="button" onclick="hostSumarSinReserva(-1)" ${(!puedeSumar || sinRes<=0)?'disabled':''}>−1</button>
-      <button type="button" class="mas" onclick="hostSumarSinReserva(1)" ${puedeSumar?'':'disabled'}>+1</button>
-      <button type="button" class="mas" onclick="hostSumarSinReserva(2)" ${puedeSumar?'':'disabled'}>+2</button>
+      ${!puedeSumar ? '' : hostSinReservaEditando ? `
+      <button type="button" onclick="hostSumarSinReserva(-1)" ${sinRes<=0?'disabled':''}>−1</button>
+      <button type="button" class="mas" onclick="hostSumarSinReserva(1)">+1</button>
+      <button type="button" class="mas" onclick="hostSumarSinReserva(2)">+2</button>
+      <button type="button" class="host-bloquear" onclick="hostToggleEditarSR()">🔒 Listo</button>` : `
+      <button type="button" class="host-editar" onclick="hostToggleEditarSR()">✎ Editar</button>`}
     </div>
     ${hostSinReservaError ? `<div class="host-sr-error">No se pudo usar el contador (${escapeHtml(String(hostSinReservaError))}).${String(hostSinReservaError).includes('permission') ? ' Falta la regla "hostSinReserva" en Firestore.' : ''}</div>` : ''}`;
+
+  renderHostAforo(tot);
 
   document.getElementById('hostFiltros').innerHTML = [['todas','Todas'],['faltan','Faltan por llegar'],['llegaron','Ya llegaron']].map(([k,l]) =>
     `<button type="button" class="host-filtro ${hostFiltro===k?'activo':''}" onclick="hostSetFiltro('${k}')">${l}</button>`).join('');
@@ -7172,19 +7312,23 @@ function renderHostLista(){
     if(r.franjaCena) chips.push(`<span class="host-chip">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`);
     if(ll > pax) chips.push(`<span class="host-chip extra">+${ll-pax} de más</span>`);
     if(tarde) chips.push(`<span class="host-chip tarde">Sin llegar · hora pasada</span>`);
+    const editando = hostEditando.has(r.id);
     return `
-    <div class="host-card host-${est}${tarde?' host-tarde':''}">
+    <div class="host-card host-${est}${tarde?' host-tarde':''}${editando?' host-card-editando':''}">
       <div class="host-card-top">
         <div class="host-hora">${formatearHora12(r.hora)}</div>
         <div class="host-nombre">${escapeHtml(r.nombre||'(sin nombre)')}</div>
         <div class="host-conteo"><b>${ll}</b><span>/${pax}</span></div>
       </div>
       ${chips.length ? `<div class="host-meta">${chips.join('')}</div>` : '<div style="height:8px;"></div>'}
+      ${editando ? `
       <div class="host-acciones">
         <button type="button" onclick='hostMarcar(${idJs}, -1)' ${ll<=0?'disabled':''}>−1</button>
         <button type="button" class="mas" onclick='hostMarcar(${idJs}, 1)'>+1 persona</button>
         <button type="button" class="todos" onclick='hostGrupoCompleto(${idJs})' ${ll>=pax?'disabled':''}>Llegó completo</button>
       </div>
+      <button type="button" class="host-bloquear host-bloquear-card" onclick='hostToggleEditar(${idJs})'>🔒 Listo — bloquear</button>` : `
+      <button type="button" class="host-editar host-editar-card" onclick='hostToggleEditar(${idJs})'>✎ Editar llegadas</button>`}
     </div>`;
   }).join('');
 }
@@ -7198,9 +7342,18 @@ function hostErrorGuardar(err){
 }
 // Suma o resta personas llegadas de UNA reserva. Se usa "increment" para que,
 // si dos hosts marcan a la vez la misma reserva, no se pisen entre sí.
+function hostToggleEditar(id){
+  if(hostEditando.has(id)) hostEditando.delete(id); else hostEditando.add(id);
+  renderHostLista();
+}
+function hostToggleEditarSR(){
+  hostSinReservaEditando = !hostSinReservaEditando;
+  renderHost();
+}
 function hostMarcar(id, delta){
   const r = reservas.find(x => x.id === id);
   if(!r || !usuarioActual) return;
+  if(!hostEditando.has(id)) return; // candado: solo se marca con la tarjeta en modo Editar
   if(delta < 0 && hostLlegaron(r) <= 0) return;
   reservasRef.doc(id).update({
     llegaron: firebase.firestore.FieldValue.increment(delta),
@@ -7210,12 +7363,12 @@ function hostMarcar(id, delta){
 }
 function hostGrupoCompleto(id){
   const r = reservas.find(x => x.id === id);
-  if(!r) return;
+  if(!r || !hostEditando.has(id)) return;
   const falta = (Number(r.pax)||0) - hostLlegaron(r);
   if(falta > 0) hostMarcar(id, falta);
 }
 function hostSumarSinReserva(n){
-  if(hostTurno === 'todos' || !usuarioActual) return;
+  if(!hostTurno || hostTurno === 'cenaSinFranja' || !usuarioActual || !hostSinReservaEditando) return;
   if(n < 0 && hostSinReservaVista() <= 0) return;
   const iso = fechaISO(hostFecha);
   hostSinReservaRef.doc(iso + '_' + hostTurno).set({
