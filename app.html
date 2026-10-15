@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.42">
+<link rel="stylesheet" href="app.css?v=6.43">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -94,6 +94,10 @@
     <button id="togglePorDia" class="app-toggle-btn" onclick="cambiarVistaApp('porDia')">
       <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
       <span class="app-toggle-label">Por día</span>
+    </button>
+    <button id="toggleHost" class="app-toggle-btn" onclick="cambiarVistaApp('host')">
+      <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      <span class="app-toggle-label">Host</span>
     </button>
     <button id="toggleSalones" class="app-toggle-btn" onclick="irASalones()">
       <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6"/></svg></span>
@@ -227,6 +231,24 @@
       <button data-view="lista" class="active" onclick="cambiarVista('lista')"><span class="icon">☰</span>Lista</button>
       <button data-view="plano" onclick="cambiarVista('plano')"><span class="icon">▦</span>Plano</button>
       <button data-view="resumen" onclick="cambiarVista('resumen')"><span class="icon">◔</span>Resumen</button>
+    </div>
+  </div>
+
+  <div id="pantallaHost" style="display:none;">
+    <div class="host-wrap">
+      <div class="host-datenav">
+        <button type="button" onclick="hostCambiarDia(-1)" aria-label="Día anterior">‹</button>
+        <div class="host-fecha" id="hostFechaLabel" onclick="hostIrHoy()" title="Ir a hoy"></div>
+        <button type="button" onclick="hostCambiarDia(1)" aria-label="Día siguiente">›</button>
+      </div>
+      <div class="host-turnos" id="hostTurnos"></div>
+      <div class="host-resumen" id="hostResumen"></div>
+      <div class="host-sinreserva" id="hostSinReserva"></div>
+      <div class="host-buscar-wrap">
+        <input type="text" id="hostBuscar" class="host-buscar" placeholder="Buscar reserva por nombre o celular..." oninput="renderHostLista()" autocomplete="off">
+      </div>
+      <div class="host-filtros" id="hostFiltros"></div>
+      <div class="host-lista" id="hostLista"></div>
     </div>
   </div>
 
@@ -534,7 +556,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.42</div>
+<div class="version-tag">v6.43</div>
 
 
 <div class="overlay" id="overlay">
@@ -1295,6 +1317,10 @@
           <input type="radio" name="fUsuRol" value="promotor" onchange="toggleUsuarioEventoWrap()">
           <div><strong>Promotor de eventos</strong><span>Queda amarrado a UN evento especial — solo ve y gestiona las solicitudes y reservas de ese evento, nada más.</span></div>
         </label>
+        <label class="rol-opcion">
+          <input type="radio" name="fUsuRol" value="host" onchange="toggleUsuarioEventoWrap()">
+          <div><strong>Host</strong><span>Solo ve la pantalla Host: marca la llegada de las personas de cada reserva confirmada y cuenta los clientes sin reserva. No crea ni edita reservas.</span></div>
+        </label>
       </div>
     </div>
     <div class="field" id="fUsuEventoWrap" style="display:none;">
@@ -1318,6 +1344,6 @@
 </div>
 
 
-<script src="app.js?v=6.42"></script>
+<script src="app.js?v=6.43"></script>
 </body>
 </html>

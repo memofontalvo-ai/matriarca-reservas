@@ -470,7 +470,7 @@ function actualizarBannerEventoPromotor(){
 function aplicarRestriccionesRol(){
   if(!usuarioActual) return;
   const rol = usuarioActual.rol || 'admin';
-  document.body.classList.remove('rol-operativo', 'rol-consulta');
+  document.body.classList.remove('rol-operativo', 'rol-consulta', 'rol-host');
   const btnConfig = document.getElementById('toggleConfig');
   const btnSalones = document.getElementById('toggleSalones');
   const btnNueva = document.getElementById('btnNuevaReservaHeader');
@@ -496,6 +496,20 @@ function aplicarRestriccionesRol(){
     if(btnSolicitudesTab) btnSolicitudesTab.style.display = '';
     if(btnBloquearDia) btnBloquearDia.style.display = '';
     if(rol === 'operativo') document.body.classList.add('rol-operativo');
+  }
+  // v6.43 — Módulo Host: lo ven Administrador, Operativo y Host. El nivel
+  // Host SOLO ve esa pantalla (sin Solicitudes, Por día, ni crear reservas).
+  const btnHostNav = document.getElementById('toggleHost');
+  const btnPorDiaNav = document.getElementById('togglePorDia');
+  if(btnHostNav) btnHostNav.style.display = (rol === 'admin' || rol === 'operativo' || rol === 'host') ? '' : 'none';
+  if(rol === 'host'){
+    document.body.classList.add('rol-host');
+    if(btnNueva) btnNueva.style.display = 'none';
+    if(btnSolicitudesTab) btnSolicitudesTab.style.display = 'none';
+    if(btnPorDiaNav) btnPorDiaNav.style.display = 'none';
+    if(btnBloquearDia) btnBloquearDia.style.display = 'none';
+  } else if(btnPorDiaNav){
+    btnPorDiaNav.style.display = '';
   }
   // Un "Promotor de eventos" solo tiene datos de UN día en todo el
   // sistema (ver recalcularReservasVisibles) — si "Por día" arrancara en
@@ -538,6 +552,8 @@ function aplicarRestriccionesRol(){
   } else if(vistaApp === 'solicitudes' && rol === 'consulta'){
     cambiarVistaApp('porDia');
   }
+  if(rol === 'host' && vistaApp !== 'host') cambiarVistaApp('host');
+  if(vistaApp === 'host' && (rol === 'consulta' || rol === 'promotor')) cambiarVistaApp(rol === 'consulta' ? 'porDia' : 'solicitudes');
 }
 
 auth.onAuthStateChanged(user => {
@@ -2030,6 +2046,7 @@ function moverSlide(indice, direccion){
 function nombreRol(rol){
   if(rol === 'admin') return 'Administrador';
   if(rol === 'consulta') return 'Consulta';
+  if(rol === 'host') return 'Host';
   return 'Operativo';
 }
 
@@ -2057,6 +2074,7 @@ function cargarUsuariosConfig(){
           <select onchange='cambiarRolUsuario(${JSON.stringify(u.id)}, this.value)' style="font-size:11px; padding:5px 6px; border-radius:8px; border:1px solid var(--border); background:var(--panel-alt); color:var(--text);">
             <option value="consulta" ${rol==='consulta'?'selected':''}>Consulta</option>
             <option value="operativo" ${rol==='operativo'?'selected':''}>Operativo</option>
+            <option value="host" ${rol==='host'?'selected':''}>Host</option>
             <option value="admin" ${rol==='admin'?'selected':''}>Administrador</option>
           </select>
           <button class="btn-config-restaurar" onclick='abrirModalEditarUsuario(${JSON.stringify(u.id)})'>✎ Editar</button>
@@ -3346,11 +3364,11 @@ function iniciarListenerReservas(){
       const solicitudesNuevas = snap.docChanges().filter(ch =>
         ch.type === 'added' && ['solicitud','lista_espera'].includes(ch.doc.data().estado)
       );
-      if(solicitudesNuevas.length > 0 && usuarioActual && usuarioActual.sonidoAvisoActivo !== false){
+      if(solicitudesNuevas.length > 0 && usuarioActual && usuarioActual.rol !== 'host' && usuarioActual.sonidoAvisoActivo !== false){
         sonarAvisoNuevaSolicitud();
         avisarVisualmenteNuevaSolicitud();
       }
-      if(solicitudesNuevas.length > 0 && usuarioActual){
+      if(solicitudesNuevas.length > 0 && usuarioActual && usuarioActual.rol !== 'host'){
         mostrarToastNuevaSolicitud(solicitudesNuevas.length);
       }
     }
@@ -6990,6 +7008,7 @@ function renderAll(){
   renderPlano();
   renderResumen();
   renderSolicitudesScreen();
+  if(vistaApp === 'host') renderHost();
   // OJO: no reseteamos calInlineMes/calInlineAno aquí — renderAll() se llama
   // constantemente (cada vez que llega un cambio en tiempo real desde Firebase),
   // y si reseteáramos el mes en cada llamada, el calendario se saltaría solo
@@ -6998,6 +7017,214 @@ function renderAll(){
   // acciones donde el usuario realmente elige una fecha nueva (ver cambiarDia,
   // seleccionarDiaInline, toggleCalendarioPorDia).
   renderCalendarioInline();
+}
+
+/* ============ MÓDULO HOST (v6.43) ============ */
+// Pantalla operativa para la persona de la puerta: ve las reservas
+// CONFIRMADAS del día/turno y va marcando cuántas personas de cada una
+// han llegado (campo nuevo `llegaron` dentro de la reserva — no toca pax,
+// estado, mesa ni nada de lo que ya existía), y cuenta los clientes que
+// llegan sin reserva (colección nueva `hostSinReserva`, un documento por
+// día+turno). Si llegan más personas de las reservadas, se suman igual y
+// la tarjeta marca "+N de más".
+let hostFecha = new Date();
+hostFecha.setHours(12,0,0,0);
+let hostTurno = 'todos';
+let hostFiltro = 'todas'; // todas | faltan | llegaron
+const hostSinReservaRef = db.collection('hostSinReserva');
+let hostUnsubSinReserva = null;
+let hostSinReservaFecha = null;
+let hostSinReservaDocs = [];
+let hostSinReservaError = null;
+const HOST_MIN_TARDE = 15; // minutos pasada la hora para marcar "tarde"
+
+function hostNorm(t){
+  return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+function hostLlegaron(r){ return Math.max(0, Number(r.llegaron)||0); }
+function hostEsFinDeSemanaCena(){ return diaEsFinDeSemanaCena(fechaISO(hostFecha)); }
+function hostTurnosDelDia(){
+  return hostEsFinDeSemanaCena()
+    ? [['todos','Todos'],['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']]
+    : [['todos','Todos'],['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
+}
+function hostReservasDelDia(){
+  const iso = fechaISO(hostFecha);
+  return reservas.filter(r => r.fecha === iso && r.estado === 'confirmada' && reservaCoincideConTurnoActivo(r, hostTurno));
+}
+function suscribirHostSinReserva(){
+  const iso = fechaISO(hostFecha);
+  if(hostUnsubSinReserva && hostSinReservaFecha === iso) return;
+  if(hostUnsubSinReserva){ hostUnsubSinReserva(); hostUnsubSinReserva = null; }
+  hostSinReservaFecha = iso;
+  hostSinReservaDocs = [];
+  hostSinReservaError = null;
+  hostUnsubSinReserva = hostSinReservaRef.where('fecha','==',iso).onSnapshot(snap => {
+    hostSinReservaDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    hostSinReservaError = null;
+    if(vistaApp === 'host') renderHost();
+  }, err => {
+    console.warn('Host: no se pudo leer clientes sin reserva:', err);
+    hostSinReservaError = (err && err.code) ? err.code : 'error';
+    if(vistaApp === 'host') renderHost();
+  });
+}
+function detenerHostSinReserva(){
+  if(hostUnsubSinReserva){ hostUnsubSinReserva(); hostUnsubSinReserva = null; }
+  hostSinReservaFecha = null;
+}
+function hostSinReservaVista(){
+  if(hostTurno === 'todos') return hostSinReservaDocs.reduce((a,d) => a + (Number(d.personas)||0), 0);
+  const d = hostSinReservaDocs.find(x => x.id === fechaISO(hostFecha) + '_' + hostTurno);
+  return d ? (Number(d.personas)||0) : 0;
+}
+
+function hostCambiarDia(delta){
+  hostFecha.setDate(hostFecha.getDate() + delta);
+  renderHost();
+}
+function hostIrHoy(){
+  hostFecha = new Date();
+  hostFecha.setHours(12,0,0,0);
+  renderHost();
+}
+function hostSetTurno(t){ hostTurno = t; renderHost(); }
+function hostSetFiltro(f){ hostFiltro = f; renderHost(); }
+
+function renderHost(){
+  const cont = document.getElementById('hostLista');
+  if(!cont) return;
+  // Si el turno elegido no existe ese día (p. ej. Cena 1 en un martes), vuelve a "Todos".
+  if(!hostTurnosDelDia().some(t => t[0] === hostTurno)) hostTurno = 'todos';
+  suscribirHostSinReserva();
+
+  const d = hostFecha;
+  const esHoy = fechaISO(d) === fechaISO(new Date());
+  document.getElementById('hostFechaLabel').innerHTML =
+    `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}<small>${esHoy ? 'Hoy' : 'Toca aquí para volver a hoy'}</small>`;
+  document.getElementById('hostTurnos').innerHTML = hostTurnosDelDia().map(([k,l]) =>
+    `<button type="button" class="host-pill ${hostTurno===k?'activo':''}" onclick="hostSetTurno('${k}')">${l}</button>`).join('');
+
+  const rs = hostReservasDelDia();
+  let esperadas = 0, llegadas = 0, faltan = 0;
+  rs.forEach(r => {
+    const pax = Number(r.pax)||0, ll = hostLlegaron(r);
+    esperadas += pax; llegadas += ll; faltan += Math.max(pax - ll, 0);
+  });
+  const sinRes = hostSinReservaVista();
+  document.getElementById('hostResumen').innerHTML = `
+    <div class="host-stat"><b>${esperadas}</b><span>Esperadas</span></div>
+    <div class="host-stat llegaron"><b>${llegadas}</b><span>Llegaron</span></div>
+    <div class="host-stat faltan"><b>${faltan}</b><span>Faltan</span></div>
+    <div class="host-stat"><b>${sinRes}</b><span>Sin reserva</span></div>
+    <div class="host-stat total"><b>${llegadas + sinRes}</b><span>En el local</span></div>`;
+
+  const puedeSumar = hostTurno !== 'todos';
+  const etiquetaTurno = (hostTurnosDelDia().find(t => t[0] === hostTurno) || ['','Todos'])[1];
+  document.getElementById('hostSinReserva').innerHTML = `
+    <div class="host-sr-info"><b>${sinRes}</b><span>clientes sin reserva</span>
+      <small>${puedeSumar ? 'Turno: ' + etiquetaTurno : 'Elige un turno arriba para sumar o restar'}</small></div>
+    <div class="host-sr-btns">
+      <button type="button" onclick="hostSumarSinReserva(-1)" ${(!puedeSumar || sinRes<=0)?'disabled':''}>−1</button>
+      <button type="button" class="mas" onclick="hostSumarSinReserva(1)" ${puedeSumar?'':'disabled'}>+1</button>
+      <button type="button" class="mas" onclick="hostSumarSinReserva(2)" ${puedeSumar?'':'disabled'}>+2</button>
+    </div>
+    ${hostSinReservaError ? `<div class="host-sr-error">No se pudo usar el contador (${escapeHtml(String(hostSinReservaError))}).${String(hostSinReservaError).includes('permission') ? ' Falta la regla "hostSinReserva" en Firestore.' : ''}</div>` : ''}`;
+
+  document.getElementById('hostFiltros').innerHTML = [['todas','Todas'],['faltan','Faltan por llegar'],['llegaron','Ya llegaron']].map(([k,l]) =>
+    `<button type="button" class="host-filtro ${hostFiltro===k?'activo':''}" onclick="hostSetFiltro('${k}')">${l}</button>`).join('');
+
+  renderHostLista();
+}
+
+function renderHostLista(){
+  const cont = document.getElementById('hostLista');
+  if(!cont) return;
+  const iso = fechaISO(hostFecha);
+  const ahora = new Date();
+  const esHoy = iso === fechaISO(ahora);
+  const minAhora = ahora.getHours()*60 + ahora.getMinutes();
+  const input = document.getElementById('hostBuscar');
+  const q = hostNorm(input ? input.value.trim() : '');
+  const qd = q.replace(/\D/g,'');
+
+  let lista = hostReservasDelDia().slice().sort((a,b) =>
+    String(a.hora||'').localeCompare(String(b.hora||'')) || String(a.nombre||'').localeCompare(String(b.nombre||'')));
+  if(q) lista = lista.filter(r => hostNorm(r.nombre).includes(q) || (qd.length >= 3 && String(r.celular||'').replace(/\D/g,'').includes(qd)));
+  if(hostFiltro === 'faltan') lista = lista.filter(r => hostLlegaron(r) < (Number(r.pax)||0));
+  if(hostFiltro === 'llegaron') lista = lista.filter(r => hostLlegaron(r) > 0);
+
+  if(lista.length === 0){
+    cont.innerHTML = `<div class="host-vacio">${q ? 'No se encontró ninguna reserva confirmada con esa búsqueda.' : 'No hay reservas confirmadas para este día y turno.'}</div>`;
+    return;
+  }
+  cont.innerHTML = lista.map(r => {
+    const pax = Number(r.pax)||0, ll = hostLlegaron(r);
+    let est = ll === 0 ? 'cero' : ll < pax ? 'parcial' : ll === pax ? 'completo' : 'extra';
+    let tarde = false;
+    if(esHoy && ll === 0 && r.hora){
+      const [h,m] = String(r.hora).split(':').map(Number);
+      if(isFinite(h) && (h*60 + (isFinite(m)?m:0) + HOST_MIN_TARDE) < minAhora) tarde = true;
+    }
+    const idJs = JSON.stringify(r.id);
+    const chips = [];
+    if(r.mesa) chips.push(`<span class="host-chip">🪑 ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`);
+    if(r.franjaCena) chips.push(`<span class="host-chip">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`);
+    if(ll > pax) chips.push(`<span class="host-chip extra">+${ll-pax} de más</span>`);
+    if(tarde) chips.push(`<span class="host-chip tarde">Sin llegar · hora pasada</span>`);
+    return `
+    <div class="host-card host-${est}${tarde?' host-tarde':''}">
+      <div class="host-card-top">
+        <div class="host-hora">${formatearHora12(r.hora)}</div>
+        <div class="host-nombre">${escapeHtml(r.nombre||'(sin nombre)')}</div>
+        <div class="host-conteo"><b>${ll}</b><span>/${pax}</span></div>
+      </div>
+      ${chips.length ? `<div class="host-meta">${chips.join('')}</div>` : '<div style="height:8px;"></div>'}
+      <div class="host-acciones">
+        <button type="button" onclick='hostMarcar(${idJs}, -1)' ${ll<=0?'disabled':''}>−1</button>
+        <button type="button" class="mas" onclick='hostMarcar(${idJs}, 1)'>+1 persona</button>
+        <button type="button" class="todos" onclick='hostGrupoCompleto(${idJs})' ${ll>=pax?'disabled':''}>Llegó completo</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function hostErrorGuardar(err){
+  console.error('Host: no se pudo guardar:', err);
+  const cod = (err && (err.code || err.name)) ? String(err.code || err.name) : 'desconocido';
+  alert('No se pudo guardar la llegada. Revisa tu conexión e intenta de nuevo.\n\nCódigo del error: ' + cod +
+    (cod.includes('permission') ? '\n\n⚠ Firebase no dejó guardar (revisar reglas de seguridad para este nivel).' : '') +
+    (cod.includes('resource-exhausted') ? '\n\n⚠ Parece que se agotó la cuota diaria de Firebase.' : ''));
+}
+// Suma o resta personas llegadas de UNA reserva. Se usa "increment" para que,
+// si dos hosts marcan a la vez la misma reserva, no se pisen entre sí.
+function hostMarcar(id, delta){
+  const r = reservas.find(x => x.id === id);
+  if(!r || !usuarioActual) return;
+  if(delta < 0 && hostLlegaron(r) <= 0) return;
+  reservasRef.doc(id).update({
+    llegaron: firebase.firestore.FieldValue.increment(delta),
+    llegadaActualizadaPor: usuarioActual.iniciales,
+    llegadaActualizadaEn: Date.now(),
+  }).catch(hostErrorGuardar);
+}
+function hostGrupoCompleto(id){
+  const r = reservas.find(x => x.id === id);
+  if(!r) return;
+  const falta = (Number(r.pax)||0) - hostLlegaron(r);
+  if(falta > 0) hostMarcar(id, falta);
+}
+function hostSumarSinReserva(n){
+  if(hostTurno === 'todos' || !usuarioActual) return;
+  if(n < 0 && hostSinReservaVista() <= 0) return;
+  const iso = fechaISO(hostFecha);
+  hostSinReservaRef.doc(iso + '_' + hostTurno).set({
+    fecha: iso,
+    turno: hostTurno,
+    personas: firebase.firestore.FieldValue.increment(n),
+    actualizadoPor: usuarioActual.iniciales,
+    actualizadoEn: Date.now(),
+  }, { merge: true }).catch(hostErrorGuardar);
 }
 
 /* ============ PANTALLA DE SOLICITUDES (global, todas las fechas) ============ */
@@ -7040,6 +7267,9 @@ function cambiarVistaApp(v){
   // Solicitudes (reservas pendientes/por aprobar) por ningún camino,
   // aunque los botones ya estén ocultos.
   if(v === 'solicitudes' && rol === 'consulta') return;
+  // v6.43 — "host" solo para admin/operativo/host; el nivel Host no puede salir de ahí.
+  if(v === 'host' && (rol === 'consulta' || rol === 'promotor')) return;
+  if(rol === 'host' && v !== 'host') return;
   vistaApp = v;
   if(v === 'solicitudes') cerrarToastNuevaSolicitud();
   document.getElementById('toggleSolicitudes').classList.toggle('active', v==='solicitudes');
@@ -7059,6 +7289,14 @@ function cambiarVistaApp(v){
   document.getElementById('pantallaPorDia').style.display = v==='porDia' ? 'flex' : 'none';
   document.getElementById('pantallaSalones').style.display = v==='salones' ? 'flex' : 'none';
   document.getElementById('pantallaConfig').style.display = v==='config' ? 'flex' : 'none';
+  const btnHostV = document.getElementById('toggleHost');
+  if(btnHostV){
+    btnHostV.classList.toggle('active', v==='host');
+    if(v==='host') btnHostV.setAttribute('aria-current','page'); else btnHostV.removeAttribute('aria-current');
+  }
+  const pantHost = document.getElementById('pantallaHost');
+  if(pantHost) pantHost.style.display = v==='host' ? 'flex' : 'none';
+  if(v==='host') renderHost(); else detenerHostSinReserva();
   if(v==='config') renderConfigMensajes();
   // Misma protección que en cambiarVista(): si el modal de una reserva se
   // quedó abierto de fondo, cambiar de pantalla principal también lo
