@@ -502,6 +502,9 @@ function aplicarRestriccionesRol(){
   const btnHostNav = document.getElementById('toggleHost');
   const btnPorDiaNav = document.getElementById('togglePorDia');
   if(btnHostNav) btnHostNav.style.display = (rol === 'admin' || rol === 'operativo' || rol === 'host') ? '' : 'none';
+  // v6.49 — Registro de clientes: todos los niveles menos promotor.
+  const btnRegNav = document.getElementById('toggleRegistro');
+  if(btnRegNav) btnRegNav.style.display = (rol === 'promotor') ? 'none' : '';
   if(rol === 'host'){
     document.body.classList.add('rol-host');
     if(btnNueva) btnNueva.style.display = 'none';
@@ -552,7 +555,8 @@ function aplicarRestriccionesRol(){
   } else if(vistaApp === 'solicitudes' && rol === 'consulta'){
     cambiarVistaApp('porDia');
   }
-  if(rol === 'host' && vistaApp !== 'host') cambiarVistaApp('host');
+  if(rol === 'host' && vistaApp !== 'host' && vistaApp !== 'registro') cambiarVistaApp('host');
+  if(vistaApp === 'registro' && rol === 'promotor') cambiarVistaApp('solicitudes');
   if(vistaApp === 'host' && (rol === 'consulta' || rol === 'promotor')) cambiarVistaApp(rol === 'consulta' ? 'porDia' : 'solicitudes');
 }
 
@@ -7009,6 +7013,7 @@ function renderAll(){
   renderResumen();
   renderSolicitudesScreen();
   if(vistaApp === 'host') renderHost();
+  if(vistaApp === 'registro') renderRegistro();
   // OJO: no reseteamos calInlineMes/calInlineAno aquí — renderAll() se llama
   // constantemente (cada vez que llega un cambio en tiempo real desde Firebase),
   // y si reseteáramos el mes en cada llamada, el calendario se saltaría solo
@@ -7512,6 +7517,244 @@ function hostQuitarSinDetalle(){
   }, { merge: true }).catch(hostErrorGuardar);
 }
 
+/* ============ REGISTRO DE CLIENTES (v6.49) ============ */
+// Informe de aforo real por día y turno, de solo lectura, para todos los
+// niveles menos promotor. Usa el aforo GUARDADO por el host (colección
+// `aforoTurnos`) y, si un turno aún no se guardó, los números EN VIVO
+// (reservas confirmadas + `hostSinReserva`). No escribe nada.
+let regFecha = new Date(); regFecha.setHours(12,0,0,0);
+let regMes = regFecha.getMonth();
+let regAno = regFecha.getFullYear();
+let regTurno = 'dia'; // 'dia' = día completo, o la clave de un turno
+let regAforoDocs = [];
+let regSinResDocs = [];
+let regUnsubAforo = null, regUnsubSinRes = null;
+let regAforoMes = null, regSinResFecha = null;
+let regError = null;
+function regIso(d){ return fechaISO(d); }
+function regTurnosDelDia(iso){
+  const fin = diaEsFinDeSemanaCena(iso);
+  const lista = fin
+    ? [['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena1','Cena 1'],['cena2','Cena 2']]
+    : [['desayuno','Desayuno'],['almuerzo','Almuerzo'],['cena','Cena']];
+  if(fin && reservas.some(r => r.fecha === iso && r.estado === 'confirmada' && r.turno === 'cena' && !r.franjaCena)){
+    lista.push(['cenaSinFranja','Cena sin franja']);
+  }
+  return lista;
+}
+function regReservasDe(iso, key){
+  return reservas.filter(r => {
+    if(r.fecha !== iso || r.estado !== 'confirmada') return false;
+    if(key === 'cenaSinFranja') return r.turno === 'cena' && !r.franjaCena;
+    return reservaCoincideConTurnoActivo(r, key);
+  });
+}
+function suscribirRegistro(){
+  const ini = regAno + '-' + String(regMes+1).padStart(2,'0') + '-01';
+  const fin = regAno + '-' + String(regMes+1).padStart(2,'0') + '-31';
+  const claveMes = regAno + '-' + regMes;
+  if(!regUnsubAforo || regAforoMes !== claveMes){
+    if(regUnsubAforo){ regUnsubAforo(); regUnsubAforo = null; }
+    regAforoMes = claveMes;
+    regAforoDocs = [];
+    regUnsubAforo = db.collection('aforoTurnos').where('fecha','>=',ini).where('fecha','<=',fin).onSnapshot(snap => {
+      regAforoDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      regError = null;
+      if(vistaApp === 'registro') renderRegistro();
+    }, err => {
+      console.warn('Registro: no se pudo leer aforos guardados:', err);
+      regError = (err && err.code) ? err.code : 'error';
+      if(vistaApp === 'registro') renderRegistro();
+    });
+  }
+  const iso = regIso(regFecha);
+  if(!regUnsubSinRes || regSinResFecha !== iso){
+    if(regUnsubSinRes){ regUnsubSinRes(); regUnsubSinRes = null; }
+    regSinResFecha = iso;
+    regSinResDocs = [];
+    regUnsubSinRes = db.collection('hostSinReserva').where('fecha','==',iso).onSnapshot(snap => {
+      regSinResDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if(vistaApp === 'registro') renderRegistro();
+    }, err => {
+      console.warn('Registro: no se pudo leer clientes sin reserva:', err);
+      regError = (err && err.code) ? err.code : 'error';
+      if(vistaApp === 'registro') renderRegistro();
+    });
+  }
+}
+function detenerRegistro(){
+  if(regUnsubAforo){ regUnsubAforo(); regUnsubAforo = null; }
+  if(regUnsubSinRes){ regUnsubSinRes(); regUnsubSinRes = null; }
+  regAforoMes = null; regSinResFecha = null;
+}
+// Números de UN turno de UN día. Si hay aforo guardado, manda ese; si no, en vivo.
+function regMetricas(iso, key){
+  const g = regAforoDocs.find(d => d.id === iso + '_' + key);
+  let items, sinRes, gruposSR, tamSR, fuente, guardadoEn = null, guardadoPor = '', detalleOk = true, nRes;
+  if(g){
+    fuente = 'guardado'; guardadoEn = g.guardadoEn; guardadoPor = g.guardadoPorNombre || g.guardadoPor || '';
+    if(Array.isArray(g.detalle)){
+      items = g.detalle.map(x => ({ pax: Number(x.pax)||0, ll: Math.max(0, Number(x.llegaron)||0) }));
+    } else { items = []; detalleOk = false; }
+    sinRes = Math.max(0, Number(g.sinReserva)||0);
+    gruposSR = Number(g.cantidadGruposSinReserva)||0;
+    tamSR = (Array.isArray(g.entradasSinReserva) ? g.entradasSinReserva : []).map(e => Number(e && e.n)||0).filter(n => n > 0);
+    nRes = g.cantidadReservas != null ? Number(g.cantidadReservas)||0 : items.length;
+    var esperadas = Number(g.esperadas)||0, llegaron = Number(g.llegaron)||0;
+    var resLlegaron = g.reservasQueLlegaron != null ? Number(g.reservasQueLlegaron)||0 : null;
+    var total = g.totalLocal != null ? Number(g.totalLocal)||0 : llegaron + sinRes;
+  } else {
+    fuente = 'vivo';
+    const rs = regReservasDe(iso, key);
+    items = rs.map(r => ({ pax: Number(r.pax)||0, ll: hostLlegaron(r) }));
+    nRes = rs.length;
+    const d = regSinResDocs.find(x => x.id === iso + '_' + key);
+    sinRes = d ? Math.max(0, Number(d.personas)||0) : 0;
+    const ent = hostEntradasDe(d);
+    gruposSR = ent.length; tamSR = ent.map(e => e.n);
+    var esperadas = items.reduce((a,x) => a + x.pax, 0), llegaron = items.reduce((a,x) => a + x.ll, 0);
+    var resLlegaron = items.filter(x => x.ll > 0).length;
+    var total = llegaron + sinRes;
+  }
+  let completas = 0, incompletas = 0, noLlegaron = 0, deMas = 0, cumple = 0;
+  items.forEach(x => {
+    if(x.pax <= 0) return;
+    if(x.ll >= x.pax) completas++; else if(x.ll > 0) incompletas++; else noLlegaron++;
+    deMas += Math.max(x.ll - x.pax, 0); cumple += Math.min(x.ll, x.pax);
+  });
+  return { key, fuente, guardadoEn, guardadoPor, detalleOk, nRes, esperadas, llegaron, resLlegaron,
+    completas, incompletas, noLlegaron, deMas, cumplimiento: esperadas > 0 ? Math.round(cumple / esperadas * 100) : null,
+    sinRes, gruposSR, tamSR, total };
+}
+// Total de personas de un día para el calendario (guardado por turno, o en vivo).
+function regTotalDia(iso){
+  let total = 0, vivo = false;
+  regTurnosDelDia(iso).forEach(([k]) => {
+    const g = regAforoDocs.find(d => d.id === iso + '_' + k);
+    if(g){ total += Number(g.totalLocal)||0; return; }
+    let t = regReservasDe(iso, k).reduce((a,r) => a + hostLlegaron(r), 0);
+    if(iso === regIso(regFecha)){
+      const d = regSinResDocs.find(x => x.id === iso + '_' + k);
+      t += d ? Math.max(0, Number(d.personas)||0) : 0;
+    }
+    if(t > 0){ total += t; vivo = true; }
+  });
+  return { total, vivo };
+}
+function regSumar(ms){
+  const s = { nRes:0, esperadas:0, llegaron:0, resLlegaron:0, completas:0, incompletas:0, noLlegaron:0, deMas:0, sinRes:0, gruposSR:0, tamSR:[], total:0, cump:0, sinDetalle:false };
+  ms.forEach(m => {
+    s.nRes += m.nRes; s.esperadas += m.esperadas; s.llegaron += m.llegaron; s.resLlegaron += (m.resLlegaron||0);
+    s.completas += m.completas; s.incompletas += m.incompletas; s.noLlegaron += m.noLlegaron; s.deMas += m.deMas;
+    s.sinRes += m.sinRes; s.gruposSR += m.gruposSR; s.tamSR = s.tamSR.concat(m.tamSR); s.total += m.total;
+    if(!m.detalleOk) s.sinDetalle = true;
+  });
+  const pesoCump = ms.reduce((a,m) => a + (m.cumplimiento != null ? m.cumplimiento * m.esperadas / 100 : 0), 0);
+  s.cumplimiento = s.esperadas > 0 ? Math.round(pesoCump / s.esperadas * 100) : null;
+  return s;
+}
+function regSetFecha(iso){
+  const [y,m,d] = iso.split('-').map(Number);
+  regFecha = new Date(y, m-1, d, 12);
+  regMes = regFecha.getMonth(); regAno = regFecha.getFullYear();
+  regTurno = 'dia';
+  renderRegistro();
+}
+function regCambiarMes(delta){
+  regMes += delta;
+  if(regMes < 0){ regMes = 11; regAno--; }
+  if(regMes > 11){ regMes = 0; regAno++; }
+  renderRegistro();
+}
+function regIrHoy(){
+  regFecha = new Date(); regFecha.setHours(12,0,0,0);
+  regMes = regFecha.getMonth(); regAno = regFecha.getFullYear();
+  regTurno = 'dia';
+  renderRegistro();
+}
+function regSetTurno(t){ regTurno = t; renderRegistro(); }
+function regTarjetasHtml(m, esDia){
+  const tamTxt = m.tamSR.length ? 'Grupos: ' + m.tamSR.join(' + ') : '';
+  const sd = m.sinDetalle || m.detalleOk === false;
+  const dato = v => sd ? '—' : v;
+  return `
+    <div class="reg-cards">
+      <div class="reg-card"><b>${m.nRes}</b><span>Reservas teníamos</span><i>${m.esperadas} persona${m.esperadas===1?'':'s'} esperadas</i></div>
+      <div class="reg-card ok"><b>${m.llegaron}</b><span>Personas con reserva que llegaron</span><i>${m.cumplimiento!=null && !sd ? 'Cumplimiento ' + m.cumplimiento + '%' : (m.esperadas>0 ? 'de ' + m.esperadas + ' esperadas' : '')}</i></div>
+      <div class="reg-card ok"><b>${dato(m.completas)}</b><span>Reservas completas</span><i>llegaron todas sus personas</i></div>
+      <div class="reg-card parcial"><b>${dato(m.incompletas)}</b><span>Reservas incompletas</span><i>llegaron algunas, no todas</i></div>
+      <div class="reg-card no"><b>${dato(m.noLlegaron)}</b><span>Reservas que no llegaron</span><i>ninguna persona</i></div>
+      <div class="reg-card"><b>${m.sinRes}</b><span>Personas sin reserva</span><i>${m.gruposSR} grupo${m.gruposSR===1?'':'s'}${tamTxt && !esDia ? ' · ' + escapeHtml(tamTxt) : ''}</i></div>
+      ${m.deMas > 0 ? `<div class="reg-card extra"><b>+${m.deMas}</b><span>Personas de más</span><i>llegaron más de las reservadas</i></div>` : ''}
+    </div>
+    ${sd ? '<div class="reg-nota">— Aforo guardado antes de que se registrara el detalle por reserva: completas/incompletas no disponibles.</div>' : ''}`;
+}
+function regFilaHtml(cls, a, b, c, d, e){
+  return `<div class="reg-fila ${cls}"><span>${a}</span><span>${b}</span><span>${c}</span><span>${d}</span><span>${e}</span></div>`;
+}
+function renderRegistro(){
+  const grid = document.getElementById('regGrid');
+  if(!grid) return;
+  suscribirRegistro();
+  const hoyIso = regIso(new Date());
+  const selIso = regIso(regFecha);
+  document.getElementById('regMesLabel').innerHTML =
+    `${MESES[regMes].charAt(0).toUpperCase() + MESES[regMes].slice(1)} ${regAno}<small>Toca aquí para volver a hoy</small>`;
+  // Calendario del mes (domingo primero)
+  let h = DIAS_CORTO.map(d => `<div class="reg-dow">${d}</div>`).join('');
+  const primero = new Date(regAno, regMes, 1, 12).getDay();
+  const nDias = new Date(regAno, regMes+1, 0).getDate();
+  for(let i=0;i<primero;i++) h += '<div class="reg-dia vacio"></div>';
+  for(let dnum=1; dnum<=nDias; dnum++){
+    const iso = regAno + '-' + String(regMes+1).padStart(2,'0') + '-' + String(dnum).padStart(2,'0');
+    const t = regTotalDia(iso);
+    h += `<button type="button" class="reg-dia ${iso===hoyIso?'hoy':''} ${iso===selIso?'sel':''}" onclick="regSetFecha('${iso}')">${dnum}${t.total>0 ? `<small class="${t.vivo?'vivo':''}">${t.total}</small>` : ''}</button>`;
+  }
+  grid.innerHTML = h;
+
+  const d = regFecha;
+  document.getElementById('regDiaLabel').textContent = `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  const turnos = regTurnosDelDia(selIso);
+  if(regTurno !== 'dia' && !turnos.some(t => t[0] === regTurno)) regTurno = 'dia';
+  document.getElementById('regTurnos').innerHTML =
+    [['dia','Día completo'], ...turnos].map(([k,l]) => `<button type="button" class="host-pill ${regTurno===k?'activo':''}" onclick="regSetTurno('${k}')">${l}</button>`).join('');
+
+  let html = '';
+  if(regError){
+    html += `<div class="reg-error">No se pudo leer parte del registro (${escapeHtml(String(regError))}).${String(regError).includes('permission') ? ' Falta actualizar las reglas de Firestore para este nivel.' : ''}</div>`;
+  }
+  const todos = turnos.map(([k]) => regMetricas(selIso, k));
+  if(regTurno === 'dia'){
+    const s = regSumar(todos);
+    const nGuard = todos.filter(m => m.fuente === 'guardado').length;
+    if(s.nRes === 0 && s.sinRes === 0 && s.total === 0){
+      html += '<div class="reg-vacio">No hay reservas ni clientes registrados en este día.</div>';
+    } else {
+      html += `<div class="reg-fuente ${nGuard===todos.length?'ok':'mixto'}">${nGuard===todos.length ? '✓ Todos los turnos tienen el aforo guardado' : `${nGuard} de ${todos.length} turnos con aforo guardado — los demás muestran números en vivo`}</div>`;
+      html += `<div class="reg-hero"><b>${s.total}</b><span>Total de personas en el día</span><i>${s.llegaron} con reserva + ${s.sinRes} sin reserva</i></div>`;
+      html += regTarjetasHtml(s, true);
+      html += `<div class="reg-tabla"><div class="reg-tabla-t">Por turno</div>` +
+        regFilaHtml('cab','Turno','Esperadas','Llegaron','Sin reserva','Total') +
+        todos.map(m => regFilaHtml('', (turnos.find(t=>t[0]===m.key)||['',''])[1] + (m.fuente==='guardado' ? ' ✓' : ' ⏳'), m.esperadas, m.llegaron, m.sinRes, '<b>' + m.total + '</b>')).join('') +
+        regFilaHtml('tot','Total', s.esperadas, s.llegaron, s.sinRes, s.total) + `</div>`;
+      html += '<div class="reg-nota">✓ aforo guardado por el host · ⏳ en curso (números en vivo, aún sin guardar)</div>';
+    }
+  } else {
+    const m = todos.find(x => x.key === regTurno) || regMetricas(selIso, regTurno);
+    const etiqueta = (turnos.find(t => t[0] === regTurno) || ['',''])[1];
+    if(m.nRes === 0 && m.sinRes === 0 && m.total === 0){
+      html += `<div class="reg-vacio">No hay reservas ni clientes registrados en ${escapeHtml(etiqueta)}.</div>`;
+    } else {
+      html += m.fuente === 'guardado'
+        ? `<div class="reg-fuente ok">✓ Aforo de ${escapeHtml(etiqueta)} guardado a las ${hostHoraCorta(m.guardadoEn)}${m.guardadoPor ? ' por ' + escapeHtml(m.guardadoPor) : ''}</div>`
+        : `<div class="reg-fuente vivo">⏳ En curso — números en vivo, el aforo de ${escapeHtml(etiqueta)} aún no está guardado</div>`;
+      html += `<div class="reg-hero"><b>${m.total}</b><span>Total de personas en ${escapeHtml(etiqueta)}</span><i>${m.llegaron} con reserva + ${m.sinRes} sin reserva</i></div>`;
+      html += regTarjetasHtml(m, false);
+    }
+  }
+  document.getElementById('regInforme').innerHTML = html;
+}
+
 /* ============ PANTALLA DE SOLICITUDES (global, todas las fechas) ============ */
 let vistaApp = 'solicitudes';
 
@@ -7554,7 +7797,8 @@ function cambiarVistaApp(v){
   if(v === 'solicitudes' && rol === 'consulta') return;
   // v6.43 — "host" solo para admin/operativo/host; el nivel Host no puede salir de ahí.
   if(v === 'host' && (rol === 'consulta' || rol === 'promotor')) return;
-  if(rol === 'host' && v !== 'host') return;
+  if(v === 'registro' && rol === 'promotor') return;
+  if(rol === 'host' && v !== 'host' && v !== 'registro') return;
   vistaApp = v;
   if(v === 'solicitudes') cerrarToastNuevaSolicitud();
   document.getElementById('toggleSolicitudes').classList.toggle('active', v==='solicitudes');
@@ -7581,7 +7825,15 @@ function cambiarVistaApp(v){
   }
   const pantHost = document.getElementById('pantallaHost');
   if(pantHost) pantHost.style.display = v==='host' ? 'flex' : 'none';
+  const btnRegV = document.getElementById('toggleRegistro');
+  if(btnRegV){
+    btnRegV.classList.toggle('active', v==='registro');
+    if(v==='registro') btnRegV.setAttribute('aria-current','page'); else btnRegV.removeAttribute('aria-current');
+  }
+  const pantReg = document.getElementById('pantallaRegistro');
+  if(pantReg) pantReg.style.display = v==='registro' ? 'flex' : 'none';
   if(v==='host') renderHost(); else detenerHostSinReserva();
+  if(v==='registro') renderRegistro(); else detenerRegistro();
   if(v==='config') renderConfigMensajes();
   // Misma protección que en cambiarVista(): si el modal de una reserva se
   // quedó abierto de fondo, cambiar de pantalla principal también lo

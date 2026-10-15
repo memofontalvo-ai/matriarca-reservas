@@ -681,8 +681,8 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
   flex-shrink:0;
 }
 .app-toggle-btn{
-  flex:1; padding:11px 6px; background:transparent; color:var(--text-muted);
-  font-size:12px; font-weight:700; border-bottom:2.5px solid transparent;
+  flex:1; padding:10px 2px; background:transparent; color:var(--text-muted);
+  font-size:11.5px; font-weight:700; border-bottom:2.5px solid transparent;
   border-right:1px solid var(--border-soft);
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
   text-align:center;
@@ -690,7 +690,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .app-toggle-btn:last-child{border-right:none;}
 .app-toggle-icon{font-size:17px; line-height:1; display:flex; align-items:center; justify-content:center;}
 .app-toggle-icon svg{width:18px; height:18px; display:block; stroke:currentColor;}
-.app-toggle-label{display:flex; align-items:center; gap:5px; white-space:nowrap;}
+.app-toggle-label{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:5px; white-space:normal; text-align:center; line-height:1.15;}
 .app-toggle-btn.active{color:var(--gold-bright); border-bottom-color:var(--gold);}
 .badge-count{
   background:#c79bff; color:#1a1230; font-size:11px; font-weight:800;
@@ -1826,7 +1826,7 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .solicitud-card-global.comercial-card{border-color:var(--comercial);}
 
 /* ===== v6.43 — MÓDULO HOST (llegadas por reserva + clientes sin reserva) ===== */
-#pantallaHost{display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+#pantallaHost, #pantallaRegistro{display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;}
 .host-wrap{padding:12px 16px 40px; max-width:760px; width:100%; margin:0 auto; box-sizing:border-box;}
 .host-datenav{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:var(--panel-alt); border:1px solid var(--border); border-radius:14px;}
 .host-datenav button{width:42px; height:42px; border-radius:12px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-size:20px; cursor:pointer;}
@@ -1959,3 +1959,38 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .host-card .host-sr-titulo{color:rgba(255,255,255,0.85);}
 .host-card .host-grupo-fila{color:#fff; border-bottom-color:rgba(255,255,255,0.25);}
 .host-card .host-grupo-fila button{border-color:#fff; color:#fff;}
+
+/* ===== v6.49 — REGISTRO DE CLIENTES (informe de aforo por día y turno) ===== */
+.reg-cal{margin-bottom:6px;}
+.reg-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:8px;}
+.reg-dow{font-size:11px; font-weight:700; color:var(--text-muted); text-align:center; padding:4px 0;}
+.reg-dia{position:relative; min-height:50px; padding:5px 2px; border-radius:10px; border:1px solid var(--border-soft); background:var(--panel); color:var(--text); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2px; font-size:13px; font-weight:700;}
+.reg-dia.vacio{visibility:hidden; cursor:default;}
+.reg-dia small{font-size:10.5px; font-weight:700; color:var(--gold-bright);}
+.reg-dia small.vivo{color:var(--text-muted); font-style:italic; border-bottom:1px dashed var(--text-muted);}
+.reg-dia.hoy{border-color:var(--gold);}
+.reg-dia.sel{background:rgba(214,170,85,0.2); border-color:var(--gold); color:var(--gold-bright);}
+.reg-dia-label{font-size:16px; font-weight:800; color:var(--text); margin:14px 0 0;}
+.reg-fuente{margin:10px 0; padding:9px 12px; border-radius:10px; font-size:13px; border:1px solid var(--border);}
+.reg-fuente.ok{background:rgba(80,180,120,0.12); border-color:rgba(80,180,120,0.5); color:#7fd9a2;}
+.reg-fuente.vivo{background:rgba(214,170,85,0.1); border-color:var(--gold); color:var(--gold-bright);}
+.reg-fuente.mixto{background:rgba(214,170,85,0.1); border-color:var(--gold); color:var(--gold-bright);}
+.reg-hero{margin:10px 0; padding:16px; border-radius:16px; background:rgba(214,170,85,0.14); border:1px solid var(--gold); text-align:center;}
+.reg-hero b{display:block; font-size:44px; line-height:1.05; color:var(--gold-bright);}
+.reg-hero span{font-size:13px; color:var(--text-muted);}
+.reg-hero i{display:block; font-style:normal; font-size:12.5px; color:var(--text-muted); margin-top:4px;}
+.reg-cards{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+.reg-card{padding:12px; border-radius:14px; background:var(--panel-alt); border:1px solid var(--border);}
+.reg-card b{display:block; font-size:28px; line-height:1.1; color:var(--text);}
+.reg-card span{display:block; font-size:12.5px; font-weight:700; color:var(--text); margin-top:2px;}
+.reg-card i{display:block; font-style:normal; font-size:11.5px; color:var(--text-muted); margin-top:3px;}
+.reg-card.ok b{color:#7fd9a2;} .reg-card.parcial b{color:#f0b95a;} .reg-card.no b{color:#ff8b8b;} .reg-card.extra b{color:#7fb8ff;}
+.reg-tabla{margin-top:12px; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:var(--panel);}
+.reg-tabla-t{padding:9px 12px; font-size:12.5px; font-weight:800; color:var(--text-muted); background:var(--panel-alt);}
+.reg-fila{display:grid; grid-template-columns:1.2fr 1fr 1fr 1fr 1fr; gap:4px; padding:9px 12px; font-size:12.5px; border-top:1px solid var(--border-soft); align-items:center; text-align:center;}
+.reg-fila > :first-child{text-align:left; font-weight:700;}
+.reg-fila.cab{font-size:11px; color:var(--text-muted); font-weight:700;}
+.reg-fila.tot{font-weight:800; color:var(--gold-bright);}
+.reg-vacio{padding:24px 12px; text-align:center; color:var(--text-muted); font-size:14px;}
+.reg-nota{font-size:11.5px; color:var(--text-muted); margin-top:8px;}
+.reg-error{margin:8px 0; padding:9px 12px; border-radius:10px; font-size:12.5px; background:rgba(255,120,120,0.1); border:1px solid rgba(255,120,120,0.5); color:#ff9b9b;}

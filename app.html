@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>La Matriarca Barranquilla · Reservas</title>
-<link rel="stylesheet" href="app.css?v=6.48">
+<link rel="stylesheet" href="app.css?v=6.49">
 
 <!-- Firebase (Firestore + Auth) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -98,6 +98,10 @@
     <button id="toggleHost" class="app-toggle-btn" onclick="cambiarVistaApp('host')">
       <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
       <span class="app-toggle-label">Host</span>
+    </button>
+    <button id="toggleRegistro" class="app-toggle-btn" onclick="cambiarVistaApp('registro')">
+      <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span class="app-toggle-label">Registro de clientes</span>
     </button>
     <button id="toggleSalones" class="app-toggle-btn" onclick="irASalones()">
       <span class="app-toggle-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6"/></svg></span>
@@ -250,6 +254,22 @@
       </div>
       <div class="host-filtros" id="hostFiltros"></div>
       <div class="host-lista" id="hostLista"></div>
+    </div>
+  </div>
+
+  <div id="pantallaRegistro" style="display:none;">
+    <div class="host-wrap reg-wrap">
+      <div class="reg-cal">
+        <div class="host-datenav">
+          <button type="button" onclick="regCambiarMes(-1)" aria-label="Mes anterior">‹</button>
+          <div class="host-fecha" id="regMesLabel" onclick="regIrHoy()" title="Ir a hoy"></div>
+          <button type="button" onclick="regCambiarMes(1)" aria-label="Mes siguiente">›</button>
+        </div>
+        <div class="reg-grid" id="regGrid"></div>
+      </div>
+      <div class="reg-dia-label" id="regDiaLabel"></div>
+      <div class="host-turnos" id="regTurnos"></div>
+      <div id="regInforme"></div>
     </div>
   </div>
 
@@ -557,7 +577,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.48</div>
+<div class="version-tag">v6.49</div>
 
 
 <div class="overlay" id="overlay">
@@ -1345,6 +1365,6 @@
 </div>
 
 
-<script src="app.js?v=6.48"></script>
+<script src="app.js?v=6.49"></script>
 </body>
 </html>
