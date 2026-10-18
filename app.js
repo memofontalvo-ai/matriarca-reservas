@@ -7567,12 +7567,11 @@ function suscribirRegistro(){
       if(vistaApp === 'registro') renderRegistro();
     });
   }
-  const iso = regIso(regFecha);
-  if(!regUnsubSinRes || regSinResFecha !== iso){
+  if(!regUnsubSinRes || regSinResFecha !== claveMes){
     if(regUnsubSinRes){ regUnsubSinRes(); regUnsubSinRes = null; }
-    regSinResFecha = iso;
+    regSinResFecha = claveMes;
     regSinResDocs = [];
-    regUnsubSinRes = db.collection('hostSinReserva').where('fecha','==',iso).onSnapshot(snap => {
+    regUnsubSinRes = db.collection('hostSinReserva').where('fecha','>=',ini).where('fecha','<=',fin).onSnapshot(snap => {
       regSinResDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if(vistaApp === 'registro') renderRegistro();
     }, err => {
@@ -7626,17 +7625,18 @@ function regMetricas(iso, key){
     completas, incompletas, noLlegaron, deMas, cumplimiento: esperadas > 0 ? Math.round(cumple / esperadas * 100) : null,
     sinRes, gruposSR, tamSR, total };
 }
-// Total de personas de un día para el calendario (guardado por turno, o en vivo).
-function regTotalDia(iso){
+// Total de personas de un día para el calendario (con reserva + sin reserva),
+// de todo el día o de un solo turno. Aforo guardado si existe; si no, en vivo.
+function regTotalDia(iso, key){
   let total = 0, vivo = false;
   regTurnosDelDia(iso).forEach(([k]) => {
+    const cenaFam = ['cena','cena1','cena2','cenaSinFranja'];
+    if(key !== 'dia' && k !== key && !(key === 'cena' && cenaFam.includes(k)) && !((key === 'cena1' || key === 'cena2') && k === 'cena')) return;
     const g = regAforoDocs.find(d => d.id === iso + '_' + k);
     if(g){ total += Number(g.totalLocal)||0; return; }
     let t = regReservasDe(iso, k).reduce((a,r) => a + hostLlegaron(r), 0);
-    if(iso === regIso(regFecha)){
-      const d = regSinResDocs.find(x => x.id === iso + '_' + k);
-      t += d ? Math.max(0, Number(d.personas)||0) : 0;
-    }
+    const d = regSinResDocs.find(x => x.id === iso + '_' + k);
+    t += d ? Math.max(0, Number(d.personas)||0) : 0;
     if(t > 0){ total += t; vivo = true; }
   });
   return { total, vivo };
@@ -7657,7 +7657,6 @@ function regSetFecha(iso){
   const [y,m,d] = iso.split('-').map(Number);
   regFecha = new Date(y, m-1, d, 12);
   regMes = regFecha.getMonth(); regAno = regFecha.getFullYear();
-  regTurno = 'dia';
   renderRegistro();
 }
 function regCambiarMes(delta){
@@ -7707,7 +7706,7 @@ function renderRegistro(){
   for(let i=0;i<primero;i++) h += '<div class="reg-dia vacio"></div>';
   for(let dnum=1; dnum<=nDias; dnum++){
     const iso = regAno + '-' + String(regMes+1).padStart(2,'0') + '-' + String(dnum).padStart(2,'0');
-    const t = regTotalDia(iso);
+    const t = regTotalDia(iso, regTurno);
     h += `<button type="button" class="reg-dia ${iso===hoyIso?'hoy':''} ${iso===selIso?'sel':''}" onclick="regSetFecha('${iso}')">${dnum}${t.total>0 ? `<small class="${t.vivo?'vivo':''}">${t.total}</small>` : ''}</button>`;
   }
   grid.innerHTML = h;
@@ -7715,7 +7714,13 @@ function renderRegistro(){
   const d = regFecha;
   document.getElementById('regDiaLabel').textContent = `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
   const turnos = regTurnosDelDia(selIso);
-  if(regTurno !== 'dia' && !turnos.some(t => t[0] === regTurno)) regTurno = 'dia';
+  // Al cambiar de día se conserva el turno elegido; si ese día no existe tal
+  // turno (Cena vs Cena 1/2 entre semana y fin de semana) se usa el equivalente.
+  if(regTurno !== 'dia' && !turnos.some(t => t[0] === regTurno)){
+    if(regTurno === 'cena' && turnos.some(t => t[0] === 'cena1')) regTurno = 'cena1';
+    else if((regTurno === 'cena1' || regTurno === 'cena2') && turnos.some(t => t[0] === 'cena')) regTurno = 'cena';
+    else regTurno = 'dia';
+  }
   document.getElementById('regTurnos').innerHTML =
     [['dia','Día completo'], ...turnos].map(([k,l]) => `<button type="button" class="host-pill ${regTurno===k?'activo':''}" onclick="regSetTurno('${k}')">${l}</button>`).join('');
 
