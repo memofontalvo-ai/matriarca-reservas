@@ -7672,6 +7672,101 @@ function regIrHoy(){
   renderRegistro();
 }
 function regSetTurno(t){ regTurno = t; renderRegistro(); }
+// v6.51 — Movimiento de entradas: al tocar el total se abre la bitácora
+// hora a hora (quién entró, cuántas personas, con o sin reserva, cuándo).
+let regDetalleAbierto = false;
+let regDetalleFiltro = 'todas'; // todas | res | sin
+function regToggleDetalle(){ regDetalleAbierto = !regDetalleAbierto; renderRegistro(); }
+function regSetDetalleFiltro(f){ regDetalleFiltro = f; renderRegistro(); }
+// Entradas de UN turno: del aforo guardado si existe, si no en vivo.
+function regEntradasTurno(iso, key){
+  const items = []; let sinHora = 0;
+  const suma = arr => arr.reduce((a,e) => a + e.n, 0);
+  const g = regAforoDocs.find(d => d.id === iso + '_' + key);
+  if(g){
+    (Array.isArray(g.detalle) ? g.detalle : []).forEach(x => {
+      const ents = hostEntradasDe(x);
+      ents.forEach(e => items.push({ en: e.en, n: e.n, tipo: 'res', nombre: x.nombre || '', por: e.por || '', key }));
+      sinHora += Math.max(0, (Number(x.llegaron)||0) - suma(ents));
+    });
+    hostEntradasDe({ entradas: g.entradasSinReserva }).forEach(e => items.push({ en: e.en, n: e.n, tipo: 'sin', nombre: '', por: e.por || '', key }));
+    sinHora += Math.max(0, Number(g.sinReservaSinDetalle)||0);
+  } else {
+    regReservasDe(iso, key).forEach(r => {
+      const ents = hostEntradasDe(r);
+      ents.forEach(e => items.push({ en: e.en, n: e.n, tipo: 'res', nombre: r.nombre || '', por: e.por || '', key }));
+      sinHora += Math.max(0, hostLlegaron(r) - suma(ents));
+    });
+    const d = regSinResDocs.find(x => x.id === iso + '_' + key);
+    const ents = hostEntradasDe(d);
+    ents.forEach(e => items.push({ en: e.en, n: e.n, tipo: 'sin', nombre: '', por: e.por || '', key }));
+    if(d) sinHora += Math.max(0, (Number(d.personas)||0) - suma(ents));
+  }
+  return { items, sinHora };
+}
+function regHoraEtiqueta(h){
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + (h < 12 ? ' a. m.' : ' p. m.');
+}
+function regMovimientoHtml(iso, keys, etiquetas){
+  let items = [], sinHora = 0;
+  keys.forEach(k => { const r = regEntradasTurno(iso, k); items = items.concat(r.items); sinHora += r.sinHora; });
+  items = items.filter(e => e.en > 0).sort((a,b) => b.en - a.en); // más reciente primero
+  if(!items.length){
+    return `<div class="reg-mov"><div class="reg-mov-vacio">Aún no hay entradas con hora registrada${sinHora>0 ? ` (${sinHora} persona${sinHora===1?'':'s'} contadas sin hora)` : ''}.</div></div>`;
+  }
+  const totRes = items.filter(e => e.tipo === 'res').reduce((a,e) => a + e.n, 0);
+  const totSin = items.filter(e => e.tipo === 'sin').reduce((a,e) => a + e.n, 0);
+  const primera = items[items.length-1], ultima = items[0];
+  // barras por hora
+  const horas = {};
+  items.forEach(e => {
+    const h = new Date(e.en).getHours();
+    horas[h] = horas[h] || { res: 0, sin: 0 };
+    horas[h][e.tipo] += e.n;
+  });
+  const hs = Object.keys(horas).map(Number);
+  const hMin = Math.min(...hs), hMax = Math.max(...hs);
+  let maxH = 1, pico = hMin;
+  for(let h = hMin; h <= hMax; h++){
+    const t = horas[h] ? horas[h].res + horas[h].sin : 0;
+    if(t > maxH){ maxH = t; pico = h; }
+  }
+  let barras = '';
+  for(let h = hMin; h <= hMax; h++){
+    const v = horas[h] || { res: 0, sin: 0 };
+    const t = v.res + v.sin;
+    barras += `<div class="reg-hora ${h===pico && t>0 ? 'pico' : ''}"><span class="reg-hora-l">${regHoraEtiqueta(h)}</span>
+      <div class="reg-hora-barra"><i class="r" style="width:${v.res/maxH*100}%"></i><i class="s" style="width:${v.sin/maxH*100}%"></i></div>
+      <b>${t}</b></div>`;
+  }
+  const hoy = iso === regIso(new Date());
+  let hace = '';
+  if(hoy){
+    const min = Math.max(0, Math.round((Date.now() - ultima.en) / 60000));
+    hace = min < 1 ? ' · ahora mismo' : (min < 60 ? ` · hace ${min} min` : ` · hace ${Math.floor(min/60)} h ${min%60} min`);
+  }
+  const filtrados = items.filter(e => regDetalleFiltro === 'todas' || e.tipo === regDetalleFiltro);
+  const mostrarTurno = keys.length > 1;
+  const filas = filtrados.map(e => `<div class="reg-ent ${e.tipo}">
+      <span class="reg-ent-hora">${hostHoraCorta(e.en)}</span>
+      <span class="reg-ent-info"><b>${e.n} persona${e.n===1?'':'s'}</b> · ${e.tipo === 'res' ? 'Con reserva' + (e.nombre ? ' — ' + escapeHtml(e.nombre) : '') : 'Sin reserva'}${mostrarTurno ? ' · ' + escapeHtml(etiquetas[e.key] || e.key) : ''}${e.por ? ' · ' + escapeHtml(e.por) : ''}</span>
+    </div>`).join('');
+  return `<div class="reg-mov">
+    <div class="reg-mov-resumen">
+      <div><span>Primera entrada</span><b>${hostHoraCorta(primera.en)}</b></div>
+      <div><span>Última entrada</span><b>${hostHoraCorta(ultima.en)}</b><i>${hace.replace(/^ · /,'')}</i></div>
+      <div><span>Entradas</span><b>${items.length}</b><i>${totRes} con res. · ${totSin} sin res.</i></div>
+      <div><span>Hora pico</span><b>${regHoraEtiqueta(pico)}</b><i>${(horas[pico].res + horas[pico].sin)} personas</i></div>
+    </div>
+    <div class="reg-mov-t">Personas por hora <small><i class="r"></i>con reserva <i class="s"></i>sin reserva</small></div>
+    <div class="reg-horas">${barras}</div>
+    <div class="reg-mov-t">Entradas (la más reciente primero)</div>
+    <div class="host-turnos reg-mov-filtros">${[['todas','Todas'],['res','Con reserva'],['sin','Sin reserva']].map(([k,l]) => `<button type="button" class="host-pill ${regDetalleFiltro===k?'activo':''}" onclick="regSetDetalleFiltro('${k}')">${l}</button>`).join('')}</div>
+    <div class="reg-ents">${filas || '<div class="reg-mov-vacio">Ninguna entrada en este filtro.</div>'}</div>
+    ${sinHora > 0 ? `<div class="reg-nota">${sinHora} persona${sinHora===1?'':'s'} ${sinHora===1?'fue contada':'fueron contadas'} sin hora de entrada (registro anterior a la bitácora) y no aparece${sinHora===1?'':'n'} en esta lista.</div>` : ''}
+  </div>`;
+}
 function regTarjetasHtml(m, esDia){
   const tamTxt = m.tamSR.length ? 'Grupos: ' + m.tamSR.join(' + ') : '';
   const sd = m.sinDetalle || m.detalleOk === false;
@@ -7736,7 +7831,11 @@ function renderRegistro(){
       html += '<div class="reg-vacio">No hay reservas ni clientes registrados en este día.</div>';
     } else {
       html += `<div class="reg-fuente ${nGuard===todos.length?'ok':'mixto'}">${nGuard===todos.length ? '✓ Todos los turnos tienen el aforo guardado' : `${nGuard} de ${todos.length} turnos con aforo guardado — los demás muestran números en vivo`}</div>`;
-      html += `<div class="reg-hero"><b>${s.total}</b><span>Total de personas en el día</span><i>${s.llegaron} con reserva + ${s.sinRes} sin reserva</i></div>`;
+      html += `<div class="reg-hero tocable" onclick="regToggleDetalle()" role="button" tabindex="0"><b>${s.total}</b><span>Total de personas en el día</span><i>${s.llegaron} con reserva + ${s.sinRes} sin reserva</i><em>${regDetalleAbierto ? '▴ Ocultar movimiento' : '▾ Toca para ver el movimiento hora a hora'}</em></div>`;
+      if(regDetalleAbierto){
+        const etq = {}; turnos.forEach(t => { etq[t[0]] = t[1]; });
+        html += regMovimientoHtml(selIso, turnos.map(t => t[0]), etq);
+      }
       html += regTarjetasHtml(s, true);
       html += `<div class="reg-tabla"><div class="reg-tabla-t">Por turno</div>` +
         regFilaHtml('cab','Turno','Esperadas','Llegaron','Sin reserva','Total') +
@@ -7753,7 +7852,8 @@ function renderRegistro(){
       html += m.fuente === 'guardado'
         ? `<div class="reg-fuente ok">✓ Aforo de ${escapeHtml(etiqueta)} guardado a las ${hostHoraCorta(m.guardadoEn)}${m.guardadoPor ? ' por ' + escapeHtml(m.guardadoPor) : ''}</div>`
         : `<div class="reg-fuente vivo">⏳ En curso — números en vivo, el aforo de ${escapeHtml(etiqueta)} aún no está guardado</div>`;
-      html += `<div class="reg-hero"><b>${m.total}</b><span>Total de personas en ${escapeHtml(etiqueta)}</span><i>${m.llegaron} con reserva + ${m.sinRes} sin reserva</i></div>`;
+      html += `<div class="reg-hero tocable" onclick="regToggleDetalle()" role="button" tabindex="0"><b>${m.total}</b><span>Total de personas en ${escapeHtml(etiqueta)}</span><i>${m.llegaron} con reserva + ${m.sinRes} sin reserva</i><em>${regDetalleAbierto ? '▴ Ocultar movimiento' : '▾ Toca para ver el movimiento hora a hora'}</em></div>`;
+      if(regDetalleAbierto) html += regMovimientoHtml(selIso, [regTurno], { [regTurno]: etiqueta });
       html += regTarjetasHtml(m, false);
     }
   }
