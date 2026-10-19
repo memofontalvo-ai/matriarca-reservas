@@ -195,8 +195,12 @@ button{cursor:pointer}
 .btn-confirmar-hora{
   width:100%;padding:13px;border-radius:11px;margin-top:14px;
   background:#1c2027;border:1.5px solid var(--gold);color:var(--gold-bright);
-  font-size:14px;font-weight:700;
+  font-size:14px;font-weight:700;line-height:1.3;
 }
+/* v3.35 — el botón pulsa suave mientras falta tocarlo, para que se note que hay que presionarlo */
+.btn-confirmar-hora:not(.confirmada){animation:pulsoConfirmarHora 2.2s ease-in-out infinite;}
+@keyframes pulsoConfirmarHora{0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,0);}50%{box-shadow:0 0 0 6px rgba(212,175,55,.22);}}
+@media (prefers-reduced-motion:reduce){.btn-confirmar-hora:not(.confirmada){animation:none;}}
 .btn-confirmar-hora.confirmada{background:linear-gradient(180deg,var(--gold-bright),var(--gold));color:#111;border-color:var(--gold-bright);}
 .error-msg{color:var(--danger);font-size:11.5px;margin-top:8px;display:none}
 .privacy{text-align:center;color:#777e88;font-size:9.5px;margin-top:8px}
@@ -217,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.34</div>
+<div class="version-tag">v3.36</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -315,8 +319,8 @@ button{cursor:pointer}
           <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
         </div>
 
-        <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()">✓ Confirmar hora seleccionada</button>
-        <div id="avisoHoraSinConfirmar" style="margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">⏱️ Confirma la hora para poder continuar con tu reserva.</div>
+        <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()">Ingresa aquí para registrar los datos de tu reserva →</button>
+        <div id="avisoHoraSinConfirmar" style="margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">👆 Toca el botón de arriba para registrar los datos de tu reserva y continuar.</div>
     </section>
 
     <div id="restoFormulario" style="display:none;">
@@ -816,7 +820,7 @@ const firebaseConfig = {
       const horaWheelBlockEl = document.getElementById('horaWheelBlockPublico');
       if(horaWheelBlockEl) horaWheelBlockEl.style.display = 'block';
       const btnConfirmar = document.getElementById('btnConfirmarHora');
-      if(btnConfirmar) btnConfirmar.textContent = '✓ Confirmar hora seleccionada';
+      if(btnConfirmar) btnConfirmar.textContent = 'Ingresa aquí para registrar los datos de tu reserva →';
     }
   }
   function elegirEventoDeParrillaPublica(id){
@@ -994,7 +998,7 @@ const firebaseConfig = {
   function enviarSolicitud(){
     const errorMsg = document.getElementById('errorMsg');
     if(!window.horaConfirmada){
-      errorMsg.textContent = 'Primero confirma la hora seleccionada (botón "✓ Confirmar hora seleccionada") antes de continuar.';
+      errorMsg.textContent = 'Primero toca el botón "Ingresa aquí para registrar los datos de tu reserva" para poder continuar.';
       errorMsg.style.display = 'block';
       return;
     }
@@ -1265,7 +1269,7 @@ const firebaseConfig = {
           avisoDup.style.display = 'block';
         }
         const btn = document.getElementById('btnConfirmarHora');
-        if(btn){ btn.classList.remove('confirmada'); btn.textContent = '✓ Confirmar hora seleccionada'; }
+        if(btn){ btn.classList.remove('confirmada'); btn.textContent = 'Ingresa aquí para registrar los datos de tu reserva →'; }
         window.horaConfirmada = false;
       } else {
         if(avisoDup) avisoDup.style.display = 'none';
@@ -1527,11 +1531,11 @@ const firebaseConfig = {
     ultimoTurnoAutoPreguntado = null;
     document.getElementById('restoFormulario').style.display = 'none';
     const avisoHora = document.getElementById('avisoHoraSinConfirmar');
-    avisoHora.textContent = '⏱️ Confirma la hora para poder continuar con tu reserva.';
+    avisoHora.textContent = '👆 Toca el botón de arriba para registrar los datos de tu reserva y continuar.';
     avisoHora.style.display = 'block';
     const btn = document.getElementById('btnConfirmarHora');
     btn.classList.remove('confirmada');
-    btn.textContent = '✓ Confirmar hora seleccionada';
+    btn.textContent = 'Ingresa aquí para registrar los datos de tu reserva →';
     const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
     if(avisoDup) avisoDup.style.display = 'none';
   }
@@ -1556,7 +1560,7 @@ const firebaseConfig = {
     document.getElementById('restoFormulario').style.display = 'block';
     const btn = document.getElementById('btnConfirmarHora');
     btn.classList.add('confirmada');
-    btn.textContent = '✓ Hora confirmada';
+    btn.textContent = '✓ Listo — completa los datos de tu reserva ↓';
   }
   // La llama también confirmarShowEspecial(), que vive en el otro
   // bloque <script> — por eso también va en window.
@@ -1578,7 +1582,7 @@ const firebaseConfig = {
     if(celularLocal.length < 7){
       const aviso = document.getElementById('avisoHoraSinConfirmar');
       if(aviso){
-        aviso.textContent = '📱 Ingresa tu celular de contacto antes de confirmar la hora — lo necesitamos para validar tu reserva.';
+        aviso.textContent = '📱 Ingresa tu celular de contacto antes de continuar — lo necesitamos para validar tu reserva.';
         aviso.style.display = 'block';
       }
       return;
