@@ -5539,6 +5539,146 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
     </div>`;
   document.getElementById('overlayInforme').classList.add('open');
 }
+// ===== Informe administrativo: INGRESOS AL LINK de solicitudes (v6.52) =====
+// Lee la colección `visitasFormulario` que escribe solicitud.html (una por
+// cada apertura del formulario): cuántos entran, a qué hora, hasta qué paso
+// llegan y quiénes dejaron el celular sin terminar. Además cruza con las
+// solicitudes ya registradas (reservas con pasoPorSolicitud) para comparar
+// día y hora — esas existen desde antes, así que el cuadro de "solicitudes"
+// ya trae historia aunque los ingresos al link apenas empiecen a contarse.
+function generarInformeIngresosLink(){
+  const mes = document.getElementById('fInformeLinkMes').value;
+  const dia = document.getElementById('fInformeLinkDia').value;
+  const hoy = new Date();
+  const yearMonth = mes || `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  const ini = dia || (yearMonth + '-01');
+  const fin = dia || (yearMonth + '-31');
+  const btn = document.getElementById('btnInformeLink');
+  if(btn){ btn.disabled = true; btn.textContent = 'Generando…'; }
+  db.collection('visitasFormulario').where('fecha','>=',ini).where('fecha','<=',fin).get().then(snap => {
+    renderInformeIngresosLink(snap.docs.map(d => d.data()), ini, fin, !!dia, yearMonth);
+  }).catch(err => {
+    console.error('Informe ingresos al link:', err);
+    alert('No se pudo leer los ingresos al link' + (err && err.code === 'permission-denied' ? ': falta publicar la regla "visitasFormulario" en Firestore.' : ' (' + ((err && err.code) || 'error') + ').'));
+  }).finally(() => { if(btn){ btn.disabled = false; btn.textContent = '🔗 Generar informe'; } });
+}
+function renderInformeIngresosLink(visitas, ini, fin, esDia, yearMonth){
+  const soloDig = t => String(t||'').replace(/\D/g,'');
+  const etiqHora = h => (h % 12 === 0 ? 12 : h % 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.');
+  const pct = (a,b) => b > 0 ? (a/b*100).toFixed(0) + '%' : '—';
+  const [a0, m0] = yearMonth.split('-').map(Number);
+  const titulo = esDia ? formatearFechaCorta(ini) + ' de ' + a0 : `${MESES[m0-1]} ${a0}`;
+  const total = visitas.length;
+  const conTel = visitas.filter(v => v.celular).length;
+  const llegoHora = visitas.filter(v => v.paso === 'hora_confirmada' || v.paso === 'enviada').length;
+  const enviaron = visitas.filter(v => v.enviada === true).length;
+  const conError = visitas.filter(v => v.errorCodigo && v.enviada !== true).length;
+  // Tres grupos que NO se cruzan y suman el total de ingresos:
+  const soloAbrieron = visitas.filter(v => !v.celular && v.enviada !== true).length;
+  const telSinTerminar = visitas.filter(v => v.celular && v.enviada !== true).length;
+  const telSinTerminarHora = visitas.filter(v => v.celular && v.enviada !== true && v.paso === 'hora_confirmada').length;
+
+  // Solicitudes ya registradas (reservas) en el mismo rango, por día de llegada y por hora.
+  const clave = r => r.fechaSolicitud || r.fecha;
+  const sols = reservas.filter(r => r.pasoPorSolicitud === true && clave(r) && clave(r) >= ini && clave(r) <= fin);
+  const solPorDia = {}, solPorHora = new Array(24).fill(0);
+  sols.forEach(r => {
+    solPorDia[clave(r)] = (solPorDia[clave(r)]||0) + 1;
+    if(r.horaSolicitud){ const d = new Date(r.horaSolicitud); if(!isNaN(d.getTime())) solPorHora[d.getHours()]++; }
+  });
+
+  // Por día
+  const dias = {};
+  visitas.forEach(v => {
+    const o = dias[v.fecha] = dias[v.fecha] || { ing:0, tel:0, env:0 };
+    o.ing++; if(v.enviada === true) o.env++; else if(v.celular) o.tel++;
+  });
+  Object.keys(solPorDia).forEach(f => { dias[f] = dias[f] || { ing:0, tel:0, env:0 }; });
+  const listaDias = Object.keys(dias).sort();
+  const filasDia = listaDias.map(f => {
+    const o = dias[f]; const [y,m,d] = f.split('-').map(Number);
+    return `<tr><td>${DIAS_CORTO[new Date(y,m-1,d,12).getDay()]} ${d}</td><td style="text-align:center;">${o.ing}</td><td style="text-align:center;">${o.ing - o.tel - o.env}</td><td style="text-align:center;">${o.tel}</td><td style="text-align:center;">${o.env}</td><td style="text-align:center;">${pct(o.env,o.ing)}</td><td style="text-align:center;">${solPorDia[f]||0}</td></tr>`;
+  }).join('');
+
+  // Por hora del día
+  const horas = Array.from({length:24}, () => ({ ing:0, tel:0, env:0 }));
+  visitas.forEach(v => {
+    const h = new Date(Number(v.creadoEn)||0).getHours();
+    if(!(Number(v.creadoEn) > 0)) return;
+    horas[h].ing++; if(v.enviada === true) horas[h].env++; else if(v.celular) horas[h].tel++;
+  });
+  let pico = -1, maxIng = 0;
+  horas.forEach((o,h) => { if(o.ing > maxIng){ maxIng = o.ing; pico = h; } });
+  const filasHora = horas.map((o,h) => (o.ing||solPorHora[h]) ? `<tr><td>${etiqHora(h)}${h===pico ? ' 🔺 <b>más ingresos</b>' : ''}</td><td style="text-align:center;">${o.ing}</td><td style="text-align:center;">${o.ing - o.tel - o.env}</td><td style="text-align:center;">${o.tel}</td><td style="text-align:center;">${o.env}</td><td style="text-align:center;">${solPorHora[h]}</td></tr>` : '').join('');
+
+  // Errores
+  const errores = {};
+  visitas.forEach(v => { if(v.errorCodigo && v.enviada !== true) errores[v.errorCodigo] = (errores[v.errorCodigo]||0) + 1; });
+  const filasError = Object.keys(errores).sort((a,b) => errores[b]-errores[a]).map(c => `<tr><td>${escapeHtml(c)}</td><td style="text-align:center;">${errores[c]}</td></tr>`).join('');
+
+  // Dejaron el celular y no terminaron (último intento por celular, sin solicitud posterior)
+  const enviaronTel = new Set(visitas.filter(v => v.enviada === true && v.celular).map(v => v.celular));
+  const ultimaPorTel = {};
+  visitas.filter(v => v.celular && v.enviada !== true && !enviaronTel.has(v.celular)).forEach(v => {
+    if(!ultimaPorTel[v.celular] || Number(v.creadoEn) > Number(ultimaPorTel[v.celular].creadoEn)) ultimaPorTel[v.celular] = v;
+  });
+  const yaTieneSolicitud = (cel, fecha) => reservas.some(r => r.pasoPorSolicitud === true && soloDig(r.celular) === cel && clave(r) >= fecha);
+  const pendientes = Object.values(ultimaPorTel).filter(v => !yaTieneSolicitud(v.celular, v.fecha))
+    .sort((a,b) => Number(b.creadoEn) - Number(a.creadoEn));
+  const ETIQ_PASO = { telefono:'Dejó el celular', hora_confirmada:'Confirmó la hora', abrio:'Solo abrió' };
+  const msjWa = encodeURIComponent('Hola 👋 Vimos que empezaste una solicitud de reserva en La Matriarca Barranquilla y quedó sin terminar. ¿Te ayudamos a completarla?');
+  const filasPend = pendientes.slice(0, 150).map(v => {
+    const d = new Date(Number(v.creadoEn)||0);
+    return `<tr><td>${d.getDate()}/${d.getMonth()+1} ${hostHoraCorta(d.getTime())}</td><td>+${escapeHtml(v.celular)}</td><td>${ETIQ_PASO[v.paso]||escapeHtml(v.paso||'')}${v.errorCodigo ? ' · ⚠ ' + escapeHtml(v.errorCodigo) : ''}</td><td><a href="https://wa.me/${encodeURIComponent(v.celular)}?text=${msjWa}" target="_blank" rel="noopener">💬 WhatsApp</a></td></tr>`;
+  }).join('');
+
+  const vacio = total === 0;
+  document.getElementById('informeContenido').innerHTML = `
+    <div class="informe-header">
+      <h1>La Matriarca Barranquilla — Ingresos al link de solicitudes</h1>
+      <div class="informe-subtitulo" style="margin-bottom:2px;">${titulo}</div>
+      <div class="informe-subtitulo">Cada vez que alguien abre el formulario cuenta como un ingreso (las pruebas internas también cuentan)</div>
+    </div>
+    <div class="ie-total-card">
+      <div class="ie-total-num">${total}</div>
+      <div class="ie-total-label">INGRESOS AL LINK</div>
+    </div>
+    <div class="informe-turno">
+      <h2>🔻 ¿Qué hizo cada persona que abrió el link?</h2>
+      ${vacio ? '<div style="font-size:12.5px; color:#777;">Todavía no hay ingresos registrados en este período. Se empiezan a contar desde que se sube la versión nueva del formulario (v3.34) y se publica la regla en Firestore.</div>' : `<table>
+        <thead><tr><th>Grupo</th><th style="text-align:center;">Clientes</th><th style="text-align:center;">% del total</th></tr></thead>
+        <tbody>
+          <tr><td>👀 Solo abrieron el link <span style="color:#777;">(no pusieron celular)</span></td><td style="text-align:center;">${soloAbrieron}</td><td style="text-align:center;">${pct(soloAbrieron,total)}</td></tr>
+          <tr><td>📱 Pusieron el celular y NO terminaron</td><td style="text-align:center;">${telSinTerminar}</td><td style="text-align:center;">${pct(telSinTerminar,total)}</td></tr>
+          <tr><td>✅ <b>Terminaron y enviaron la solicitud</b></td><td style="text-align:center;"><b>${enviaron}</b></td><td style="text-align:center;"><b>${pct(enviaron,total)}</b></td></tr>
+          <tr><td><b>Total de ingresos al link</b></td><td style="text-align:center;"><b>${total}</b></td><td style="text-align:center;">100%</td></tr>
+        </tbody></table>
+        <div style="margin-top:6px; font-size:12px; color:#555;">De los ${telSinTerminar} que dejaron el celular sin terminar, ${telSinTerminarHora} llegaron a confirmar la hora.${conError>0 ? ` <span style="color:#a33;">⚠ ${conError} tuvieron un error al enviar.</span>` : ''}</div>
+        <div style="margin-top:4px; font-size:11.5px; color:#777;">Cada apertura del link cuenta como un ingreso (si la misma persona entra dos veces, son dos ingresos).</div>`}
+    </div>
+    <div class="informe-turno">
+      <h2>📅 Por día</h2>
+      ${listaDias.length===0 ? '<div style="font-size:12.5px; color:#777;">Sin datos en este período.</div>' : `<table>
+        <thead><tr><th>Día</th><th style="text-align:center;">Ingresos al link</th><th style="text-align:center;">Solo abrieron</th><th style="text-align:center;">Celular sin terminar</th><th style="text-align:center;">Terminaron</th><th style="text-align:center;">Conversión</th><th style="text-align:center;">Solicitudes registradas</th></tr></thead>
+        <tbody>${filasDia}</tbody></table>
+        <div style="margin-top:6px; font-size:11.5px; color:#777;">“Solicitudes registradas” viene de las reservas ya guardadas (incluye días anteriores al conteo de ingresos).</div>`}
+    </div>
+    <div class="informe-turno">
+      <h2>🕐 Por hora del día</h2>
+      ${filasHora==='' ? '<div style="font-size:12.5px; color:#777;">Sin datos en este período.</div>' : `<table>
+        <thead><tr><th>Hora</th><th style="text-align:center;">Ingresos al link</th><th style="text-align:center;">Solo abrieron</th><th style="text-align:center;">Celular sin terminar</th><th style="text-align:center;">Terminaron</th><th style="text-align:center;">Solicitudes registradas</th></tr></thead>
+        <tbody>${filasHora}</tbody></table>`}
+    </div>
+    ${filasError ? `<div class="informe-turno"><h2>⚠ Errores al enviar</h2><table><thead><tr><th>Código</th><th style="text-align:center;">Veces</th></tr></thead><tbody>${filasError}</tbody></table></div>` : ''}
+    <div class="informe-turno">
+      <h2>📱 Dejaron su celular y no terminaron (${pendientes.length})</h2>
+      ${pendientes.length===0 ? '<div style="font-size:12.5px; color:#777;">Ninguno en este período.</div>' : `<table>
+        <thead><tr><th>Cuándo</th><th>Celular</th><th>Se quedó en</th><th></th></tr></thead>
+        <tbody>${filasPend}</tbody></table>
+        <div style="margin-top:6px; font-size:11.5px; color:#777;">No incluye a quienes después sí enviaron su solicitud. Úsalo solo para ayudarles a completar su reserva.</div>`}
+    </div>`;
+  document.getElementById('overlayInforme').classList.add('open');
+}
 // Motor común de los dos informes (especiales y general) — la única
 // diferencia real entre ambos es el umbral mínimo de pax: 30 para el de
 // especiales, 0 (sin filtro) para el general, que incluye TODAS las
