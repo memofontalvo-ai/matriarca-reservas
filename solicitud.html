@@ -217,7 +217,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.33</div>
+<div class="version-tag">v3.34</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -488,6 +488,55 @@ const firebaseConfig = {
   };
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
+
+  // ===== v3.34 — Seguimiento de ingresos al link =====
+  // Cada vez que alguien abre el formulario se guarda UN registro en la
+  // colección `visitasFormulario` (id aleatorio por apertura) y se va
+  // actualizando con el avance: abrió → dejó su celular → confirmó la hora →
+  // envió la solicitud (o el código de error si falló). Sirve para el informe
+  // "Ingresos al link" (Config → Informes): cuántos entran, a qué hora, en qué
+  // paso se quedan y quiénes dejaron su celular sin terminar. Es solo
+  // informativo: nunca bloquea ni demora el formulario, y si falla en silencio
+  // (por ejemplo sin la regla en Firestore) el formulario funciona igual.
+  const VISITA_ID = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  const VISITA_ORDEN = ['abrio', 'telefono', 'hora_confirmada', 'enviada'];
+  const visitaDatos = {
+    fecha: (function(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })(),
+    creadoEn: Date.now(),
+    paso: 'abrio',
+    enviada: false,
+    dispositivo: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '') ? 'movil' : 'escritorio',
+    origen: (function(){ try{ return document.referrer ? new URL(document.referrer).hostname.slice(0, 60) : ''; }catch(e){ return ''; } })(),
+  };
+  function visitaRegistrar(campos){
+    try{
+      campos = campos || {};
+      if(campos.paso && VISITA_ORDEN.indexOf(campos.paso) < VISITA_ORDEN.indexOf(visitaDatos.paso)) delete campos.paso; // nunca retrocede
+      Object.assign(visitaDatos, campos, { ultimoPasoEn: Date.now() });
+      db.collection('visitasFormulario').doc(VISITA_ID).set(visitaDatos, { merge: true }).catch(() => {});
+    }catch(e){}
+  }
+  visitaRegistrar({});
+  (function(){
+    let timer = null, ultimo = '';
+    function guardarCelular(){
+      const inp = document.getElementById('fCelular'), cod = document.getElementById('fCelularCod');
+      if(!inp || !cod) return;
+      const local = inp.value.replace(/\D/g, '');
+      if(local.length < 7) return;
+      const tel = (cod.value + local).slice(0, 20);
+      if(tel === ultimo) return;
+      ultimo = tel;
+      visitaRegistrar({ celular: tel, paso: 'telefono' });
+    }
+    function enlazar(){
+      const inp = document.getElementById('fCelular');
+      if(!inp) return;
+      inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(guardarCelular, 1500); });
+      inp.addEventListener('blur', guardarCelular);
+    }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', enlazar); else enlazar();
+  })();
 
   // Carrusel de fotos publicitarias (banner arriba del formulario) — cada
   // foto vive en su propio documento de la colección carruselFotos (se
@@ -1121,10 +1170,12 @@ const firebaseConfig = {
       // Firebase), así que los errores solo quedan en consola.
       upsertCliente(datos).catch(err => console.error('No se pudo registrar el cliente:', err));
       try{ llenarTarjetaReserva(datos); }catch(errTarjeta){ console.error('No se pudo armar la tarjeta de reserva:', errTarjeta); }
+      visitaRegistrar({ paso: 'enviada', enviada: true });
       document.getElementById('formulario').style.display = 'none';
       document.getElementById('confirmacion').style.display = 'block';
     }).catch(err => {
       console.error(err);
+      visitaRegistrar({ errorCodigo: String((err && (err.code || err.motivo || err.name)) || 'desconocido').slice(0, 60) });
       if(err && err.motivo === 'DUPLICADO_SIMULTANEO'){
         errorMsg.textContent = 'Justo en este instante ya se registró una reserva con este mismo celular para esta fecha y turno. Revisa si ya está registrada antes de intentar de nuevo.';
       } else {
@@ -1532,6 +1583,7 @@ const firebaseConfig = {
       }
       return;
     }
+    visitaRegistrar({ celular: (document.getElementById('fCelularCod').value + celularLocal).slice(0, 20), paso: 'hora_confirmada' });
     // Si es una reserva para un evento especial, la hora ya viene fija
     // desde la configuración del evento (hora de entrada) — no se calcula
     // a partir de lo que marque la rueda, que además está oculta.
