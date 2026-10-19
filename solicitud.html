@@ -217,7 +217,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.31</div>
+<div class="version-tag">v3.32</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -1128,7 +1128,11 @@ const firebaseConfig = {
       if(err && err.motivo === 'DUPLICADO_SIMULTANEO'){
         errorMsg.textContent = 'Justo en este instante ya se registró una reserva con este mismo celular para esta fecha y turno. Revisa si ya está registrada antes de intentar de nuevo.';
       } else {
-        errorMsg.textContent = 'No se pudo enviar la solicitud. Revisa tu conexión e intenta de nuevo.';
+        // v3.32 — se agrega el código técnico del error para poder saber la
+        // causa real (cuota de Firebase, permisos, conexión...) y no perder
+        // solicitudes sin saber por qué.
+        const codigoErrSol = (err && (err.code || err.name)) ? String(err.code || err.name) : 'desconocido';
+        errorMsg.textContent = 'No se pudo enviar la solicitud. Revisa tu conexión e intenta de nuevo. (Código: ' + codigoErrSol + ')';
       }
       errorMsg.style.display = 'block';
       btn.disabled = false;
