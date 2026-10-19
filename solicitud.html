@@ -217,7 +217,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.32</div>
+<div class="version-tag">v3.33</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -1421,7 +1421,22 @@ const firebaseConfig = {
   });
 
   // -------- Selector de hora: ruedas nativas dentro de la página --------
-  let estadoHora = { hora:8, minuto:20, ampm:'PM' };
+  // v3.33 — hora inicial según el momento en que se abre el formulario, para
+  // que NUNCA arranque en una hora sin servicio (antes quedaba en 01:00 AM en
+  // algunos celulares): antes del mediodía → 12:00 PM; entre 12:00 y 3:59 PM →
+  // la siguiente hora en punto (12:30 → 1:00 PM); de 4:00 PM en adelante → 8:00 PM.
+  function horaInicialPorDefecto(){
+    const n = new Date();
+    const m = n.getHours()*60 + n.getMinutes();
+    let h24;
+    if(m < 12*60) h24 = 12;
+    else if(m < 16*60) h24 = Math.min(15, Math.max(12, Math.ceil((m+10)/60)));
+    else h24 = 20;
+    const ampm = h24 >= 12 ? 'PM' : 'AM';
+    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    return { hora:h12, minuto:0, ampm };
+  }
+  let estadoHora = horaInicialPorDefecto();
   // La persona tiene que CONFIRMAR la hora a propósito (botón aparte) antes
   // de que se detecte el turno y se desbloquee el resto del formulario.
   // Antes se detectaba solo, en caliente, mientras todavía movía la rueda
@@ -1556,6 +1571,7 @@ const firebaseConfig = {
     const items = [...rueda.querySelectorAll('.rueda-item')];
     let ultimo = null;
     let timer = null;
+    let listo = false; // true cuando la posición inicial ya quedó puesta
 
     function seleccionarCentro(){
       const centro = rueda.scrollTop + rueda.clientHeight/2;
@@ -1586,6 +1602,7 @@ const firebaseConfig = {
     items.forEach((item,i)=> item.dataset.index = i);
 
     rueda.addEventListener('scroll',()=>{
+      if(!listo) return; // ignora el scroll en 0 de antes de la posición inicial
       clearTimeout(timer);
       seleccionarCentro(); // actualiza mientras se mueve
       timer = setTimeout(seleccionarCentro, 70);
@@ -1598,33 +1615,52 @@ const firebaseConfig = {
       });
     });
 
+    // v3.33 — posicionamiento inicial a prueba de fallos. Si la rueda todavía
+    // no tiene tamaño (contenedor oculto / sin maquetar), asignar scrollTop se
+    // ignora y la rueda se quedaba en el primer valor (01:00 AM). Ahora se
+    // espera a que sea visible, se reafirma mientras la persona no la toque, y
+    // el scroll no cambia la hora hasta que la posición inicial quedó puesta.
     const indiceInicial = Math.max(0, valores.map(String).indexOf(String(inicial)));
-    requestAnimationFrame(()=>{
-      rueda.scrollTop = indiceInicial * 42;
-      seleccionarCentro();
-    });
+    const destino = indiceInicial * 42;
+    let tocada = false;
+    ['touchstart','pointerdown','mousedown','wheel'].forEach(ev =>
+      rueda.addEventListener(ev, ()=>{ tocada = true; }, {passive:true}));
+    function aplicarInicial(){
+      if(tocada) return;
+      if(!rueda.clientHeight) return; // oculta: se reintenta al hacerse visible
+      if(Math.abs(rueda.scrollTop - destino) > 2) rueda.scrollTop = destino;
+      if(!listo){ listo = true; seleccionarCentro(); }
+    }
+    requestAnimationFrame(aplicarInicial);
+    [120, 500, 1500].forEach(ms => setTimeout(aplicarInicial, ms));
+    if(window.ResizeObserver){
+      new ResizeObserver(aplicarInicial).observe(rueda);
+    }
   }
 
   crearRueda(
     'wheelHora',
     Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),
-    '08',
+    String(estadoHora.hora).padStart(2,'0'),
     v=>{ estadoHora.hora = Number(v); actualizarHora(); }
   );
 
   crearRueda(
     'wheelMinuto',
     ['00','05','10','15','20','25','30','35','40','45','50','55'],
-    '20',
+    String(estadoHora.minuto).padStart(2,'0'),
     v=>{ estadoHora.minuto = Number(v); actualizarHora(); }
   );
 
   crearRueda(
     'wheelAmPm',
     ['AM','PM'],
-    'PM',
+    estadoHora.ampm,
     v=>{ estadoHora.ampm = v; actualizarHora(); }
   );
+  // v3.33 — deja el campo de hora y el resumen coherentes desde el inicio,
+  // aunque las ruedas todavía no se hayan podido dibujar.
+  actualizarHora();
 
   // Cantidad de personas se escribe directamente.
   // Cantidad de personas queda vacía hasta que el cliente la escriba.
