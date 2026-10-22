@@ -221,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.36</div>
+<div class="version-tag">v3.37</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -296,10 +296,38 @@ button{cursor:pointer}
       </div>
         <input type="time" id="fHora" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
 
-        <div class="field" style="margin-top:14px; text-align:left;">
-          <label>Celular de contacto <span style="font-weight:400; color:var(--muted); text-transform:none;">(lo necesitamos primero, para validar tu reserva)</span></label>
-          <div class="celular-con-codigo">
-            <select id="fCelularCod">
+        <!-- v3.37: el botón de "confirmar hora" ya no se muestra; la validación corre sola.
+             Se conserva oculto porque el JS lo referencia. -->
+        <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()" style="display:none">Continuar</button>
+        <div id="avisoHoraSinConfirmar" style="display:none"></div>
+    </section>
+
+    <div id="restoFormulario">
+
+    <section class="section" id="seccionTurnoWrap" style="display:none;">
+      <div class="section-title">Selecciona el turno</div>
+      <div class="turno-opts" id="turnoOpts">
+        <button type="button" class="turno-opt" data-val="desayuno" onclick="elegirTurno('desayuno')">☕ Desayuno</button>
+        <button type="button" class="turno-opt" data-val="almuerzo" onclick="elegirTurno('almuerzo')">☀️ Almuerzo</button>
+        <button type="button" class="turno-opt" data-val="cena" onclick="elegirTurno('cena')">🌙 Cena</button>
+      </div>
+    </section>
+
+    <section class="card-form card-blanca" id="cardDatos">
+      <div class="card-blanca-titulo">Completa tus datos</div>
+
+      <div class="field">
+        <input type="text" id="fNombre" maxlength="60" placeholder="Nombre" autocomplete="given-name" aria-label="Nombre">
+      </div>
+      <div class="field">
+        <input type="text" id="fApellido" maxlength="60" placeholder="Apellido" autocomplete="family-name" aria-label="Apellido">
+      </div>
+      <div class="field">
+        <input type="email" id="fCorreo" maxlength="120" placeholder="Correo electrónico (opcional)" autocomplete="email" aria-label="Correo electrónico, opcional">
+      </div>
+      <div class="field">
+        <div class="celular-con-codigo">
+          <select id="fCelularCod">
               <option value="57" selected>🇨🇴 +57</option>
               <option value="58">🇻🇪 +58</option>
               <option value="1">🇺🇸 +1</option>
@@ -313,65 +341,19 @@ button{cursor:pointer}
               <option value="34">🇪🇸 +34</option>
               <option value="506">🇨🇷 +506</option>
             </select>
-            <input type="tel" id="fCelular" maxlength="20" placeholder="300 000 0000" onblur="buscarClienteExistente()">
-          </div>
-          <div id="clienteReconocidoAviso" class="cliente-reconocido-aviso" style="display:none;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>¡Qué bueno tenerte de vuelta! Completamos tus datos.</span></div>
-          <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
+          <input type="tel" id="fCelular" maxlength="20" placeholder="Celular" autocomplete="tel-national" aria-label="Celular" onblur="buscarClienteExistente()">
         </div>
-
-        <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()">Ingresa aquí para registrar los datos de tu reserva →</button>
-        <div id="avisoHoraSinConfirmar" style="margin-top:8px; font-size:12px; color:#e8a33d; text-align:center;">👆 Toca el botón de arriba para registrar los datos de tu reserva y continuar.</div>
-    </section>
-
-    <div id="restoFormulario" style="display:none;">
-
-    <section class="section">
-      <div class="section-title">Selecciona el turno</div>
-      <div class="turno-opts" id="turnoOpts">
-        <button type="button" class="turno-opt" data-val="desayuno" onclick="elegirTurno('desayuno')">☕ Desayuno</button>
-        <button type="button" class="turno-opt" data-val="almuerzo" onclick="elegirTurno('almuerzo')">☀️ Almuerzo</button>
-        <button type="button" class="turno-opt" data-val="cena" onclick="elegirTurno('cena')">🌙 Cena</button>
+        <div class="card-blanca-ayuda">Escribe un celular correcto para que el restaurante pueda contactarte.</div>
+        <div id="clienteReconocidoAviso" class="cliente-reconocido-aviso" style="display:none;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>¡Qué bueno tenerte de vuelta! Completamos tus datos.</span></div>
+        <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:#fdecee; border:1px solid #e5636a; color:#a3262d; font-size:12.5px; line-height:1.4;"></div>
       </div>
-    </section>
-
-    <section class="card-form" id="cardContacto">
-      <div class="card-head">
-        <div class="card-num">1</div>
-        <div>
-          <div class="card-title">Datos de contacto</div>
-          <div class="card-sub">Para identificar y confirmar tu reserva</div>
-        </div>
-      </div>
-
-      <div id="bloqueDatosPostCelularPublico">
       <div class="field">
-        <label>Nombre completo</label>
-        <input type="text" id="fNombre" maxlength="100" placeholder="Tu nombre completo">
-      </div>
-
-      <div class="field">
-        <label>Correo <span class="opt">· opcional</span></label>
-        <input type="email" id="fCorreo" maxlength="120" placeholder="tucorreo@ejemplo.com">
-      </div>
-
-      <div class="field">
-        <label>Cumpleaños <span class="opt">· opcional</span></label>
+        <label class="card-blanca-label" for="fCumpleanos">Fecha de cumpleaños <span class="opt">· opcional</span></label>
         <input type="date" id="fCumpleanos">
       </div>
-      </div>
-    </section>
-
-    <section class="card-form" id="cardReserva">
-      <div class="card-head">
-        <div class="card-num">2</div>
-        <div>
-          <div class="card-title">Datos de la reserva</div>
-          <div class="card-sub">Cuéntanos cómo deseas reservar</div>
-        </div>
-      </div>
 
       <div class="field">
-        <label>Número de personas</label>
+        <label class="card-blanca-label">Número de personas</label>
         <div class="pax-stepper">
           <button type="button" class="pax-btn" id="btnPaxMenos" onclick="cambiarPaxPublico(-1)" aria-label="Restar una persona">−</button>
           <input type="number" id="fPax" min="1" max="500" inputmode="numeric" placeholder="?">
@@ -379,17 +361,8 @@ button{cursor:pointer}
         </div>
       </div>
 
-      <div class="field" id="seccionVipPublico">
-        <label>Tipo de reserva</label>
-        <div class="vip-opts" id="vipOpts">
-          <button type="button" class="vip-opt" data-val="si" onclick="elegirVip('si')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8z"/></svg><span>Sala VIP</span></button>
-          <button type="button" class="vip-opt" data-val="no" onclick="elegirVip('no')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11V8a3 3 0 013-3h8a3 3 0 013 3v3"/><path d="M3 13a2 2 0 014 0v2h10v-2a2 2 0 014 0v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4z"/><path d="M6 19v2M18 19v2"/></svg><span>Mesa</span></button>
-        </div>
-        <div class="vip-note">La Sala VIP está sujeta a disponibilidad y condiciones del restaurante.</div>
-      </div>
-
       <div class="field" id="seccionObsPublico">
-        <label>Observaciones <span class="opt">· opcional</span></label>
+        <label class="card-blanca-label" for="fObs">Observaciones <span class="opt">· opcional</span></label>
         <textarea id="fObs" maxlength="500" placeholder="Ej.: cumpleaños, aniversario o alguna solicitud particular"></textarea>
       </div>
     </section>
@@ -521,6 +494,19 @@ const firebaseConfig = {
     }catch(e){}
   }
   visitaRegistrar({});
+  // v3.37 — el formulario pide nombre y apellido por separado. Cuando el nombre
+  // viene ya completo (cliente registrado / WhatsApp), se reparte en dos mitades;
+  // al enviar se vuelven a unir, así el nombre guardado queda idéntico.
+  function setNombreCompleto(full, soloSiVacio){
+    const n = document.getElementById('fNombre'), a = document.getElementById('fApellido');
+    if(!n || !a || !full) return;
+    if(soloSiVacio && (n.value.trim() || a.value.trim())) return;
+    const p = String(full).trim().split(/\s+/);
+    if(p.length === 1){ n.value = p[0]; a.value = ''; return; }
+    const k = Math.ceil(p.length / 2);
+    n.value = p.slice(0, k).join(' ');
+    a.value = p.slice(k).join(' ');
+  }
   (function(){
     let timer = null, ultimo = '';
     function guardarCelular(){
@@ -680,7 +666,7 @@ const firebaseConfig = {
         // de partida (el cliente lo puede corregir si hace falta).
         if(data.nombre){
           const fNombre = document.getElementById('fNombre');
-          if(fNombre && !fNombre.value.trim()) fNombre.value = data.nombre;
+          if(fNombre) setNombreCompleto(data.nombre, true);
         }
         if(aviso) aviso.style.display = 'block';
       };
@@ -693,7 +679,7 @@ const firebaseConfig = {
             const fNombre = document.getElementById('fNombre');
             const fCorreo = document.getElementById('fCorreo');
             const fCumpleanos = document.getElementById('fCumpleanos');
-            if(fNombre && cdata.nombre) fNombre.value = cdata.nombre;
+            if(fNombre && cdata.nombre) setNombreCompleto(cdata.nombre, false);
             if(fCorreo && cdata.correo) fCorreo.value = cdata.correo;
             if(fCumpleanos && cdata.cumpleanos) fCumpleanos.value = cdata.cumpleanos;
             if(aviso) aviso.style.display = 'block';
@@ -731,6 +717,7 @@ const firebaseConfig = {
     document.getElementById('bannerEventoValor').textContent = eventoActual.valorEntrada ? `Valor de entrada: $${Number(eventoActual.valorEntrada).toLocaleString('es-CO')}` : '';
     document.getElementById('bannerEvento').style.display = 'block';
     document.getElementById('fFecha').value = eventoActual.fecha;
+    window._usuarioMovio = true; // v3.37: en eventos la validación corre sola
     document.getElementById('fFecha').dispatchEvent(new Event('change'));
     document.getElementById('fHora').value = eventoActual.horaEntrada || '';
     if(eventoActual.horaEntrada){
@@ -833,7 +820,7 @@ const firebaseConfig = {
   }
 
   let turnoSel = null;
-  let vipSel = null;
+  let vipSel = 'no'; // v3.37: ya no se pregunta Mesa/VIP al cliente — lo define el restaurante al atender
   let autorizacionWhatsAppSel = null;
   // El cliente vio la publicidad de un show especial y tocó "Continuar
   // con mi reserva" para ESE turno puntual (ver abrirModalShowEspecial).
@@ -897,8 +884,9 @@ const firebaseConfig = {
     // elegir otra hora/turno y volver a confirmar. Si ya estaba
     // desbloqueado de antes (la persona ya tenía la reserva armada y solo
     // tocó otro turno para probar), no le borra lo que ya tenía escrito.
+    window._reintentarEnvioTrasValidar = false;
     if(!window.horaConfirmada && window.bloquearFormularioPorHoraSinConfirmar){
-      window.bloquearFormularioPorHoraSinConfirmar();
+      window.bloquearFormularioPorHoraSinConfirmar(true);
     }
   }
 
@@ -920,9 +908,10 @@ const firebaseConfig = {
   function cancelarShowEspecial(){
     turnoPendienteShow = null;
     reintentarEnvioAlConfirmarShow = false;
+    window._reintentarEnvioTrasValidar = false;
     document.getElementById('overlayShowEspecial').style.display = 'none';
     if(!window.horaConfirmada && window.bloquearFormularioPorHoraSinConfirmar){
-      window.bloquearFormularioPorHoraSinConfirmar();
+      window.bloquearFormularioPorHoraSinConfirmar(true);
     }
   }
   function confirmarShowEspecial(){
@@ -997,14 +986,11 @@ const firebaseConfig = {
 
   function enviarSolicitud(){
     const errorMsg = document.getElementById('errorMsg');
-    if(!window.horaConfirmada){
-      errorMsg.textContent = 'Primero toca el botón "Ingresa aquí para registrar los datos de tu reserva" para poder continuar.';
-      errorMsg.style.display = 'block';
-      return;
-    }
     const fecha = document.getElementById('fFecha').value;
     const hora = document.getElementById('fHora').value;
-    const nombre = document.getElementById('fNombre').value.trim();
+    const nombreSolo = document.getElementById('fNombre').value.trim();
+    const apellidoSolo = document.getElementById('fApellido').value.trim();
+    const nombre = (nombreSolo + ' ' + apellidoSolo).trim();
     const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
     const celularCod = document.getElementById('fCelularCod').value;
     const celular = celularLocal ? `+${celularCod} ${celularLocal}` : '';
@@ -1013,9 +999,18 @@ const firebaseConfig = {
     const correo = document.getElementById('fCorreo').value.trim();
     const cumpleanos = document.getElementById('fCumpleanos').value;
 
-    if(!fecha || !turnoSel || !hora || !nombre || !celularLocal || !pax || !vipSel){
-      errorMsg.textContent = 'Por favor completa fecha, turno, hora, nombre completo, celular, cantidad de personas y si deseas VIP o mesa — son los datos que el restaurante necesita para poder atenderte.';
+    if(!fecha || !hora || !nombreSolo || !apellidoSolo || !celularLocal || !pax){
+      errorMsg.textContent = 'Por favor completa nombre, apellido, celular y cantidad de personas — son los datos que el restaurante necesita para poder atenderte.';
       errorMsg.style.display = 'block';
+      return;
+    }
+    // v3.37: la hora ya no se confirma con un botón. Si todavía no se validó el
+    // turno (fecha/hora con bloqueo, show especial, duplicado), se valida AHORA
+    // y, si todo está bien, el envío continúa solo (ver desbloquearFormularioComoConfirmado).
+    if(!window.horaConfirmada || !turnoSel){
+      errorMsg.style.display = 'none';
+      window._reintentarEnvioTrasValidar = true;
+      confirmarHoraSeleccionada();
       return;
     }
     if(!autorizacionWhatsAppSel){
@@ -1271,6 +1266,8 @@ const firebaseConfig = {
         const btn = document.getElementById('btnConfirmarHora');
         if(btn){ btn.classList.remove('confirmada'); btn.textContent = 'Ingresa aquí para registrar los datos de tu reserva →'; }
         window.horaConfirmada = false;
+        window._reintentarEnvioTrasValidar = false;
+        if(avisoDup) avisoDup.scrollIntoView({behavior:'smooth', block:'center'});
       } else {
         if(avisoDup) avisoDup.style.display = 'none';
         if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
@@ -1314,6 +1311,7 @@ const firebaseConfig = {
     ];
     if(!clienteFueAutocompletado){
       camposAContar.push(document.getElementById('fNombre')?.value);
+      camposAContar.push(document.getElementById('fApellido')?.value);
       camposAContar.push(document.getElementById('fCorreo')?.value);
     }
     const camposConDatos = camposAContar.some(v => (v || '').trim().length > 0);
@@ -1335,7 +1333,7 @@ const firebaseConfig = {
       const fNombre = document.getElementById('fNombre');
       const fCorreo = document.getElementById('fCorreo');
       const fCumpleanos = document.getElementById('fCumpleanos');
-      if(!fNombre.value.trim() && data.nombre) fNombre.value = data.nombre;
+      if(data.nombre) setNombreCompleto(data.nombre, true);
       if(!fCorreo.value.trim() && data.correo) fCorreo.value = data.correo;
       if(!fCumpleanos.value && data.cumpleanos) fCumpleanos.value = data.cumpleanos;
       if(aviso) aviso.style.display = 'block';
@@ -1524,20 +1522,38 @@ const firebaseConfig = {
     bloquearFormularioPorHoraSinConfirmar();
   }
 
-  function bloquearFormularioPorHoraSinConfirmar(){
+  // v3.37 — el formulario de datos ya NO se esconde ni pide un botón: siempre
+  // está a la vista. "Bloquear" ahora solo invalida la validación anterior del
+  // turno (fecha u hora cambiaron) y programa una nueva, automática.
+  let autoTimer = null;
+  window._usuarioMovio = false;
+  window._autoIntentado = false;
+  function programarAutoConfirmar(ms){
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => {
+      if(window.horaConfirmada) return;
+      window._autoIntentado = true;
+      confirmarHoraSeleccionada();
+    }, ms);
+  }
+  function bloquearFormularioPorHoraSinConfirmar(conservarIntento){
     window.horaConfirmada = false;
     turnoSel = null;
     turnoConfirmadoShow = null;
     ultimoTurnoAutoPreguntado = null;
-    document.getElementById('restoFormulario').style.display = 'none';
-    const avisoHora = document.getElementById('avisoHoraSinConfirmar');
-    avisoHora.textContent = '👆 Toca el botón de arriba para registrar los datos de tu reserva y continuar.';
-    avisoHora.style.display = 'block';
+    document.querySelectorAll('.turno-opt').forEach(b => b.classList.remove('on'));
+    const wrapTurno = document.getElementById('seccionTurnoWrap');
+    if(wrapTurno) wrapTurno.style.display = 'none';
     const btn = document.getElementById('btnConfirmarHora');
-    btn.classList.remove('confirmada');
-    btn.textContent = 'Ingresa aquí para registrar los datos de tu reserva →';
+    if(btn) btn.classList.remove('confirmada');
     const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
     if(avisoDup) avisoDup.style.display = 'none';
+    // Si el cliente acaba de cerrar un aviso (turno sin cupo / show), no se le
+    // vuelve a mostrar solo: tiene que cambiar fecha u hora, o tocar Enviar.
+    if(conservarIntento === true) return;
+    window._autoIntentado = false;
+    clearTimeout(autoTimer);
+    if(window._usuarioMovio) programarAutoConfirmar(900);
   }
   // Esta función la llama también actualizarDisponibilidadTurnos(), que
   // vive en el otro bloque <script> (fuera de este IIFE) — por eso hay que
@@ -1556,11 +1572,15 @@ const firebaseConfig = {
   // visible por debajo, sin haberse resuelto nada.
   function desbloquearFormularioComoConfirmado(){
     window.horaConfirmada = true;
-    document.getElementById('avisoHoraSinConfirmar').style.display = 'none';
-    document.getElementById('restoFormulario').style.display = 'block';
+    const wrapTurno = document.getElementById('seccionTurnoWrap');
+    if(wrapTurno) wrapTurno.style.display = eventoActual ? 'none' : 'block';
     const btn = document.getElementById('btnConfirmarHora');
-    btn.classList.add('confirmada');
-    btn.textContent = '✓ Listo — completa los datos de tu reserva ↓';
+    if(btn) btn.classList.add('confirmada');
+    // Si la validación la disparó el botón Enviar, el envío sigue solo.
+    if(window._reintentarEnvioTrasValidar){
+      window._reintentarEnvioTrasValidar = false;
+      setTimeout(() => enviarSolicitud(), 0);
+    }
   }
   // La llama también confirmarShowEspecial(), que vive en el otro
   // bloque <script> — por eso también va en window.
@@ -1574,20 +1594,11 @@ const firebaseConfig = {
   // (b) se queda bloqueado hasta que la persona resuelva el modal (y si
   // lo cancela, sigue bloqueado, tal como debe ser).
   function confirmarHoraSeleccionada(){
-    // Primero el celular: es la entrada para poder validar si esta
-    // reserva puede continuar (fecha/turno bloqueados, o si ya existe una
-    // reserva igual con este mismo celular) — sin el celular no se puede
-    // validar nada, así que se pide antes de seguir.
-    const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
-    if(celularLocal.length < 7){
-      const aviso = document.getElementById('avisoHoraSinConfirmar');
-      if(aviso){
-        aviso.textContent = '📱 Ingresa tu celular de contacto antes de continuar — lo necesitamos para validar tu reserva.';
-        aviso.style.display = 'block';
-      }
-      return;
-    }
-    visitaRegistrar({ celular: (document.getElementById('fCelularCod').value + celularLocal).slice(0, 20), paso: 'hora_confirmada' });
+    // v3.37: ya no se exige el celular antes. La validación de turno
+    // (bloqueos, show especial) corre sola; si el celular ya está escrito, de
+    // paso se revisa que no haya otra reserva igual (y al enviar se revisa
+    // siempre).
+    visitaRegistrar({ paso: 'hora_confirmada' });
     // Si es una reserva para un evento especial, la hora ya viene fija
     // desde la configuración del evento (hora de entrada) — no se calcula
     // a partir de lo que marque la rueda, que además está oculta.
@@ -1611,6 +1622,27 @@ const firebaseConfig = {
   // que se ejecuta en el ámbito global — por eso también hay que
   // exponerla aquí, igual que la de arriba.
   window.confirmarHoraSeleccionada = confirmarHoraSeleccionada;
+
+  // v3.37 — validación automática (sin botón):
+  //  · en cuanto la persona mueve la hora o cambia la fecha, se valida a los
+  //    0,9 s de que deja de tocar;
+  //  · si en cambio acepta la hora sugerida y empieza a llenar sus datos, se
+  //    valida cuando toca el primer campo;
+  //  · y siempre se valida al tocar "Enviar" si aún no se había hecho.
+  ['pointerdown','touchstart','mousedown','wheel','click','change'].forEach(ev => {
+    ['horaWheelBlockPublico','dateCarousel'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.addEventListener(ev, () => { window._usuarioMovio = true; }, {passive:true, capture:true});
+    });
+  });
+  document.addEventListener('focusin', e => {
+    const t = e.target;
+    if(t && t.closest && t.closest('#cardDatos') && !window.horaConfirmada && !window._autoIntentado){
+      window._autoIntentado = true;
+      clearTimeout(autoTimer);
+      confirmarHoraSeleccionada();
+    }
+  });
 
   function crearRueda(id, valores, inicial, onChange){
     const rueda = document.getElementById(id);
@@ -2325,4 +2357,40 @@ function toggleAutorizacionDetalle(){
 /* botón final */
 .btn-enviar{min-height:56px; font-size:16.5px; border-radius:14px; margin-top:20px}
 .privacy{font-size:12px; margin-top:12px; color:#8b919b}
+
+/* ===== v3.37 — Tarjeta blanca "Completa tus datos" ===== */
+.card-form.card-blanca{
+  background:#ffffff; color:#1d1f23; border:1px solid #e3e5e9;
+  border-radius:18px; padding:22px 16px 18px; color-scheme:light;
+  box-shadow:0 6px 24px rgba(0,0,0,.35);
+}
+.card-blanca-titulo{
+  text-align:center; font-size:21px; font-weight:800; color:#1d1f23;
+  margin-bottom:18px; letter-spacing:-.2px;
+}
+.card-form.card-blanca .field{margin-bottom:12px}
+.card-form.card-blanca .field:last-child{margin-bottom:0}
+.card-form.card-blanca .field label.card-blanca-label{display:block; font-size:14px; font-weight:600; color:#2a2d33; margin-bottom:7px}
+.card-form.card-blanca .field label.card-blanca-label .opt{color:#7b818b; font-weight:500}
+.card-form.card-blanca .field input,
+.card-form.card-blanca .field textarea,
+.card-form.card-blanca .field select{
+  background:#ffffff; color:#1d1f23; border:1px solid #d5d9df; border-radius:10px;
+  font-size:16px; min-height:52px; padding:13px 14px;
+}
+.card-form.card-blanca .field input::placeholder,
+.card-form.card-blanca .field textarea::placeholder{color:#8a909a; opacity:1}
+.card-form.card-blanca .field input:focus,
+.card-form.card-blanca .field textarea:focus,
+.card-form.card-blanca .field select:focus{
+  border-color:#c9862b; outline:none; box-shadow:0 0 0 3px rgba(201,134,43,.18);
+}
+.card-form.card-blanca .field textarea{min-height:96px}
+.card-form.card-blanca .celular-con-codigo select{padding:13px 4px}
+.card-blanca-ayuda{font-size:12.5px; font-style:italic; color:#5d6470; margin-top:7px; line-height:1.4}
+.card-form.card-blanca .cliente-reconocido-aviso{color:#1c8a5a}
+.card-form.card-blanca .pax-btn{background:#f1f3f6; border:1px solid #d5d9df; color:#1d1f23}
+.card-form.card-blanca .pax-btn:active{background:#e4e7ec}
+.card-form.card-blanca .pax-stepper #fPax{font-weight:800; font-size:22px}
+.card-form.card-blanca #fCumpleanos{color:#1d1f23}
 </style>
