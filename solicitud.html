@@ -221,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.38</div>
+<div class="version-tag">v3.39</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -317,15 +317,6 @@ button{cursor:pointer}
       <div class="card-blanca-titulo">Completa tus datos</div>
 
       <div class="field">
-        <input type="text" id="fNombre" maxlength="60" placeholder="Nombre" autocomplete="given-name" aria-label="Nombre">
-      </div>
-      <div class="field">
-        <input type="text" id="fApellido" maxlength="60" placeholder="Apellido" autocomplete="family-name" aria-label="Apellido">
-      </div>
-      <div class="field">
-        <input type="email" id="fCorreo" maxlength="120" placeholder="Correo electrónico (opcional)" autocomplete="email" aria-label="Correo electrónico, opcional">
-      </div>
-      <div class="field">
         <div class="celular-con-codigo">
           <select id="fCelularCod">
               <option value="57" selected>🇨🇴 +57</option>
@@ -341,11 +332,20 @@ button{cursor:pointer}
               <option value="34">🇪🇸 +34</option>
               <option value="506">🇨🇷 +506</option>
             </select>
-          <input type="tel" id="fCelular" maxlength="20" placeholder="Celular" autocomplete="tel-national" aria-label="Celular" onblur="buscarClienteExistente()">
+          <input type="tel" id="fCelular" maxlength="20" placeholder="Celular" autocomplete="tel-national" aria-label="Celular" oninput="if(this.value.replace(/\D/g,'').length>=10) buscarClienteExistente()" onblur="buscarClienteExistente()">
         </div>
-        <div class="card-blanca-ayuda">Escribe un celular correcto para que el restaurante pueda contactarte.</div>
+        <div class="card-blanca-ayuda">Empieza por tu celular: si ya eres cliente, completamos tus datos automáticamente.</div>
         <div id="clienteReconocidoAviso" class="cliente-reconocido-aviso" style="display:none;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>¡Qué bueno tenerte de vuelta! Completamos tus datos.</span></div>
         <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:#fdecee; border:1px solid #e5636a; color:#a3262d; font-size:12.5px; line-height:1.4;"></div>
+      </div>
+      <div class="field">
+        <input type="text" id="fNombre" maxlength="60" placeholder="Nombre" autocomplete="given-name" aria-label="Nombre">
+      </div>
+      <div class="field">
+        <input type="text" id="fApellido" maxlength="60" placeholder="Apellido" autocomplete="family-name" aria-label="Apellido">
+      </div>
+      <div class="field">
+        <input type="email" id="fCorreo" maxlength="120" placeholder="Correo electrónico (opcional)" autocomplete="email" aria-label="Correo electrónico, opcional">
       </div>
       <div class="field">
         <label class="card-blanca-label" for="fCumpleDia">Fecha de cumpleaños <span class="opt">· opcional</span></label>
