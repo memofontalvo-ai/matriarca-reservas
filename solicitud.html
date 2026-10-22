@@ -9,7 +9,7 @@
 <title>Solicitar reserva · La Matriarca</title>
 <style>
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:wght@600&display=swap');
 
 :root{
   --bg:#08090b;
@@ -221,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.40</div>
+<div class="version-tag">v4.0</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -238,8 +238,17 @@ button{cursor:pointer}
   </div>
 
   <div id="formulario">
-    <div class="subtitle">Cuéntanos los detalles de tu reserva</div>
-    <div class="subtitle-small">Completa la información para asegurar tu mesa.</div>
+    <div class="hero-nuevo">
+      <h1 id="tituloPaso">Reserva tu mesa</h1>
+      <div class="lead-nuevo" id="leadPaso">Elige cuántos son, el día y la hora.</div>
+      <div class="pasos" id="pasosBar">
+        <div class="paso on" id="pasoInd1"><i>1</i><span>Tu reserva</span></div>
+        <div class="paso-ln" id="pasoLn1"></div>
+        <div class="paso" id="pasoInd2"><i>2</i><span>Tus datos</span></div>
+        <div class="paso-ln" id="pasoLn2"></div>
+        <div class="paso" id="pasoInd3"><i>3</i><span>Listo</span></div>
+      </div>
+    </div>
 
     <div id="tipoReservaBlockPublico" style="display:none; margin:14px 0;">
       <div style="font-size:11px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; margin-bottom:8px; text-align:center;">¿Qué tipo de reserva quieres hacer?</div>
@@ -250,6 +259,7 @@ button{cursor:pointer}
       <div id="parrillaEventosPublica" style="display:none; margin-top:12px;"></div>
     </div>
 
+    <div class="sheet-nuevo">
     <div id="bannerEvento" style="display:none; margin:12px 0 18px; padding:14px 16px; border-radius:12px; background:rgba(201,161,90,0.12); border:1px solid var(--gold); text-align:center;">
       <div style="font-size:11px; letter-spacing:1px; color:var(--gold-bright); text-transform:uppercase; margin-bottom:3px;">🎤 Reserva para el evento especial</div>
       <div id="bannerEventoNombre" style="font-size:16px; font-weight:700; margin-bottom:2px;"></div>
@@ -257,66 +267,77 @@ button{cursor:pointer}
       <div id="bannerEventoValor" style="font-size:12.5px; color:var(--muted); margin-top:4px;"></div>
     </div>
 
-    <section class="section">
-      <div class="section-title">Selecciona la fecha</div>
-      <div class="date-row" id="dateCarousel">
-        <label class="date-card calendar-card" aria-label="Abrir calendario">
-          📅
-          <input type="date" id="fFecha">
-        </label>
-      </div>
-      <div class="date-summary">
-        <span id="fechaResumen">—</span>
-        <span class="hora-resumen">🕘 <span id="horaResumen">Por definir</span></span>
-      </div>
-      <div id="avisoFechaBloqueada" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:rgba(224,90,90,0.12); border:1px solid var(--danger); color:#f0a3a7; font-size:12.5px; line-height:1.4;"></div>
-    </section>
+    <!-- ============ PASO 1 · Tu reserva ============ -->
+    <div id="paso1">
+      <section class="blk">
+        <div class="q">¿Cuántas personas?</div>
+        <div class="pax-stepper">
+          <button type="button" class="pax-btn" id="btnPaxMenos" onclick="cambiarPaxPublico(-1)" aria-label="Restar una persona">−</button>
+          <input type="number" id="fPax" min="1" max="500" inputmode="numeric" placeholder="?">
+          <button type="button" class="pax-btn" id="btnPaxMas" onclick="cambiarPaxPublico(1)" aria-label="Sumar una persona">+</button>
+        </div>
+      </section>
 
-    
-    <section class="section">
-      <div id="horaWheelBlockPublico">
-      <div class="section-title">Selecciona la hora</div>
-      <div class="time-panel">
-        <div class="wheel-time-grid">
-          <div class="wheel-col">
-            <label>Hora</label>
-            <div class="rueda" id="wheelHora" aria-label="Seleccionar hora"></div>
-          </div>
-          <div class="colon">:</div>
-          <div class="wheel-col">
-            <label>Minutos</label>
-            <div class="rueda" id="wheelMinuto" aria-label="Seleccionar minutos"></div>
-          </div>
-          <div class="wheel-col">
-            <label>AM/PM</label>
-            <div class="rueda" id="wheelAmPm" aria-label="Seleccionar AM o PM"></div>
+      <section class="blk" id="bloqueFecha">
+        <div class="q">¿Qué día?</div>
+        <div class="date-row" id="dateCarousel">
+          <label class="date-card calendar-card" aria-label="Abrir calendario">
+            📅
+            <input type="date" id="fFecha">
+          </label>
+        </div>
+        <div class="date-summary">
+          <span id="fechaResumen">—</span>
+          <span class="hora-resumen"><span id="horaResumen">Por definir</span></span>
+        </div>
+        <div id="avisoFechaBloqueada" class="aviso-fecha" style="display:none;"></div>
+      </section>
+
+      <section class="blk" id="horaWheelBlockPublico">
+        <div class="q">¿A qué hora?</div>
+        <div class="seg" id="turnoTabs">
+          <button type="button" class="tab-turno" data-val="desayuno" onclick="elegirTabTurno('desayuno')">Desayuno</button>
+          <button type="button" class="tab-turno" data-val="almuerzo" onclick="elegirTabTurno('almuerzo')">Almuerzo</button>
+          <button type="button" class="tab-turno" data-val="cena" onclick="elegirTabTurno('cena')">Cena</button>
+        </div>
+        <div class="hrs" id="horasRapidas"></div>
+        <div id="panelOtraHora" class="otra-panel" style="display:none;">
+          <div class="otra-titulo">Desliza para elegir la hora exacta</div>
+          <div class="time-panel">
+            <div class="wheel-time-grid">
+              <div class="wheel-col">
+                <label>Hora</label>
+                <div class="rueda" id="wheelHora" aria-label="Seleccionar hora"></div>
+              </div>
+              <div class="colon">:</div>
+              <div class="wheel-col">
+                <label>Minutos</label>
+                <div class="rueda" id="wheelMinuto" aria-label="Seleccionar minutos"></div>
+              </div>
+              <div class="wheel-col">
+                <label>AM/PM</label>
+                <div class="rueda" id="wheelAmPm" aria-label="Seleccionar AM o PM"></div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      </div>
         <input type="time" id="fHora" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
+      </section>
 
-        <!-- v3.37: el botón de "confirmar hora" ya no se muestra; la validación corre sola.
-             Se conserva oculto porque el JS lo referencia. -->
-        <button type="button" class="btn-confirmar-hora" id="btnConfirmarHora" onclick="confirmarHoraSeleccionada()" style="display:none">Continuar</button>
-        <div id="avisoHoraSinConfirmar" style="display:none"></div>
-    </section>
-
-    <div id="restoFormulario">
-
-    <section class="section" id="seccionTurnoWrap" style="display:none;">
-      <div class="section-title">Selecciona el turno</div>
-      <div class="turno-opts" id="turnoOpts">
-        <button type="button" class="turno-opt" data-val="desayuno" onclick="elegirTurno('desayuno')">☕ Desayuno</button>
-        <button type="button" class="turno-opt" data-val="almuerzo" onclick="elegirTurno('almuerzo')">☀️ Almuerzo</button>
-        <button type="button" class="turno-opt" data-val="cena" onclick="elegirTurno('cena')">🌙 Cena</button>
+      <div class="barra-paso">
+        <div class="sum" id="resumenPaso1"></div>
+        <div class="error-msg" id="errorPaso1"></div>
+        <button type="button" class="btn-enviar" id="btnContinuarPaso1" onclick="continuarPaso1()">Continuar →</button>
       </div>
-    </section>
+    </div>
 
-    <section class="card-form card-blanca" id="cardDatos">
-      <div class="card-blanca-titulo">Completa tus datos</div>
+    <!-- ============ PASO 2 · Tus datos (empieza por el celular) ============ -->
+    <div id="paso2" style="display:none;">
+      <div class="chip-resumen"><span id="resumenPaso2"></span><a href="#" onclick="irAPaso(1); return false;">Cambiar</a></div>
 
+      <section class="card-form card-blanca" id="cardDatos">
       <div class="field">
+        <label class="card-blanca-label" for="fCelular">Celular</label>
         <div class="celular-con-codigo">
           <select id="fCelularCod">
               <option value="57" selected>🇨🇴 +57</option>
@@ -332,20 +353,23 @@ button{cursor:pointer}
               <option value="34">🇪🇸 +34</option>
               <option value="506">🇨🇷 +506</option>
             </select>
-          <input type="tel" id="fCelular" maxlength="20" placeholder="Celular" autocomplete="tel-national" aria-label="Celular" oninput="if(this.value.replace(/\D/g,'').length>=10) buscarClienteExistente()" onblur="buscarClienteExistente()">
+          <input type="tel" id="fCelular" maxlength="20" placeholder="300 000 0000" autocomplete="tel-national" aria-label="Celular" oninput="if(this.value.replace(/\D/g,'').length>=10) buscarClienteExistente()" onblur="buscarClienteExistente()">
         </div>
         <div class="card-blanca-ayuda">Empieza por tu celular: si ya eres cliente, completamos tus datos automáticamente.</div>
         <div id="clienteReconocidoAviso" class="cliente-reconocido-aviso" style="display:none;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>¡Qué bueno tenerte de vuelta! Completamos tus datos.</span></div>
         <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:#fdecee; border:1px solid #e5636a; color:#a3262d; font-size:12.5px; line-height:1.4;"></div>
       </div>
       <div class="field">
-        <input type="text" id="fNombre" maxlength="60" placeholder="Nombre" autocomplete="given-name" aria-label="Nombre">
+        <label class="card-blanca-label" for="fNombre">Nombre</label>
+        <input type="text" id="fNombre" maxlength="60" placeholder="Tu nombre" autocomplete="given-name" aria-label="Nombre">
       </div>
       <div class="field">
-        <input type="text" id="fApellido" maxlength="60" placeholder="Apellido" autocomplete="family-name" aria-label="Apellido">
+        <label class="card-blanca-label" for="fApellido">Apellido</label>
+        <input type="text" id="fApellido" maxlength="60" placeholder="Tu apellido" autocomplete="family-name" aria-label="Apellido">
       </div>
       <div class="field">
-        <input type="email" id="fCorreo" maxlength="120" placeholder="Correo electrónico (opcional)" autocomplete="email" aria-label="Correo electrónico, opcional">
+        <label class="card-blanca-label" for="fCorreo">Correo electrónico <span class="opt">· opcional</span></label>
+        <input type="email" id="fCorreo" maxlength="120" placeholder="tucorreo@ejemplo.com" autocomplete="email" aria-label="Correo electrónico, opcional">
       </div>
       <div class="field">
         <label class="card-blanca-label" for="fCumpleDia">Fecha de cumpleaños <span class="opt">· opcional</span></label>
@@ -364,20 +388,11 @@ button{cursor:pointer}
         <input type="hidden" id="fCumpleanos">
       </div>
 
-      <div class="field">
-        <label class="card-blanca-label">Número de personas</label>
-        <div class="pax-stepper">
-          <button type="button" class="pax-btn" id="btnPaxMenos" onclick="cambiarPaxPublico(-1)" aria-label="Restar una persona">−</button>
-          <input type="number" id="fPax" min="1" max="500" inputmode="numeric" placeholder="?">
-          <button type="button" class="pax-btn" id="btnPaxMas" onclick="cambiarPaxPublico(1)" aria-label="Sumar una persona">+</button>
-        </div>
-      </div>
-
       <div class="field" id="seccionObsPublico">
         <label class="card-blanca-label" for="fObs">Observaciones <span class="opt">· opcional</span></label>
         <textarea id="fObs" maxlength="500" placeholder="Ej.: cumpleaños, aniversario o alguna solicitud particular"></textarea>
       </div>
-    </section>
+      </section>
 
     <section class="card-form autorizacion-whatsapp" id="cardWhatsapp">
       <div class="wa-titulo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 01-12.6 7.4L3 20.5l1.7-5.2A8.5 8.5 0 1121 11.5z"/><path d="M12 15.5s-3-1.9-3-4a1.7 1.7 0 013-1 1.7 1.7 0 013 1c0 2.1-3 4-3 4z"/></svg><span>¿Quieres recibir novedades por WhatsApp?</span></div>
@@ -394,11 +409,11 @@ button{cursor:pointer}
       </div>
     </section>
 
-    <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">✈ Enviar solicitud de reserva</button>
+      <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">Enviar solicitud de reserva</button>
+      <div class="error-msg" id="errorMsg"></div>
+      <div class="privacy">🔒 Tus datos están protegidos y se usarán para gestionar tu reserva.</div>
     </div>
-
-    <div class="error-msg" id="errorMsg"></div>
-    <div class="privacy">🔒 Tus datos están protegidos y se usarán para gestionar tu reserva.</div>
+    </div>
   </div>
 
   <div class="confirmacion" id="confirmacion">
@@ -488,7 +503,7 @@ const firebaseConfig = {
   // informativo: nunca bloquea ni demora el formulario, y si falla en silencio
   // (por ejemplo sin la regla en Firestore) el formulario funciona igual.
   const VISITA_ID = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-  const VISITA_ORDEN = ['abrio', 'telefono', 'hora_confirmada', 'enviada'];
+  const VISITA_ORDEN = ['abrio', 'hora_confirmada', 'telefono', 'enviada']; // v4.0: primero se elige la reserva (paso 1), después el celular (paso 2)
   const visitaDatos = {
     fecha: (function(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })(),
     creadoEn: Date.now(),
@@ -922,9 +937,9 @@ const firebaseConfig = {
     // elegir otra hora/turno y volver a confirmar. Si ya estaba
     // desbloqueado de antes (la persona ya tenía la reserva armada y solo
     // tocó otro turno para probar), no le borra lo que ya tenía escrito.
-    window._reintentarEnvioTrasValidar = false;
+    window._continuarAlValidar = false;
     if(!window.horaConfirmada && window.bloquearFormularioPorHoraSinConfirmar){
-      window.bloquearFormularioPorHoraSinConfirmar(true);
+      window.bloquearFormularioPorHoraSinConfirmar();
     }
   }
 
@@ -946,10 +961,10 @@ const firebaseConfig = {
   function cancelarShowEspecial(){
     turnoPendienteShow = null;
     reintentarEnvioAlConfirmarShow = false;
-    window._reintentarEnvioTrasValidar = false;
+    window._continuarAlValidar = false;
     document.getElementById('overlayShowEspecial').style.display = 'none';
     if(!window.horaConfirmada && window.bloquearFormularioPorHoraSinConfirmar){
-      window.bloquearFormularioPorHoraSinConfirmar(true);
+      window.bloquearFormularioPorHoraSinConfirmar();
     }
   }
   function confirmarShowEspecial(){
@@ -996,7 +1011,7 @@ const firebaseConfig = {
     turnoConfirmadoShow = null;
     ultimoTurnoAutoPreguntado = null;
     const fecha = document.getElementById('fFecha').value;
-    document.querySelectorAll('.turno-opt').forEach(b => {
+    document.querySelectorAll('.turno-opt, .tab-turno').forEach(b => {
       const info = infoBloqueoTurno(fecha, b.dataset.val);
       b.classList.toggle('bloqueado', esBloqueoDuro(info));
     });
@@ -1042,13 +1057,12 @@ const firebaseConfig = {
       errorMsg.style.display = 'block';
       return;
     }
-    // v3.37: la hora ya no se confirma con un botón. Si todavía no se validó el
-    // turno (fecha/hora con bloqueo, show especial, duplicado), se valida AHORA
-    // y, si todo está bien, el envío continúa solo (ver desbloquearFormularioComoConfirmado).
+    // v4.0: la fecha, hora y turno se validan en el paso 1 ("Continuar"). Si por
+    // algún motivo ya no están validados (cambió la fecha u hora), se vuelve al paso 1.
     if(!window.horaConfirmada || !turnoSel){
-      errorMsg.style.display = 'none';
-      window._reintentarEnvioTrasValidar = true;
-      confirmarHoraSeleccionada();
+      irAPaso(1);
+      const e1 = document.getElementById('errorPaso1');
+      if(e1){ e1.textContent = 'Revisa la fecha y la hora, y toca Continuar.'; e1.style.display = 'block'; }
       return;
     }
     if(!autorizacionWhatsAppSel){
@@ -1301,11 +1315,10 @@ const firebaseConfig = {
           avisoDup.textContent = `⚠️ Ya tienes una reserva registrada con este celular para esta fecha y turno: ${dup.nombre||''} · ${dup.hora||'sin hora'} · ${dup.pax||'?'} personas. Cambia la fecha, el turno o el celular para continuar.`;
           avisoDup.style.display = 'block';
         }
-        const btn = document.getElementById('btnConfirmarHora');
-        if(btn){ btn.classList.remove('confirmada'); btn.textContent = 'Ingresa aquí para registrar los datos de tu reserva →'; }
-        window.horaConfirmada = false;
-        window._reintentarEnvioTrasValidar = false;
-        if(avisoDup) avisoDup.scrollIntoView({behavior:'smooth', block:'center'});
+        // v4.0: el aviso se ve en el paso 2 (debajo del celular) y el envío vuelve a
+        // revisar el duplicado, así que se deja pasar al paso 2 en vez de bloquear.
+        if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
+        if(typeof alDesbloquear === 'function') alDesbloquear();
       } else {
         if(avisoDup) avisoDup.style.display = 'none';
         if(window.desbloquearFormularioComoConfirmado) window.desbloquearFormularioComoConfirmado();
@@ -1359,9 +1372,28 @@ const firebaseConfig = {
     window.location.href = 'index.html';
   }
 
+  // v4.0 — en el paso 2, en cuanto hay celular, avisa si ya existe una reserva activa
+  // con ese celular para la misma fecha y turno. Solo avisa; el envío lo vuelve a revisar.
+  function avisarDuplicadoCelular(){
+    const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
+    if(!avisoDup || !turnoSel) return;
+    const fecha = document.getElementById('fFecha').value;
+    const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
+    if(celularLocal.length < 7){ avisoDup.style.display = 'none'; return; }
+    const celular = `+${document.getElementById('fCelularCod').value} ${celularLocal}`;
+    revisarSolicitudDuplicada(fecha, turnoSel, celular, idExistente).then(dup => {
+      if(dup){
+        avisoDup.textContent = `⚠️ Ya tienes una reserva registrada con este celular para esta fecha y turno: ${dup.nombre||''} · ${dup.hora||'sin hora'} · ${dup.pax||'?'} personas. Cambia la fecha o el turno para continuar.`;
+        avisoDup.style.display = 'block';
+      } else {
+        avisoDup.style.display = 'none';
+      }
+    }).catch(() => {});
+  }
   function buscarClienteExistente(){
     const celularLocal = document.getElementById('fCelular').value.trim().replace(/\D/g,'');
     if(celularLocal.length < 7) return; // aún no terminó de escribir un número plausible
+    avisarDuplicadoCelular();
     const celularCod = document.getElementById('fCelularCod').value;
     const tel = normalizarTelefono(`+${celularCod} ${celularLocal}`);
     const aviso = document.getElementById('clienteReconocidoAviso');
@@ -1478,15 +1510,19 @@ const firebaseConfig = {
       b.type = 'button';
       b.className = 'date-card generated-date' + (mismaFecha(d,seleccionada) ? ' on' : '');
 
-      const dow = new Intl.DateTimeFormat('es-CO',{weekday:'short'})
+      const dow = mismaFecha(d,hoy) ? 'HOY' : new Intl.DateTimeFormat('es-CO',{weekday:'short'})
         .format(d).replace('.','').toUpperCase();
       const mon = new Intl.DateTimeFormat('es-CO',{month:'short'})
         .format(d).replace('.','').toUpperCase();
 
+      // v4.0 — punto dorado en los días que tienen un show especial
+      const diaInfo = (typeof FECHAS_BLOQUEADAS !== 'undefined' && FECHAS_BLOQUEADAS[isoLocal(d)]) || null;
+      const tieneShow = !!diaInfo && ['desayuno','almuerzo','cena'].some(t => diaInfo[t] && diaInfo[t].tipo === 'show_especial');
       b.innerHTML =
         `<span class="dow">${dow}</span>` +
         `<span class="num">${d.getDate()}</span>` +
-        `<span class="mon">${mon}</span>`;
+        `<span class="mon">${mon}</span>` +
+        (tieneShow ? '<u class="punto-show" title="Show especial"></u>' : '');
 
       b.addEventListener('click',()=>{
         fechaInput.value = isoLocal(d);
@@ -1555,43 +1591,26 @@ const firebaseConfig = {
     horaResumen.textContent =
       `${String(h12).padStart(2,'0')}:${String(min).padStart(2,'0')} ${estadoHora.ampm}`;
 
-    // Cualquier movimiento de la rueda invalida la confirmación anterior —
-    // hay que volver a confirmar la nueva hora antes de seguir.
+    // Cualquier cambio de hora invalida la validación anterior: se vuelve a
+    // validar al tocar "Continuar".
     bloquearFormularioPorHoraSinConfirmar();
+    if(typeof pintarHoras === 'function') pintarHoras();
+    if(typeof actualizarResumenPaso1 === 'function') actualizarResumenPaso1();
   }
 
-  // v3.37 — el formulario de datos ya NO se esconde ni pide un botón: siempre
-  // está a la vista. "Bloquear" ahora solo invalida la validación anterior del
-  // turno (fecha u hora cambiaron) y programa una nueva, automática.
-  let autoTimer = null;
-  window._usuarioMovio = false;
-  window._autoIntentado = false;
-  function programarAutoConfirmar(ms){
-    clearTimeout(autoTimer);
-    autoTimer = setTimeout(() => {
-      if(window.horaConfirmada) return;
-      window._autoIntentado = true;
-      confirmarHoraSeleccionada();
-    }, ms);
-  }
-  function bloquearFormularioPorHoraSinConfirmar(conservarIntento){
+  // v4.0 — la validación del turno ya no corre sola: la dispara el botón
+  // "Continuar" del paso 1 (continuarPaso1). "Bloquear" solo invalida la
+  // validación anterior cuando cambia la fecha o la hora.
+  function bloquearFormularioPorHoraSinConfirmar(){
     window.horaConfirmada = false;
     turnoSel = null;
     turnoConfirmadoShow = null;
     ultimoTurnoAutoPreguntado = null;
     document.querySelectorAll('.turno-opt').forEach(b => b.classList.remove('on'));
-    const wrapTurno = document.getElementById('seccionTurnoWrap');
-    if(wrapTurno) wrapTurno.style.display = 'none';
-    const btn = document.getElementById('btnConfirmarHora');
-    if(btn) btn.classList.remove('confirmada');
     const avisoDup = document.getElementById('avisoSolicitudDuplicadaCliente');
     if(avisoDup) avisoDup.style.display = 'none';
-    // Si el cliente acaba de cerrar un aviso (turno sin cupo / show), no se le
-    // vuelve a mostrar solo: tiene que cambiar fecha u hora, o tocar Enviar.
-    if(conservarIntento === true) return;
-    window._autoIntentado = false;
-    clearTimeout(autoTimer);
-    if(window._usuarioMovio) programarAutoConfirmar(900);
+    const e1 = document.getElementById('errorPaso1');
+    if(e1) e1.style.display = 'none';
   }
   // Esta función la llama también actualizarDisponibilidadTurnos(), que
   // vive en el otro bloque <script> (fuera de este IIFE) — por eso hay que
@@ -1610,14 +1629,10 @@ const firebaseConfig = {
   // visible por debajo, sin haberse resuelto nada.
   function desbloquearFormularioComoConfirmado(){
     window.horaConfirmada = true;
-    const wrapTurno = document.getElementById('seccionTurnoWrap');
-    if(wrapTurno) wrapTurno.style.display = eventoActual ? 'none' : 'block';
-    const btn = document.getElementById('btnConfirmarHora');
-    if(btn) btn.classList.add('confirmada');
-    // Si la validación la disparó el botón Enviar, el envío sigue solo.
-    if(window._reintentarEnvioTrasValidar){
-      window._reintentarEnvioTrasValidar = false;
-      setTimeout(() => enviarSolicitud(), 0);
+    // Si la validación la disparó el botón "Continuar", ahora sí pasa al paso 2.
+    if(window._continuarAlValidar){
+      window._continuarAlValidar = false;
+      irAPaso(2);
     }
   }
   // La llama también confirmarShowEspecial(), que vive en el otro
@@ -1632,11 +1647,6 @@ const firebaseConfig = {
   // (b) se queda bloqueado hasta que la persona resuelva el modal (y si
   // lo cancela, sigue bloqueado, tal como debe ser).
   function confirmarHoraSeleccionada(){
-    // v3.37: ya no se exige el celular antes. La validación de turno
-    // (bloqueos, show especial) corre sola; si el celular ya está escrito, de
-    // paso se revisa que no haya otra reserva igual (y al enviar se revisa
-    // siempre).
-    visitaRegistrar({ paso: 'hora_confirmada' });
     // Si es una reserva para un evento especial, la hora ya viene fija
     // desde la configuración del evento (hora de entrada) — no se calcula
     // a partir de lo que marque la rueda, que además está oculta.
@@ -1644,11 +1654,7 @@ const firebaseConfig = {
     if(eventoActual){
       turnoAuto = eventoActual.turno;
     } else {
-      const { h24, min } = horaActual24();
-      const minutosDelDia = h24*60 + min;
-      if(minutosDelDia >= 480 && minutosDelDia < 660) turnoAuto = 'desayuno';
-      else if(minutosDelDia >= 660 && minutosDelDia < 1080) turnoAuto = 'almuerzo';
-      else turnoAuto = 'cena';
+      turnoAuto = turnoDeHora();
     }
     ultimoTurnoAutoPreguntado = turnoAuto;
     elegirTurno(turnoAuto);
@@ -1661,26 +1667,15 @@ const firebaseConfig = {
   // exponerla aquí, igual que la de arriba.
   window.confirmarHoraSeleccionada = confirmarHoraSeleccionada;
 
-  // v3.37 — validación automática (sin botón):
-  //  · en cuanto la persona mueve la hora o cambia la fecha, se valida a los
-  //    0,9 s de que deja de tocar;
-  //  · si en cambio acepta la hora sugerida y empieza a llenar sus datos, se
-  //    valida cuando toca el primer campo;
-  //  · y siempre se valida al tocar "Enviar" si aún no se había hecho.
-  ['pointerdown','touchstart','mousedown','wheel','click','change'].forEach(ev => {
-    ['horaWheelBlockPublico','dateCarousel'].forEach(id => {
-      const el = document.getElementById(id);
-      if(el) el.addEventListener(ev, () => { window._usuarioMovio = true; }, {passive:true, capture:true});
-    });
-  });
-  document.addEventListener('focusin', e => {
-    const t = e.target;
-    if(t && t.closest && t.closest('#cardDatos') && !window.horaConfirmada && !window._autoIntentado){
-      window._autoIntentado = true;
-      clearTimeout(autoTimer);
-      confirmarHoraSeleccionada();
-    }
-  });
+  // v4.0 — mismo criterio de turno de siempre, en un solo lugar:
+  // 8:00–10:59 desayuno · 11:00–5:59 pm almuerzo · el resto cena.
+  function turnoDeHora(){
+    const { h24, min } = horaActual24();
+    const m = h24*60 + min;
+    if(m >= 480 && m < 660) return 'desayuno';
+    if(m >= 660 && m < 1080) return 'almuerzo';
+    return 'cena';
+  }
 
   function crearRueda(id, valores, inicial, onChange){
     const rueda = document.getElementById(id);
@@ -1764,29 +1759,159 @@ const firebaseConfig = {
     }
   }
 
-  crearRueda(
-    'wheelHora',
-    Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),
-    String(estadoHora.hora).padStart(2,'0'),
-    v=>{ estadoHora.hora = Number(v); actualizarHora(); }
-  );
+  // v4.0 — las ruedas ya no se dibujan al cargar: quedan escondidas detrás de
+  // "Otra hora" y se crean la primera vez que se abren, con la hora que ya
+  // tenga elegida el cliente (si se crearan ocultas, al mostrarse volverían a
+  // la hora por defecto y pisarían lo que eligió en los botones).
+  let ruedasCreadas = false;
+  function crearRuedasHora(){
+    crearRueda(
+      'wheelHora',
+      Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')),
+      String(estadoHora.hora).padStart(2,'0'),
+      v=>{ estadoHora.hora = Number(v); actualizarHora(); }
+    );
+    crearRueda(
+      'wheelMinuto',
+      ['00','05','10','15','20','25','30','35','40','45','50','55'],
+      String(estadoHora.minuto).padStart(2,'0'),
+      v=>{ estadoHora.minuto = Number(v); actualizarHora(); }
+    );
+    crearRueda(
+      'wheelAmPm',
+      ['AM','PM'],
+      estadoHora.ampm,
+      v=>{ estadoHora.ampm = v; actualizarHora(); }
+    );
+    ruedasCreadas = true;
+  }
+  function sincronizarRuedas(){
+    const pos = {wheelHora:String(estadoHora.hora).padStart(2,'0'), wheelMinuto:String(estadoHora.minuto).padStart(2,'0'), wheelAmPm:estadoHora.ampm};
+    Object.keys(pos).forEach(id => {
+      const r = document.getElementById(id);
+      const items = r ? [...r.querySelectorAll('.rueda-item')] : [];
+      const idx = items.findIndex(it => it.dataset.value === pos[id]);
+      if(idx >= 0) r.scrollTop = idx * 42;
+    });
+  }
 
-  crearRueda(
-    'wheelMinuto',
-    ['00','05','10','15','20','25','30','35','40','45','50','55'],
-    String(estadoHora.minuto).padStart(2,'0'),
-    v=>{ estadoHora.minuto = Number(v); actualizarHora(); }
-  );
+  // Horas rápidas por turno. Para cambiar las opciones que ve el cliente,
+  // se edita solo esta tabla: [hora, minuto, 'AM'|'PM'].
+  const HORAS_RAPIDAS = {
+    desayuno: [[8,0,'AM'],[8,30,'AM'],[9,0,'AM'],[9,30,'AM'],[10,0,'AM'],[10,30,'AM']],
+    almuerzo: [[12,0,'PM'],[12,30,'PM'],[1,0,'PM'],[1,30,'PM'],[2,0,'PM'],[2,30,'PM'],[3,0,'PM'],[3,30,'PM']],
+    cena:     [[6,0,'PM'],[6,30,'PM'],[7,0,'PM'],[7,30,'PM'],[8,0,'PM'],[8,30,'PM'],[9,0,'PM'],[9,30,'PM']]
+  };
+  const HORA_POR_DEFECTO_TURNO = { desayuno:[9,0,'AM'], almuerzo:[1,0,'PM'], cena:[8,0,'PM'] };
+  let turnoPestana = null;      // pestaña abierta (Desayuno / Almuerzo / Cena)
+  let otraHoraAbierta = false;
 
-  crearRueda(
-    'wheelAmPm',
-    ['AM','PM'],
-    estadoHora.ampm,
-    v=>{ estadoHora.ampm = v; actualizarHora(); }
-  );
+  function etiquetaHora(h, m, ap){ return `${h}:${String(m).padStart(2,'0')}<small>${ap.toLowerCase()}</small>`; }
+  function esHoraRapida(t){ return HORAS_RAPIDAS[t].some(([h,m,ap]) => h === Number(estadoHora.hora) && m === Number(estadoHora.minuto) && ap === estadoHora.ampm); }
+
+  function pintarHoras(){
+    const cont = document.getElementById('horasRapidas');
+    if(!cont) return;
+    const t = turnoPestana || turnoDeHora();
+    document.querySelectorAll('#turnoTabs .tab-turno').forEach(b => b.classList.toggle('on', b.dataset.val === t));
+    const rapida = esHoraRapida(t);
+    cont.innerHTML = HORAS_RAPIDAS[t].map(([h,m,ap]) => {
+      const on = h === Number(estadoHora.hora) && m === Number(estadoHora.minuto) && ap === estadoHora.ampm;
+      return `<button type="button" class="h${on?' on':''}" onclick="elegirHoraRapida(${h},${m},'${ap}')">${etiquetaHora(h,m,ap)}</button>`;
+    }).join('') +
+      `<button type="button" class="h otra${(!rapida || otraHoraAbierta)?' on-otra':''}" onclick="abrirOtraHora()">` +
+      (!rapida ? etiquetaHora(Number(estadoHora.hora), Number(estadoHora.minuto), estadoHora.ampm) : 'Otra hora') + `</button>`;
+  }
+  function elegirHoraRapida(h, m, ap){
+    estadoHora.hora = h; estadoHora.minuto = m; estadoHora.ampm = ap;
+    otraHoraAbierta = false;
+    const p = document.getElementById('panelOtraHora'); if(p) p.style.display = 'none';
+    actualizarHora();
+  }
+  function elegirTabTurno(t){
+    turnoPestana = t;
+    const d = HORA_POR_DEFECTO_TURNO[t];
+    elegirHoraRapida(d[0], d[1], d[2]);
+  }
+  function abrirOtraHora(){
+    const p = document.getElementById('panelOtraHora'); if(!p) return;
+    otraHoraAbierta = !otraHoraAbierta;
+    p.style.display = otraHoraAbierta ? 'block' : 'none';
+    if(otraHoraAbierta){
+      if(!ruedasCreadas) crearRuedasHora(); else sincronizarRuedas();
+    }
+    pintarHoras();
+  }
+  window.elegirHoraRapida = elegirHoraRapida;
+  window.elegirTabTurno = elegirTabTurno;
+  window.abrirOtraHora = abrirOtraHora;
+
+  // ---- Pasos del formulario ----
+  const DIAS_CORTOS = ['dom','lun','mar','mié','jue','vie','sáb'];
+  const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  function resumenReservaTexto(){
+    const pax = Number(document.getElementById('fPax').value) || 0;
+    const iso = document.getElementById('fFecha').value;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+    let f = '';
+    if(m){ const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3])); f = `${DIAS_CORTOS[d.getDay()]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`; f = f.charAt(0).toUpperCase() + f.slice(1); }
+    const hr = document.getElementById('horaResumen').textContent.replace(/^0/, '').replace(' AM',' am').replace(' PM',' pm');
+    return [pax ? `${pax} ${pax === 1 ? 'persona' : 'personas'}` : 'Personas por elegir', f, hr].filter(Boolean).join(' · ');
+  }
+  function actualizarResumenPaso1(){
+    const el = document.getElementById('resumenPaso1');
+    if(el) el.textContent = resumenReservaTexto();
+  }
+  window.actualizarResumenPaso1 = actualizarResumenPaso1;
+
+  function irAPaso(n){
+    document.getElementById('paso1').style.display = n === 1 ? 'block' : 'none';
+    document.getElementById('paso2').style.display = n === 2 ? 'block' : 'none';
+    document.getElementById('tituloPaso').textContent = n === 1 ? 'Reserva tu mesa' : 'Tus datos';
+    document.getElementById('leadPaso').textContent = n === 1 ? 'Elige cuántos son, el día y la hora.' : 'Empieza por tu celular.';
+    [1,2,3].forEach(i => {
+      const el = document.getElementById('pasoInd' + i);
+      el.className = 'paso' + (i < n ? ' ok' : (i === n ? ' on' : ''));
+      el.querySelector('i').innerHTML = i < n ? '✓' : String(i);
+    });
+    document.getElementById('pasoLn1').className = 'paso-ln' + (n > 1 ? ' ok' : '');
+    document.getElementById('pasoLn2').className = 'paso-ln';
+    if(n === 2){
+      document.getElementById('resumenPaso2').textContent = resumenReservaTexto();
+      visitaRegistrar({ paso: 'hora_confirmada' });   // terminó el paso 1
+      avisarDuplicadoCelular();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  window.irAPaso = irAPaso;
+
+  // Botón "Continuar" del paso 1: pide personas, valida fecha/hora/turno con las
+  // mismas reglas de siempre (bloqueos, show especial, duplicado) y pasa al paso 2.
+  function continuarPaso1(){
+    const e1 = document.getElementById('errorPaso1');
+    const pax = Number(document.getElementById('fPax').value);
+    if(!pax || pax < 1){
+      e1.textContent = 'Elige cuántas personas son con los botones + y −.';
+      e1.style.display = 'block';
+      return;
+    }
+    if(pax > 500){
+      e1.textContent = 'La cantidad de personas es demasiado alta — revísala.';
+      e1.style.display = 'block';
+      return;
+    }
+    e1.style.display = 'none';
+    if(window.horaConfirmada && turnoSel){ irAPaso(2); return; }   // ya validado y sin cambios
+    window._continuarAlValidar = true;
+    confirmarHoraSeleccionada();
+  }
+  window.continuarPaso1 = continuarPaso1;
   // v3.33 — deja el campo de hora y el resumen coherentes desde el inicio,
   // aunque las ruedas todavía no se hayan podido dibujar.
   actualizarHora();
+  pintarHoras();
+  actualizarResumenPaso1();
+  document.getElementById('fPax').addEventListener('input', () => { actualizarResumenPaso1(); const e1 = document.getElementById('errorPaso1'); if(e1) e1.style.display = 'none'; });
 
   // Cantidad de personas se escribe directamente.
   // Cantidad de personas queda vacía hasta que el cliente la escriba.
@@ -1799,7 +1924,7 @@ const firebaseConfig = {
   // bloqueos de Firebase todavía no han terminado de cargar en este
   // instante: para cuando confirme la hora, ya van a estar listos.
   bloquearFormularioPorHoraSinConfirmar();
-  fechasBloqueadasPromesa.then(actualizarAvisoBloqueo);
+  fechasBloqueadasPromesa.then(() => { actualizarAvisoBloqueo(); pintarCarrusel(); });
 })();
 
 </script>
@@ -2433,4 +2558,95 @@ function toggleAutorizacionDetalle(){
 .card-form.card-blanca #fCumpleanos{color:#1d1f23}
 .cumple-row{display:grid; grid-template-columns:1fr 1.8fr; gap:10px}
 .card-form.card-blanca .cumple-row select{width:100%; min-width:0; padding:13px 12px}
+
+/* ===================== v4.0 — Formulario en 3 pasos ===================== */
+body{background:radial-gradient(130% 55% at 50% 0%,#33270f 0%,#0c0a07 60%) no-repeat #0c0a07}
+.hero-nuevo{text-align:center;padding:2px 0 4px}
+.hero-nuevo h1{font-family:'Lora',Georgia,'Times New Roman',serif;font-weight:600;font-size:30px;line-height:1.12;color:#f7efdc;margin:6px 0 4px;letter-spacing:-.2px}
+.lead-nuevo{color:#c9bfa6;font-size:16.5px;margin-bottom:16px}
+.pasos{display:flex;align-items:flex-start;padding:0 4px 18px}
+.paso{flex:0 0 auto;width:86px;text-align:center;font-size:14px;color:#9a8f76}
+.paso i{display:flex;margin:0 auto 6px;width:30px;height:30px;border-radius:50%;border:1.5px solid #5b4d2c;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:15px;color:#9a8f76}
+.paso.on{color:#f7efdc;font-weight:700}
+.paso.on i{background:#e6b64a;border-color:#e6b64a;color:#1a1305}
+.paso.ok{color:#e6b64a}
+.paso.ok i{border-color:#e6b64a;color:#e6b64a}
+.paso-ln{flex:1;height:1.5px;background:#4a3d22;margin-top:15px}
+.paso-ln.ok{background:#e6b64a}
+
+.sheet-nuevo{background:#fbf9f4;border-radius:28px;padding:24px 18px 20px;color:#1b1814;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.sheet-nuevo .blk{margin:0 0 26px}
+.sheet-nuevo .q{font-family:'Lora',Georgia,'Times New Roman',serif;font-weight:600;font-size:21px;color:#1b1814;margin-bottom:12px}
+
+/* personas */
+.sheet-nuevo .pax-stepper{display:grid;grid-template-columns:64px 1fr 64px;gap:10px;align-items:center;background:#fff;border:1.5px solid #ddd5c5;border-radius:18px;padding:8px}
+.sheet-nuevo .pax-btn{height:60px;width:100%;border-radius:14px;border:0;background:#f1ece0;color:#1b1814;font-size:30px;font-weight:600}
+.sheet-nuevo .pax-btn:last-child{background:#14110c;color:#e6b64a}
+.sheet-nuevo .pax-btn:active{filter:brightness(.92)}
+.sheet-nuevo .pax-stepper #fPax{position:static !important;opacity:1 !important;pointer-events:auto !important;width:100% !important;height:60px !important;min-width:0;border:0;background:transparent;color:#1b1814;text-align:center;font-family:'Lora',Georgia,serif;font-size:38px;font-weight:600;outline:none;padding:0;-moz-appearance:textfield;appearance:textfield}
+.sheet-nuevo .pax-stepper #fPax::placeholder{color:#b5ac98}
+
+/* día */
+.sheet-nuevo .date-row{margin:0 -18px;padding:0 18px 4px;gap:9px}
+.sheet-nuevo .date-card{flex:0 0 66px;height:92px;border-radius:16px;background:#fff;border:1.5px solid #ddd5c5;color:#1b1814;position:relative}
+.sheet-nuevo .date-card .dow,.sheet-nuevo .date-card .mon{font-size:13px;color:#6f6759;font-weight:700}
+.sheet-nuevo .date-card .num{font-family:'Lora',Georgia,serif;font-size:28px;font-weight:600;margin:3px 0}
+.sheet-nuevo .date-card.on{background:#14110c;border-color:#14110c;color:#f7efdc}
+.sheet-nuevo .date-card.on .dow,.sheet-nuevo .date-card.on .mon{color:#d8b25a}
+.sheet-nuevo .calendar-card{flex-basis:56px;color:#8a5d0a;background:#fffaf0;border:1.5px dashed #c9a45a;font-size:24px}
+.punto-show{position:absolute;right:8px;top:8px;width:9px;height:9px;border-radius:50%;background:#d9972a;text-decoration:none}
+.sheet-nuevo .date-summary{margin-top:12px;border:0;background:transparent;padding:0;font-size:17px;font-weight:700;color:#1b1814}
+.sheet-nuevo .date-summary .hora-resumen{color:#8a5d0a;font-weight:700;white-space:nowrap}
+.aviso-fecha{margin-top:12px;background:#fdf1d6;border:1.5px solid #ecc979;border-radius:14px;padding:12px 14px;font-size:16px;color:#5a410a;line-height:1.4}
+
+/* hora */
+.sheet-nuevo .seg{display:flex;background:#eee8da;border-radius:14px;padding:4px;margin-bottom:14px;gap:2px}
+.tab-turno{flex:1;border:0;background:transparent;padding:12px 0;border-radius:11px;font-size:17px;font-weight:700;color:#6f6759}
+.tab-turno.on{background:#fff;color:#1b1814;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.tab-turno.bloqueado{text-decoration:line-through;opacity:.5}
+.sheet-nuevo .hrs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sheet-nuevo .hrs .h{height:58px;border-radius:14px;background:#fff;border:1.5px solid #ddd5c5;font-size:20px;font-weight:700;color:#1b1814;display:flex;align-items:center;justify-content:center;padding:0}
+.sheet-nuevo .hrs .h small{font-size:14px;font-weight:400;margin-left:4px;color:#6f6759}
+.sheet-nuevo .hrs .h.on{background:#14110c;border-color:#14110c;color:#f7efdc}
+.sheet-nuevo .hrs .h.on small{color:#d8b25a}
+.sheet-nuevo .hrs .h.otra{color:#8a5d0a;border:1.5px dashed #c9a45a;background:#fffaf0;font-size:18px}
+.sheet-nuevo .hrs .h.otra.on-otra{background:#14110c;border:1.5px solid #14110c;color:#f7efdc}
+.sheet-nuevo .hrs .h.otra.on-otra small{color:#d8b25a}
+.otra-panel{margin-top:14px}
+.otra-titulo{font-size:15px;color:#6f6759;margin-bottom:8px}
+
+/* barra de continuar */
+.barra-paso{margin:4px -18px -20px;background:#fff;border-top:1px solid #e6dfd0;padding:14px 18px 18px;border-radius:0 0 28px 28px}
+.barra-paso .sum{font-size:17px;font-weight:700;margin-bottom:12px;color:#1b1814}
+.sheet-nuevo .btn-enviar{height:64px;border-radius:18px;font-size:21px;margin-top:0;padding:0;box-shadow:0 6px 16px rgba(201,150,46,.35)}
+.sheet-nuevo .error-msg{font-size:15px;margin:0 0 10px;line-height:1.35}
+
+/* paso 2 */
+.chip-resumen{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#14110c;color:#f7efdc;border-radius:16px;padding:14px 16px;font-size:16.5px;font-weight:700;margin-bottom:20px}
+.chip-resumen a{color:#e6b64a;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+.sheet-nuevo .card-form.card-blanca{background:transparent;border:0;box-shadow:none;padding:0;border-radius:0;margin:0}
+.sheet-nuevo .card-form.card-blanca .field{margin-bottom:18px}
+.sheet-nuevo .card-form.card-blanca .field input,
+.sheet-nuevo .card-form.card-blanca .field textarea,
+.sheet-nuevo .card-form.card-blanca .field select{min-height:60px;font-size:19px}
+.sheet-nuevo .card-form.card-blanca .field textarea{min-height:96px}
+.sheet-nuevo .card-form.card-blanca .celular-con-codigo{gap:10px}
+.sheet-nuevo .card-form.card-blanca .celular-con-codigo select{flex:0 0 124px;width:124px;font-size:17px;padding:13px 6px}
+.sheet-nuevo .cumple-row{display:grid;grid-template-columns:1fr 1.8fr;gap:10px}
+
+/* WhatsApp */
+.sheet-nuevo .card-form.autorizacion-whatsapp{background:#f1ece0;border:0;border-radius:18px;padding:18px;margin:6px 0 20px}
+.sheet-nuevo .wa-titulo{color:#1b1814;font-family:'Lora',Georgia,serif;font-size:20px;font-weight:600}
+.sheet-nuevo .wa-titulo svg{color:#8a5d0a}
+.sheet-nuevo .wa-corto{color:#5f5748;font-size:16px}
+.sheet-nuevo .card-form .vip-opt{background:#fff;border:1.5px solid #cfc7b6;color:#1b1814;min-height:58px;font-size:19px}
+.sheet-nuevo .card-form .vip-opt.on{background:#14110c;border-color:#14110c;color:#f7efdc}
+.sheet-nuevo .card-form .vip-opt.on svg{color:#e6b64a}
+.sheet-nuevo .wa-leer{color:#8a5d0a;font-size:16px}
+.sheet-nuevo .wa-detalle{border-top-color:#d9d1bf}
+.sheet-nuevo .autorizacion-whatsapp__texto{color:#3d372c;font-size:14.5px}
+.sheet-nuevo .autorizacion-whatsapp__nota{color:#6f6759;font-size:13.5px}
+.sheet-nuevo .autorizacion-whatsapp__politica{color:#8a5d0a;font-size:14.5px}
+.sheet-nuevo .privacy{color:#6f6759;font-size:14px;text-align:center;margin-top:14px}
+@media (prefers-reduced-motion:reduce){.hero-nuevo *{animation:none !important}}
 </style>
