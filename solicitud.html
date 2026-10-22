@@ -221,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.39</div>
+<div class="version-tag">v3.40</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -604,7 +604,9 @@ const firebaseConfig = {
       }
     }).catch(err => console.error('Error cargando el carrusel de fotos:', err));
   }
-  cargarCarruselPublicidad();
+  // v3.40: el banner de "Próximos eventos especiales" ya no se muestra en el formulario
+  // (para no confundir al cliente de entrada). La función se conserva por si se reactiva.
+  // cargarCarruselPublicidad();
 
   // Fechas/turnos que el restaurante bloqueó — se cargan una vez al abrir
   // el formulario. Cada turno bloqueado trae su propio "tipo":
@@ -784,7 +786,9 @@ const firebaseConfig = {
   } else {
     // Llegó de forma general (ej. desde "Reservar ahora" en la página de
     // inicio) — se le pregunta qué tipo de reserva quiere hacer.
-    document.getElementById('tipoReservaBlockPublico').style.display = 'block';
+    // v3.40: el selector "Reserva normal / Evento especial" ya no se muestra. Todas las
+    // reservas son normales; si la fecha tiene show especial, sale el aviso por fecha/turno.
+    // document.getElementById('tipoReservaBlockPublico').style.display = 'block';
   }
 
   function elegirTipoReservaPublico(tipo){
