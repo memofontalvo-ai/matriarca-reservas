@@ -3077,6 +3077,15 @@ function formatearFechaLarga(iso){
   return `${DIAS[fecha.getDay()]} ${d} de ${MESES[m-1]}`;
 }
 
+// v6.54 — el cumpleaños solo guarda mes y día (el año guardado, 2000, es de
+// relleno y no es fecha de nacimiento). Se muestra sin año ni día de la semana.
+function formatearCumple(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  if(!m || !d) return '';
+  return `${d} de ${MESES[m-1]}`;
+}
+
 function guardarMensaje(tipo, valor){
   mensajesConfigRef.set({ [tipo]: valor }, { merge: true }).then(() => {
     const el = document.getElementById('msgGuardado_' + tipo);
@@ -5930,7 +5939,7 @@ function renderTablaClientes(){
       <td>${escapeHtml(c.nombre||'—')}</td>
       <td>${escapeHtml(c.telefono||'—')}</td>
       <td>${escapeHtml(c.correo||'—')}</td>
-      <td>${c.cumpleanos ? formatearFechaLarga(c.cumpleanos) : '—'}</td>
+      <td>${c.cumpleanos ? formatearCumple(c.cumpleanos) : '—'}</td>
       <td>${c.fechaPrimeraSolicitud ? formatearFechaLarga(c.fechaPrimeraSolicitud) : '—'}</td>
       <td>${c.fechaUltimaSolicitud ? formatearFechaLarga(c.fechaUltimaSolicitud) : '—'}</td>
       <td style="text-align:center;"><b>${c.cantidadSolicitudes||0}</b></td>
@@ -5967,7 +5976,7 @@ function exportarClientesCSV(){
     const partes = (c.nombre||'').trim().split(/\s+/);
     const nombrePila = partes[0] || '';
     const apellido = partes.slice(1).join(' ');
-    return [nombrePila, apellido, c.telefono||'', c.correo||'', c.cumpleanos||'', c.fechaPrimeraSolicitud||'', c.fechaUltimaSolicitud||'', c.cantidadSolicitudes||0]
+    return [nombrePila, apellido, c.telefono||'', c.correo||'', formatearCumple(c.cumpleanos), c.fechaPrimeraSolicitud||'', c.fechaUltimaSolicitud||'', c.cantidadSolicitudes||0]
       .map(csvCelda).join(',');
   });
   const csv = '\uFEFF' + encabezados.join(',') + '\n' + filas.join('\n'); // \uFEFF = BOM para que Excel muestre bien las tildes

@@ -221,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v3.37</div>
+<div class="version-tag">v3.38</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -348,8 +348,20 @@ button{cursor:pointer}
         <div id="avisoSolicitudDuplicadaCliente" style="display:none; margin-top:8px; padding:9px 11px; border-radius:9px; background:#fdecee; border:1px solid #e5636a; color:#a3262d; font-size:12.5px; line-height:1.4;"></div>
       </div>
       <div class="field">
-        <label class="card-blanca-label" for="fCumpleanos">Fecha de cumpleaños <span class="opt">· opcional</span></label>
-        <input type="date" id="fCumpleanos">
+        <label class="card-blanca-label" for="fCumpleDia">Fecha de cumpleaños <span class="opt">· opcional</span></label>
+        <div class="cumple-row">
+          <select id="fCumpleDia" aria-label="Día de cumpleaños" onchange="actualizarCumple()"><option value="">Día</option></select>
+          <select id="fCumpleMes" aria-label="Mes de cumpleaños" onchange="actualizarCumple()">
+            <option value="">Mes</option>
+            <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+            <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+            <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+        <!-- v3.38: solo día y mes. Se guarda como 2000-MM-DD (el año 2000 es solo de relleno,
+             no es fecha de nacimiento; el panel lo muestra sin año). -->
+        <input type="hidden" id="fCumpleanos">
       </div>
 
       <div class="field">
@@ -497,6 +509,28 @@ const firebaseConfig = {
   // v3.37 — el formulario pide nombre y apellido por separado. Cuando el nombre
   // viene ya completo (cliente registrado / WhatsApp), se reparte en dos mitades;
   // al enviar se vuelven a unir, así el nombre guardado queda idéntico.
+  const DIAS_POR_MES = [31,29,31,30,31,30,31,31,30,31,30,31];
+  function actualizarCumple(){
+    const dia = document.getElementById('fCumpleDia'), mes = document.getElementById('fCumpleMes'), hid = document.getElementById('fCumpleanos');
+    if(!dia || !mes || !hid) return;
+    const max = mes.value ? DIAS_POR_MES[Number(mes.value) - 1] : 31;
+    if(dia.options.length - 1 !== max){
+      const sel = dia.value;
+      dia.innerHTML = '<option value="">Día</option>' + Array.from({length: max}, (_, i) => { const v = String(i + 1).padStart(2, '0'); return `<option value="${v}">${i + 1}</option>`; }).join('');
+      dia.value = (sel && Number(sel) <= max) ? sel : '';
+    }
+    hid.value = (dia.value && mes.value) ? `2000-${mes.value}-${dia.value}` : '';
+  }
+  // Acepta cualquier fecha guardada (AAAA-MM-DD) y toma solo mes y día.
+  function setCumpleanos(iso){
+    const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(iso || '');
+    if(!m) return;
+    document.getElementById('fCumpleMes').value = m[1];
+    actualizarCumple();
+    document.getElementById('fCumpleDia').value = m[2];
+    actualizarCumple();
+  }
+  actualizarCumple();
   function setNombreCompleto(full, soloSiVacio){
     const n = document.getElementById('fNombre'), a = document.getElementById('fApellido');
     if(!n || !a || !full) return;
@@ -681,7 +715,7 @@ const firebaseConfig = {
             const fCumpleanos = document.getElementById('fCumpleanos');
             if(fNombre && cdata.nombre) setNombreCompleto(cdata.nombre, false);
             if(fCorreo && cdata.correo) fCorreo.value = cdata.correo;
-            if(fCumpleanos && cdata.cumpleanos) fCumpleanos.value = cdata.cumpleanos;
+            if(fCumpleanos && cdata.cumpleanos) setCumpleanos(cdata.cumpleanos);
             if(aviso) aviso.style.display = 'block';
           } else {
             aplicarNombreDeContactoComoRespaldo();
@@ -1335,7 +1369,7 @@ const firebaseConfig = {
       const fCumpleanos = document.getElementById('fCumpleanos');
       if(data.nombre) setNombreCompleto(data.nombre, true);
       if(!fCorreo.value.trim() && data.correo) fCorreo.value = data.correo;
-      if(!fCumpleanos.value && data.cumpleanos) fCumpleanos.value = data.cumpleanos;
+      if(!fCumpleanos.value && data.cumpleanos) setCumpleanos(data.cumpleanos);
       if(aviso) aviso.style.display = 'block';
     }).catch(err => console.error('No se pudo buscar el cliente:', err));
   }
@@ -2393,4 +2427,6 @@ function toggleAutorizacionDetalle(){
 .card-form.card-blanca .pax-btn:active{background:#e4e7ec}
 .card-form.card-blanca .pax-stepper #fPax{font-weight:800; font-size:22px}
 .card-form.card-blanca #fCumpleanos{color:#1d1f23}
+.cumple-row{display:grid; grid-template-columns:1fr 1.8fr; gap:10px}
+.card-form.card-blanca .cumple-row select{width:100%; min-width:0; padding:13px 12px}
 </style>
