@@ -221,7 +221,7 @@ button{cursor:pointer}
 </head>
 <body>
 
-<div class="version-tag">v4.0</div>
+<div class="version-tag">v4.1</div>
 <button type="button" class="form-close-x" onclick="cerrarFormularioSolicitud()" aria-label="Cerrar">×</button>
 <div class="wrap">
   <div class="logo-header">
@@ -394,20 +394,6 @@ button{cursor:pointer}
       </div>
       </section>
 
-    <section class="card-form autorizacion-whatsapp" id="cardWhatsapp">
-      <div class="wa-titulo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 01-12.6 7.4L3 20.5l1.7-5.2A8.5 8.5 0 1121 11.5z"/><path d="M12 15.5s-3-1.9-3-4a1.7 1.7 0 013-1 1.7 1.7 0 013 1c0 2.1-3 4-3 4z"/></svg><span>¿Quieres recibir novedades por WhatsApp?</span></div>
-      <div class="wa-corto">Es voluntario y no afecta tu solicitud. Podremos enviarte eventos, promociones y beneficios.</div>
-      <div class="vip-opts" id="autorizacionOpts" style="margin-top:14px;">
-        <button type="button" class="vip-opt" data-val="si" onclick="elegirAutorizacionWhatsApp('si')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span>Sí, autorizo</span></button>
-        <button type="button" class="vip-opt" data-val="no" onclick="elegirAutorizacionWhatsApp('no')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg><span>No autorizo</span></button>
-      </div>
-      <button type="button" class="wa-leer" id="btnLeerAutorizacion" onclick="toggleAutorizacionDetalle()" aria-expanded="false" aria-controls="autorizacionDetalle">Leer autorización completa y política de datos</button>
-      <div id="autorizacionDetalle" class="wa-detalle" style="display:none;">
-      <div class="autorizacion-whatsapp__texto">Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.</div>
-      <div class="autorizacion-whatsapp__nota">Esta autorización es voluntaria y no es necesaria para solicitar una reserva. Los mensajes relacionados directamente con tu solicitud o reserva podrán ser enviados independientemente de esta autorización.</div>
-      <a class="autorizacion-whatsapp__politica" id="linkPoliticaDatos" href="#" target="_blank" rel="noopener">Consultar Política de Tratamiento de Datos Personales</a>
-      </div>
-    </section>
 
       <button class="btn-enviar" id="btnEnviar" onclick="enviarSolicitud()">Enviar solicitud de reserva</button>
       <div class="error-msg" id="errorMsg"></div>
@@ -1065,13 +1051,6 @@ const firebaseConfig = {
       if(e1){ e1.textContent = 'Revisa la fecha y la hora, y toca Continuar.'; e1.style.display = 'block'; }
       return;
     }
-    if(!autorizacionWhatsAppSel){
-      errorMsg.textContent = 'Por favor indica si autorizas o no recibir información por WhatsApp — puedes elegir cualquiera de las dos opciones, solo necesitamos que elijas una para poder continuar.';
-      errorMsg.dataset.motivo = 'autorizacion';
-      errorMsg.style.display = 'block';
-      errorMsg.scrollIntoView({behavior:'smooth', block:'center'});
-      return;
-    }
     // Refuerzo de seguridad justo antes de guardar: si el turno elegido
     // resulta estar bloqueado por EVENTO PRIVADO, no se manda bajo ninguna
     // circunstancia. Si está bloqueado por falta de disponibilidad, o si
@@ -1172,21 +1151,8 @@ const firebaseConfig = {
       pasoPorSolicitud: true,
       estado: 'solicitud', canal: 'WhatsApp (autogestión)'
     };
-    // Autorización voluntaria para campañas de WhatsApp — lectura
-    // defensiva: si el checkbox no existiera por algún motivo, no debe
-    // detener el envío de la reserva, simplemente queda como "no
-    // autorizado". Campos aditivos, no tocan nada de lo que ya existía.
-    {
-      const autorizoWhatsApp = autorizacionWhatsAppSel === 'si';
-      datos.autorizacionWhatsApp = autorizoWhatsApp;
-      datos.estadoAutorizacionWhatsApp = autorizoWhatsApp ? 'autorizado' : 'no_autorizado';
-      datos.fechaAutorizacionWhatsApp = autorizoWhatsApp ? firebase.firestore.FieldValue.serverTimestamp() : null;
-      datos.origenAutorizacionWhatsApp = 'formulario_publico_reservas';
-      datos.versionAutorizacionWhatsApp = 'v1';
-      if(autorizoWhatsApp){
-        datos.textoAutorizacionWhatsApp = 'Autorizo de manera previa, expresa e informada a La Matriarca Barranquilla para utilizar mis datos de contacto y enviarme por WhatsApp información sobre eventos, programación musical, promociones, descuentos, beneficios y novedades. Entiendo que esta autorización es voluntaria y que podré retirarla en cualquier momento.';
-      }
-    }
+    // v4.1 — ya no se pide autorización de WhatsApp en el formulario: la
+    // aceptación se da al seguir la conversación por WhatsApp con el restaurante.
     if(eventoActual){
       datos.eventoId = eventoActual.id;
       datos.eventoNombre = eventoActual.nombre;
@@ -1450,10 +1416,7 @@ const firebaseConfig = {
           fechaPrimeraSolicitud: hoyISO,
           fechaUltimaSolicitud: hoyISO,
           cantidadSolicitudes: 1,
-          estadoUltimaSolicitud: datos.estado || '',
-          autorizacionWhatsApp: datos.autorizacionWhatsApp || false,
-          estadoAutorizacionWhatsApp: datos.estadoAutorizacionWhatsApp || 'no_autorizado',
-          fechaAutorizacionWhatsApp: datos.fechaAutorizacionWhatsApp || null
+          estadoUltimaSolicitud: datos.estado || ''
         });
       }
     }));
@@ -1951,6 +1914,14 @@ function toggleAutorizacionDetalle(){
   det.style.display = abrir ? 'block' : 'none';
   btn.setAttribute('aria-expanded', abrir ? 'true' : 'false');
 }
+
+// v4.1 — cada toque en + / − suma o resta al instante (sin doble toque = zoom en iPhone)
+(function(){
+  [['btnPaxMenos',-1],['btnPaxMas',1]].forEach(function(x){
+    var b=document.getElementById(x[0]); if(!b) return;
+    b.addEventListener('touchend',function(e){ e.preventDefault(); cambiarPaxPublico(x[1]); },{passive:false});
+  });
+})();
 </script>
 <script>
 // v3.31 — tarjeta de confirmación de la reserva (solo presentación: lee los
@@ -2649,4 +2620,8 @@ body{background:radial-gradient(130% 55% at 50% 0%,#33270f 0%,#0c0a07 60%) no-re
 .sheet-nuevo .autorizacion-whatsapp__politica{color:#8a5d0a;font-size:14.5px}
 .sheet-nuevo .privacy{color:#6f6759;font-size:14px;text-align:center;margin-top:14px}
 @media (prefers-reduced-motion:reduce){.hero-nuevo *{animation:none !important}}
+
+/* v4.1 — evita el zoom por doble toque al pulsar rápido + / − (iOS) */
+html,body,button,a,label,select,.date-card,.tab-turno,.h,.pax-btn,.pax-stepper{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pax-btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 </style>
