@@ -7355,10 +7355,10 @@ function renderHostAforo(tot){
       estado = `<div class="host-aforo-estado sin">Aforo de ${etiqueta} sin guardar</div>`;
       textoBtn = '💾 Guardar aforo — ' + etiqueta;
     } else if(Number(g.esperadas) === tot.esperadas && Number(g.llegaron) === tot.llegadas && Number(g.sinReserva) === tot.sinRes && (Number(g.cantidadGruposSinReserva)||0) === tot.det.nGrupos){
-      estado = `<div class="host-aforo-estado ok">✓ Aforo de ${etiqueta} guardado a las ${hostHoraCorta(g.guardadoEn)} por ${escapeHtml(g.guardadoPor||'')}</div>`;
+      estado = `<div class="host-aforo-estado ok">✓ Aforo de ${etiqueta} guardado a las ${hostHoraCorta(g.guardadoEn)} por ${escapeHtml(g.guardadoPor||'')} · se guarda solo</div>`;
       textoBtn = '💾 Guardar de nuevo';
     } else {
-      estado = `<div class="host-aforo-estado cambio">⚠ Hay cambios desde el último guardado (${hostHoraCorta(g.guardadoEn)}). Falta actualizar.</div>`;
+      estado = `<div class="host-aforo-estado cambio">⚠ Hay cambios desde el último guardado (${hostHoraCorta(g.guardadoEn)}). Se actualiza solo en un momento; si no, toca el botón.</div>`;
       textoBtn = '💾 Actualizar aforo — ' + etiqueta;
     }
     html += estado + `<button type="button" class="host-guardar-aforo" onclick="hostGuardarAforo()" ${hostGuardandoAforo?'disabled':''}>${hostGuardandoAforo ? 'Guardando…' : textoBtn}</button>`;
@@ -7373,16 +7373,33 @@ function renderHostAforo(tot){
   }
   cont.innerHTML = html;
 }
-function hostGuardarAforo(){
-  if(!usuarioActual || !hostTurno || hostTurno === 'cenaSinFranja' || hostGuardandoAforo) return;
-  if(hostEditando.size > 0 || hostSinReservaEditando){
-    if(!confirm('Todavía hay tarjetas abiertas en modo Editar. ¿Guardar el aforo de todas formas?')) return;
+// v6.57 — Guardado automático del aforo: cada vez que alguien registra o quita
+// una entrada (con o sin reserva), un momento después se guarda solo la foto
+// del turno. Así nadie depende de acordarse del botón "Guardar aforo".
+// Se espera ~1.5 s y se agrupan varios toques seguidos en un solo guardado.
+let hostAforoAutoTimer = null;
+function hostAforoAutoProgramar(){
+  const clave = fechaISO(hostFecha) + '_' + hostTurno;
+  clearTimeout(hostAforoAutoTimer);
+  hostAforoAutoTimer = setTimeout(() => hostGuardarAforo(true, clave), 1500);
+}
+function hostGuardarAforo(auto, claveEsperada){
+  if(!usuarioActual || !hostTurno || hostTurno === 'cenaSinFranja') return;
+  if(auto){
+    // Si en ese rato cambió de día/turno en pantalla, no se guarda lo que no es.
+    if(claveEsperada !== fechaISO(hostFecha) + '_' + hostTurno) return;
+    if(hostGuardandoAforo){ hostAforoAutoProgramar(); return; }   // reintenta cuando termine el guardado en curso
+  } else {
+    if(hostGuardandoAforo) return;
+    if(hostEditando.size > 0 || hostSinReservaEditando){
+      if(!confirm('Todavía hay tarjetas abiertas en modo Editar. ¿Guardar el aforo de todas formas?')) return;
+    }
   }
   const tot = hostCalcularTotales();
   const iso = fechaISO(hostFecha);
   const etiqueta = HOST_ETIQUETA_TURNO[hostTurno] || hostTurno;
   hostGuardandoAforo = true;
-  renderHost();
+  if(!auto) renderHost();
   hostAforoRef.doc(iso + '_' + hostTurno).set({
     fecha: iso,
     turno: hostTurno,
@@ -7403,8 +7420,10 @@ function hostGuardarAforo(){
     guardadoPorNombre: usuarioActual.nombre,
     guardadoEn: Date.now(),
   }).then(() => {
-    hostSoltarCandados();
-  }).catch(hostErrorGuardar).finally(() => {
+    if(!auto) hostSoltarCandados();   // el guardado automático NO cierra las tarjetas abiertas
+  }).catch(err => {
+    if(auto) console.warn('Host: no se pudo guardar el aforo automáticamente:', err); else hostErrorGuardar(err);
+  }).finally(() => {
     hostGuardandoAforo = false;
     if(vistaApp === 'host') renderHost();
   });
@@ -7620,7 +7639,7 @@ function hostRegistrarEntradaReserva(id){
     entradas: F.arrayUnion({ n: n, en: Date.now(), por: usuarioActual.iniciales }),
     llegadaActualizadaPor: usuarioActual.iniciales,
     llegadaActualizadaEn: Date.now(),
-  }).catch(hostErrorGuardar);
+  }).then(hostAforoAutoProgramar).catch(hostErrorGuardar);
 }
 function hostQuitarEntradaReserva(id, en){
   const r = reservas.find(x => x.id === id);
@@ -7640,7 +7659,7 @@ function hostQuitarEntradaReserva(id, en){
     entradas: F.arrayRemove(e.raw),
     llegadaActualizadaPor: usuarioActual.iniciales,
     llegadaActualizadaEn: Date.now(),
-  }).catch(hostErrorGuardar));
+  }).then(hostAforoAutoProgramar).catch(hostErrorGuardar));
 }
 // Personas marcadas con los botones viejos (+1 / Llegó completo), que no
 // quedaron como "entrada" con detalle.
@@ -7654,7 +7673,7 @@ function hostQuitarSinDetalleReserva(id){
     llegaron: firebase.firestore.FieldValue.increment(-legacy),
     llegadaActualizadaPor: usuarioActual.iniciales,
     llegadaActualizadaEn: Date.now(),
-  }).catch(hostErrorGuardar);
+  }).then(hostAforoAutoProgramar).catch(hostErrorGuardar);
 }
 
 // Entrada SIN reserva: cada una es un grupo de N personas.
@@ -7673,7 +7692,7 @@ function hostRegistrarEntradaSR(){
     entradas: F.arrayUnion({ n: n, en: Date.now(), por: usuarioActual.iniciales }),
     actualizadoPor: usuarioActual.iniciales,
     actualizadoEn: Date.now(),
-  }, { merge: true }).catch(hostErrorGuardar);
+  }, { merge: true }).then(hostAforoAutoProgramar).catch(hostErrorGuardar);
 }
 function hostQuitarEntradaSR(en){
   if(!hostTurno || !usuarioActual || !hostSinReservaEditando) return;
@@ -7696,7 +7715,7 @@ function hostQuitarEntradaSR(en){
     entradas: F.arrayRemove(e.raw),
     actualizadoPor: usuarioActual.iniciales,
     actualizadoEn: Date.now(),
-  }, { merge: true }).catch(hostErrorGuardar));
+  }, { merge: true }).then(hostAforoAutoProgramar).catch(hostErrorGuardar));
 }
 // Quita lo que se contó antes de existir las entradas (solo había un total).
 function hostQuitarSinDetalle(){
@@ -7711,7 +7730,7 @@ function hostQuitarSinDetalle(){
     personas: firebase.firestore.FieldValue.increment(-det.legacy),
     actualizadoPor: usuarioActual.iniciales,
     actualizadoEn: Date.now(),
-  }, { merge: true }).catch(hostErrorGuardar);
+  }, { merge: true }).then(hostAforoAutoProgramar).catch(hostErrorGuardar);
 }
 
 /* ============ REGISTRO DE CLIENTES (v6.49) ============ */
