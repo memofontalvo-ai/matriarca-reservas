@@ -7215,7 +7215,21 @@ const HOST_MIN_TARDE = 15; // minutos pasada la hora para marcar "tarde"
 function hostNorm(t){
   return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 }
-function hostLlegaron(r){ return Math.max(0, Number(r.llegaron)||0); }
+// v6.55 — Nunca menos que la suma de las entradas con detalle: si el total
+// guardado quedó por debajo (p. ej. por un doble toque en "quitar"), mandan las entradas.
+function hostLlegaron(r){
+  const ll = Math.max(0, Number(r.llegaron)||0);
+  const enEnt = hostEntradasDe(r).reduce((a,e) => a + e.n, 0);
+  return Math.max(ll, enEnt);
+}
+// v6.55 — Evita que un doble toque repita la misma operación mientras se guarda.
+let hostOpOcupada = false;
+function hostOp(promesa){
+  hostOpOcupada = true;
+  const fin = () => { hostOpOcupada = false; };
+  Promise.resolve(promesa).then(fin, fin);
+  return promesa;
+}
 function hostEsFinDeSemanaCena(){ return diaEsFinDeSemanaCena(fechaISO(hostFecha)); }
 function hostTurnosDelDia(){
   const fin = hostEsFinDeSemanaCena();
@@ -7390,9 +7404,9 @@ function hostMapaTamanos(entradas){
 }
 function hostSinReservaDetalle(){
   const d = hostSinReservaDocs.find(x => x.id === fechaISO(hostFecha) + '_' + hostTurno);
-  const personas = d ? Math.max(0, Number(d.personas)||0) : 0;
   const entradas = hostEntradasDe(d);
   const enEntradas = entradas.reduce((a,e) => a + e.n, 0);
+  const personas = Math.max(d ? Math.max(0, Number(d.personas)||0) : 0, enEntradas);
   return { personas, entradas, nGrupos: entradas.length, enEntradas, legacy: Math.max(0, personas - enEntradas) };
 }
 function hostSinReservaVista(){ return hostSinReservaDetalle().personas; }
@@ -7589,16 +7603,22 @@ function hostRegistrarEntradaReserva(id){
 function hostQuitarEntradaReserva(id, en){
   const r = reservas.find(x => x.id === id);
   if(!r || !usuarioActual || !hostEditando.has(id)) return;
-  const e = hostEntradasDe(r).find(x => x.en === en);
-  if(!e || hostLlegaron(r) < e.n) return;
+  if(hostOpOcupada) return;
+  const ents = hostEntradasDe(r);
+  const e = ents.find(x => x.en === en);
+  if(!e) return;
   if(!confirm('¿Quitar la entrada de ' + e.n + ' persona' + (e.n===1?'':'s') + ' de ' + (r.nombre||'esta reserva') + '?')) return;
   const F = firebase.firestore.FieldValue;
-  reservasRef.doc(id).update({
-    llegaron: F.increment(-e.n),
+  const guardado = Math.max(0, Number(r.llegaron)||0);
+  const sumaEnt = ents.reduce((a,x) => a + x.n, 0);
+  const coherente = guardado >= sumaEnt;
+  hostOp(reservasRef.doc(id).update({
+    // si el total guardado quedó por debajo de las entradas, se recalcula con las que quedan
+    llegaron: coherente ? F.increment(-e.n) : (sumaEnt - e.n),
     entradas: F.arrayRemove(e.raw),
     llegadaActualizadaPor: usuarioActual.iniciales,
     llegadaActualizadaEn: Date.now(),
-  }).catch(hostErrorGuardar);
+  }).catch(hostErrorGuardar));
 }
 // Personas marcadas con los botones viejos (+1 / Llegó completo), que no
 // quedaron como "entrada" con detalle.
@@ -7635,20 +7655,26 @@ function hostRegistrarEntradaSR(){
 }
 function hostQuitarEntradaSR(en){
   if(!hostTurno || !usuarioActual || !hostSinReservaEditando) return;
-  const e = hostSinReservaDetalle().entradas.find(x => x.en === en);
+  if(hostOpOcupada) return;
+  const det = hostSinReservaDetalle();
+  const e = det.entradas.find(x => x.en === en);
   if(!e) return;
   if(!confirm('¿Quitar la entrada de ' + e.n + ' persona' + (e.n===1?'':'s') + '?')) return;
   const F = firebase.firestore.FieldValue;
   const iso = fechaISO(hostFecha);
-  hostSinReservaRef.doc(iso + '_' + hostTurno).set({
+  const docSR = hostSinReservaDocs.find(x => x.id === iso + '_' + hostTurno);
+  const guardado = docSR ? Math.max(0, Number(docSR.personas)||0) : 0;
+  const coherente = guardado >= det.enEntradas;
+  hostOp(hostSinReservaRef.doc(iso + '_' + hostTurno).set({
     fecha: iso,
     turno: hostTurno,
-    personas: F.increment(-e.n),
-    cantidadGrupos: F.increment(-1),
+    // si el total guardado quedó descuadrado, se recalcula desde las entradas restantes
+    personas: coherente ? F.increment(-e.n) : (det.enEntradas - e.n),
+    cantidadGrupos: coherente ? F.increment(-1) : Math.max(0, det.nGrupos - 1),
     entradas: F.arrayRemove(e.raw),
     actualizadoPor: usuarioActual.iniciales,
     actualizadoEn: Date.now(),
-  }, { merge: true }).catch(hostErrorGuardar);
+  }, { merge: true }).catch(hostErrorGuardar));
 }
 // Quita lo que se contó antes de existir las entradas (solo había un total).
 function hostQuitarSinDetalle(){
