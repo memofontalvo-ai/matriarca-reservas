@@ -5003,7 +5003,9 @@ function cerrarComprobanteViewer(){
 // "Plano", armando un porMesaRef que solo contiene esta reserva en sus
 // mesas — así el resto del plano se ve libre, sin mezclar con las demás
 // reservas del turno).
-function verMesasDeReserva(id){
+// v6.56 — `titilar` (la usa el módulo Host): la mesa de la reserva parpadea
+// para que quien está en la puerta la ubique de un vistazo.
+function verMesasDeReserva(id, titilar){
   const r = reservas.find(x => x.id === id);
   if(!r || !r.mesa) return;
   if(!PLANO_MAESTRO){ alert('Todavía no hay un plano configurado — ve a Salones para crearlo.'); return; }
@@ -5024,9 +5026,29 @@ function verMesasDeReserva(id){
       ${buildZoneGridPlano('C', ZONES_PLANO.C, mesas, pref, porMesaRef)}
     </div>`;
   }
-  document.getElementById('verMesasTitulo').textContent = `Mesas de ${r.nombre}`;
+  document.getElementById('verMesasTitulo').textContent = titilar ? `${hostMesaTexto(r)} · ${r.nombre||''}` : `Mesas de ${r.nombre}`;
+  const canvasVM = document.getElementById('verMesasCanvas');
+  canvasVM.classList.toggle('ver-mesas-titila', !!titilar);
+  const subVM = document.getElementById('verMesasSub');
+  if(subVM) subVM.textContent = titilar
+    ? 'La mesa que titila es la de esta reserva. Cuando la ubiques, toca Cerrar.'
+    : 'Resaltadas en dorado — el resto del plano se ve tal cual está, solo como referencia.';
+  const avisoPrev = document.getElementById('verMesasAviso');
+  if(avisoPrev) avisoPrev.remove();
+  if(titilar && !canvasVM.querySelector('.p-ocupada, .p-pendiente')){
+    canvasVM.insertAdjacentHTML('afterbegin', `<div id="verMesasAviso" style="background:#3a2a0a;border:1px solid #b8860b;color:#f5d98a;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:14px;">No encontré ${escapeHtml(hostMesaTexto(r))} dibujada en el plano actual (puede ser de un plano de evento). La mesa asignada es: <b>${escapeHtml(String(r.mesa).split('+').join(' + '))}</b>.</div>`);
+  }
   document.getElementById('overlayVerMesas').classList.add('open');
 }
+// Texto legible de la(s) mesa(s) de una reserva: "Mesa SB3", "Mesa A1 + A2" o el salón VIP.
+function hostMesaTexto(r){
+  if(!r || !r.mesa) return 'Sin mesa';
+  const vip = esSalonVipEspecial(r.mesa);
+  if(vip) return '👑 ' + vip;
+  const partes = String(r.mesa).split('+').map(x => x.trim()).filter(Boolean).map(mesaLabel);
+  return (partes.length > 1 ? 'Mesas ' : 'Mesa ') + partes.join(' + ');
+}
+function hostVerMesa(id){ verMesasDeReserva(id, true); }
 
 // Ventanita rápida con solo las observaciones de una reserva, sin tener
 // que abrir el modal completo de edición para leerlas.
@@ -7507,7 +7529,7 @@ function renderHostLista(){
     }
     const idJs = JSON.stringify(r.id);
     const chips = [];
-    if(r.mesa) chips.push(`<span class="host-chip">🪑 ${escapeHtml(mesaLabelCorto(r.mesa))}</span>`);
+    if(r.mesa) chips.push(`<span class="host-chip">🪑 ${escapeHtml(hostMesaTexto(r).replace('👑 ',''))}</span><button type="button" class="host-ver-mesa" onclick='hostVerMesa(${idJs})'>📍 Ver mesa</button>`);
     if(r.franjaCena) chips.push(`<span class="host-chip">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`);
     const ent = hostEntradasDe(r);
     const legacyR = Math.max(0, ll - ent.reduce((a,e) => a + e.n, 0));

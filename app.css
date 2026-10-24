@@ -2023,3 +2023,23 @@ main{flex:none; display:block; overflow:visible; min-height:0;}
 .reg-ent-hora{font-weight:800; color:var(--gold-bright); font-size:12.5px;}
 .reg-ent-info b{color:var(--text);}
 .reg-mov-vacio{padding:14px 8px; text-align:center; color:var(--text-muted); font-size:13px;}
+
+
+/* v6.56 — Host: botón "Ver mesa" y mesa que titila en el plano */
+.host-ver-mesa{border:1.5px solid var(--gold-bright,#e6b64a); background:rgba(0,0,0,.25); color:#fff; border-radius:999px; min-height:40px; padding:6px 14px; font-size:15px; font-weight:700; cursor:pointer; touch-action:manipulation}
+.host-ver-mesa:active{filter:brightness(1.2)}
+.ver-mesas-titila *{pointer-events:none}
+@keyframes hostTitilar{
+  0%,100%{filter:brightness(1);box-shadow:0 0 0 3px rgba(255,214,102,.95),0 0 14px 4px rgba(255,214,102,.55);transform:scale(1)}
+  50%{filter:brightness(1.9) saturate(1.4);box-shadow:0 0 0 6px #fff,0 0 30px 12px rgba(255,214,102,.95);transform:scale(1.16)}
+}
+.ver-mesas-titila .plano-mesa-core.p-ocupada,.ver-mesas-titila .plano-mesa-core.p-pendiente,
+.ver-mesas-titila .plano-mesa-libre.p-ocupada,.ver-mesas-titila .plano-mesa-libre.p-pendiente,
+.ver-mesas-titila .plano-zona-libre.reservable.p-ocupada,.ver-mesas-titila .plano-zona-libre.reservable.p-pendiente{
+  animation:hostTitilar .9s ease-in-out infinite; position:relative; z-index:20;
+}
+@media (prefers-reduced-motion:reduce){
+  .ver-mesas-titila .plano-mesa-core.p-ocupada,.ver-mesas-titila .plano-mesa-core.p-pendiente,
+  .ver-mesas-titila .plano-mesa-libre.p-ocupada,.ver-mesas-titila .plano-mesa-libre.p-pendiente,
+  .ver-mesas-titila .plano-zona-libre.reservable.p-ocupada,.ver-mesas-titila .plano-zona-libre.reservable.p-pendiente{animation:none; box-shadow:0 0 0 5px #fff,0 0 18px 8px rgba(255,214,102,.9)}
+}
