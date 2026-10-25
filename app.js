@@ -3425,6 +3425,34 @@ let turnoActivo = 'todos';
 function turnoRealDesdeActivo(t){
   return (t === 'cena1' || t === 'cena2') ? 'cena' : t;
 }
+// v6.58 — Turno que corresponde a una hora, con la misma regla que ya usa el
+// formulario al CREAR (8:00–10:59 Desayuno, 11:00–17:59 Almuerzo, 18:00+ Cena).
+function turnoSugeridoPorHora(hhmm){
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm||''));
+  if(!m) return null;
+  const min = Number(m[1])*60 + Number(m[2]);
+  if(min >= 480 && min < 660) return 'desayuno';
+  if(min >= 660 && min < 1080) return 'almuerzo';
+  return 'cena';   // 6:00 pm en adelante y la madrugada (los shows pasan de medianoche)
+}
+// Revisa que la hora corresponda al turno. Si no, avisa y deja elegir:
+// Aceptar = mover al turno que corresponde; Cancelar = NO guarda, para que
+// el staff corrija la hora o el turno. Devuelve el turno final, o null si
+// se canceló. Los eventos especiales fijan su propio turno y no se tocan.
+function resolverTurnoSegunHora(hora, turno, fecha){
+  if(eventosCache.some(e => e.fecha === fecha && e.turno === turno && e.activo !== false)) return turno;
+  const sug = turnoSugeridoPorHora(hora);
+  if(!sug || sug === turno) return turno;
+  const et = { desayuno:'Desayuno', almuerzo:'Almuerzo', cena:'Cena' };
+  const ok = confirm(`⚠ La hora ${formatearHora12(hora)} no es de ${et[turno]||turno}: corresponde a ${et[sug]}.\n\nAceptar = mover la reserva a ${et[sug]}.\nCancelar = no guardar todavía, para corregir la hora o el turno.`);
+  return ok ? sug : null;
+}
+function reservaHoraDesalineadaConTurno(r){
+  if(!r || !r.hora || !r.turno) return null;
+  if(eventosCache.some(e => e.fecha === r.fecha && e.turno === r.turno && e.activo !== false)) return null; // los eventos fijan su propio turno
+  const sug = turnoSugeridoPorHora(r.hora);
+  return (sug && sug !== r.turno) ? sug : null;
+}
 function reservaCoincideConTurnoActivo(r, t){
   if(t === 'todos') return true;
   // Coincidencia estricta: "Cena 1" muestra SOLO lo que de verdad quedó
@@ -7550,6 +7578,8 @@ function renderHostLista(){
     const chips = [];
     if(r.mesa) chips.push(`<span class="host-chip">🪑 ${escapeHtml(hostMesaTexto(r).replace('👑 ',''))}</span><button type="button" class="host-ver-mesa" onclick='hostVerMesa(${idJs})'>📍 Ver mesa</button>`);
     if(r.franjaCena) chips.push(`<span class="host-chip">${r.franjaCena==='temprano'?'🕕 Cena 1':'🎶 Cena 2'}</span>`);
+    { const desal = reservaHoraDesalineadaConTurno(r);
+      if(desal) chips.push(`<span class="host-chip tarde">⚠ La hora es de ${HOST_ETIQUETA_TURNO[desal]} — corrige el turno en Por día</span>`); }
     const ent = hostEntradasDe(r);
     const legacyR = Math.max(0, ll - ent.reduce((a,e) => a + e.n, 0));
     if(ent.length) chips.push(`<span class="host-chip">Entradas: ${ent.map(e => e.n).join(' + ')}${legacyR>0?` + ${legacyR} s/d`:''}</span>`);
@@ -9395,6 +9425,13 @@ function guardarReserva(){
   // sigue exactamente la misma regla, para que nunca vuelvan a
   // desincronizarse entre sí).
   const evCorrespondiente = eventosCache.find(e => e.fecha === fechaFinal && e.turno === turnoFinal && e.activo !== false);
+  // v6.58 — La hora y el turno se eligen por separado al EDITAR y podían quedar
+  // descuadrados (ej. 12:00 PM en "Cena"). Se revisa antes de guardar.
+  {
+    const turnoOk = resolverTurnoSegunHora(horaNueva, turnoFinal, fechaFinal);
+    if(turnoOk === null) return;
+    turnoFinal = turnoOk;
+  }
   // Si esta reserva cae en un evento especial que exige cover, no se deja
   // marcar como Aprobada sin haber cargado cuánto se cobró (con su
   // comprobante) — se queda en Pendiente hasta que eso esté completo.
@@ -9610,6 +9647,14 @@ function enviarParaAprobacion(){
     return;
   }
   if(!mesa){ alert('Asigna una mesa en el plano antes de enviar para aprobación — es indispensable para poder recibir al cliente ese día.'); return; }
+  { // v6.58 — misma revisión hora/turno que al guardar
+    const turnoOk = resolverTurnoSegunHora(hora, modalTurno, modalFecha);
+    if(turnoOk === null) return;
+    if(turnoOk !== modalTurno){
+      modalTurno = turnoOk;
+      const selT = document.getElementById('fTurnoReservaEdit'); if(selT) selT.value = turnoOk;
+    }
+  }
 
   const btnAprob = document.getElementById('btnEnviarParaAprobacion');
   if(btnAprob){ btnAprob.disabled = true; btnAprob.textContent = 'Guardando…'; }
