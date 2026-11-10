@@ -48,7 +48,7 @@
   (function(){
     var origen = document.querySelector('.version-tag');
     var destino = document.getElementById('headerVersionLine');
-    if(origen && destino) destino.textContent = origen.textContent;
+    if(origen && destino) destino.textContent = origen.textContent + ' · js6.62'; // marca: confirma que app.js y app.html son de la misma entrega
   })();
 
 /* ============ SEGURIDAD: ESCAPE DE HTML ============ */
@@ -2059,6 +2059,7 @@ function cargarUsuariosConfig(){
   if(!el) return;
   db.collection('usuarios').get().then(snap => {
     usuariosCache = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    try{ poblarSelectorInformeResponsable(); }catch(e){ console.warn('Selector de informe por responsable:', e); }
     if(usuariosCache.length === 0){
       el.innerHTML = '<div class="config-mensaje-sub">Todavía no has creado ningún usuario.</div>';
       return;
@@ -5598,6 +5599,203 @@ function renderInformeEstadisticasSolicitudes(yearMonth){
     </div>`;
   document.getElementById('overlayInforme').classList.add('open');
 }
+// ===== Informe administrativo: RESPONSABLE (usuario) por mes (v6.60) =====
+// ¿Qué reservas hizo cada usuario en el mes? Cuántas quedaron efectivas
+// (confirmadas), cuántas siguen activas (confirmadas con fecha por llegar),
+// cuántas ya pasaron, cuántas están pendientes, cuántas se vencieron sin
+// confirmar y cuántas se cancelaron. "Del mes" = el día en que se HIZO la
+// reserva (fechaSolicitud) — igual que los demás informes de solicitudes.
+// Responsable = quien creó la reserva; si entró por el link y nadie la
+// "creó", quien la gestionó por última vez.
+const ESTADOS_PENDIENTES_INFORME = ['solicitud','pendiente','lista_espera','mensaje_enviado','pendiente_aprobacion','proceso_comercial'];
+function responsableDeReserva(r){
+  const ini = r.creadoPorIniciales || r.ultimoEditorIniciales || '';
+  const nom = r.creadoPorNombre || r.ultimoEditorNombre || '';
+  return { ini: ini || '—', nombre: nom || (ini ? ini : 'Sin responsable') };
+}
+// Llena el selector con los usuarios de Config y, además, con cualquier
+// responsable que aparezca en reservas aunque ya no exista como usuario.
+function poblarSelectorInformeResponsable(){
+  const sel = document.getElementById('fInformeResponsable');
+  if(!sel) return;
+  // Si todavía no se han cargado los usuarios (ej. se abre el informe antes
+  // de que termine la carga), se piden ahora y se vuelve a llenar la lista.
+  if(!(usuariosCache && usuariosCache.length) && !poblarSelectorInformeResponsable._cargando){
+    poblarSelectorInformeResponsable._cargando = true;
+    db.collection('usuarios').get().then(snap => {
+      usuariosCache = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      poblarSelectorInformeResponsable();
+    }).catch(err => console.warn('No se pudieron cargar los usuarios para el informe:', err))
+      .finally(() => { poblarSelectorInformeResponsable._cargando = false; });
+  }
+  const previo = sel.value;
+  const mapa = new Map();
+  (usuariosCache || []).forEach(u => { if(u.iniciales) mapa.set(u.iniciales, u.nombre || u.usuario || u.iniciales); });
+  reservas.forEach(r => { const x = responsableDeReserva(r); if(x.ini !== '—' && !mapa.has(x.ini)) mapa.set(x.ini, x.nombre); });
+  const opciones = [...mapa.entries()].sort((a,b) => a[1].localeCompare(b[1], 'es'));
+  sel.innerHTML = '<option value="__todos__">Todos los usuarios (comparativo)</option>' +
+    opciones.map(([ini, nom]) => `<option value="${escapeHtml(ini)}">${escapeHtml(ini)} — ${escapeHtml(nom)}</option>`).join('') +
+    '<option value="—">Sin responsable (entró por el link)</option>';
+  if(previo && [...sel.options].some(o => o.value === previo)) sel.value = previo;
+}
+function generarInformeResponsable(){
+  poblarSelectorInformeResponsable();
+  const sel = document.getElementById('fInformeResponsable');
+  let yearMonth = document.getElementById('fInformeResponsableMes').value;
+  if(!yearMonth){
+    const hoy = new Date();
+    yearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+  }
+  renderInformeResponsable(yearMonth, sel ? sel.value : '__todos__');
+}
+// Se vuelve a llenar la lista cada vez que se toca el selector, por si llegaron usuarios o reservas nuevas.
+(function(){
+  const sel = document.getElementById('fInformeResponsable');
+  if(!sel) return;
+  ['focus','mousedown','touchstart'].forEach(ev => sel.addEventListener(ev, () => { try{ poblarSelectorInformeResponsable(); }catch(e){ console.warn(e); } }, {passive:true}));
+})();
+// Clasifica una reserva en UNA sola categoría (las categorías suman el total).
+function categoriaInformeResponsable(r, hoyISO){
+  if(r.estado === 'cancelada') return r.vencidaAutomaticamente === true ? 'vencidaSinConfirmar' : 'cancelada';
+  if(r.estado === 'confirmada') return (r.fecha && r.fecha < hoyISO) ? 'yaPaso' : 'activa';
+  if(ESTADOS_PENDIENTES_INFORME.includes(r.estado)) return 'pendiente';
+  return 'otra';
+}
+function renderInformeResponsable(yearMonth, filtroIni){
+  const [anio, mes] = yearMonth.split('-').map(Number);
+  const mesLabel = `${MESES[mes-1]} ${anio}`;
+  const hoyISO = fechaISO(new Date());
+  const fechaClave = r => r.fechaSolicitud || r.fecha;
+  const delMes = reservas.filter(r => fechaClave(r) && fechaClave(r).startsWith(yearMonth));
+  const sumaPax = arr => arr.reduce((s,r) => s + (Number(r.pax)||0), 0);
+  const pct = (a,b) => b > 0 ? (a/b*100).toFixed(0) + '%' : '—';
+  const CATS = ['activa','yaPaso','pendiente','vencidaSinConfirmar','cancelada','otra'];
+  const resumir = arr => {
+    const o = { total: arr.length, pax: sumaPax(arr) };
+    CATS.forEach(c => o[c] = arr.filter(r => categoriaInformeResponsable(r, hoyISO) === c).length);
+    o.efectivas = o.activa + o.yaPaso;
+    o.efectivasPax = sumaPax(arr.filter(r => ['activa','yaPaso'].includes(categoriaInformeResponsable(r, hoyISO))));
+    return o;
+  };
+  const etiquetaCat = { activa:'Activa (por llegar)', yaPaso:'Ya pasó', pendiente:'Pendiente', vencidaSinConfirmar:'Venció sin confirmar', cancelada:'Cancelada', otra: 'Otro' };
+  const colorCat = { activa:'#1f7a52', yaPaso:'#555', pendiente:'#a17a1c', vencidaSinConfirmar:'#a33', cancelada:'#a33', otra:'#777' };
+  const encabezado = (sub) => `
+    <div class="informe-header">
+      <h1>La Matriarca Barranquilla — Informe por responsable</h1>
+      <div class="informe-subtitulo" style="margin-bottom:2px;">${mesLabel}</div>
+      <div class="informe-subtitulo">${sub}</div>
+    </div>`;
+  const pie = `
+    <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:12px; text-align:center; color:#666; line-height:1.5;">
+      "Del mes" = reservas que se HICIERON en ${mesLabel}. Responsable = quien creó la reserva (si entró por el link, quien la gestionó).<br>
+      Efectivas = confirmadas (activas + ya pasaron). Activa = confirmada con fecha de hoy en adelante. Corte: ${formatearFechaCorta(hoyISO)}.
+    </div>`;
+
+  // ---- Comparativo: todos los usuarios
+  if(filtroIni === '__todos__'){
+    const grupos = new Map();
+    delMes.forEach(r => {
+      const x = responsableDeReserva(r);
+      if(!grupos.has(x.ini)) grupos.set(x.ini, { nombre: x.nombre, arr: [] });
+      grupos.get(x.ini).arr.push(r);
+    });
+    const filas = [...grupos.entries()].map(([ini, g]) => ({ ini, nombre: g.nombre, ...resumir(g.arr) }))
+      .sort((a,b) => b.total - a.total);
+    const tot = resumir(delMes);
+    const celda = n => `<td style="text-align:center;">${n}</td>`;
+    const filasHtml = filas.map(f => `<tr>
+      <td><b>${escapeHtml(f.ini === '—' ? 'Link' : f.ini)}</b> ${escapeHtml(f.ini === '—' ? 'Sin responsable' : f.nombre)}</td>
+      ${celda(f.total)}${celda(f.efectivas)}${celda(f.activa)}${celda(f.yaPaso)}${celda(f.pendiente)}${celda(f.vencidaSinConfirmar)}${celda(f.cancelada)}
+      <td style="text-align:center;">${pct(f.efectivas, f.total)}</td></tr>`).join('');
+    document.getElementById('informeContenido').innerHTML = encabezado('Comparativo de todos los usuarios') + `
+      <div class="ie-total-card">
+        <div class="ie-total-num">${tot.total} · ${tot.pax} pax</div>
+        <div class="ie-total-label">RESERVAS HECHAS EN EL MES (TODOS)</div>
+      </div>
+      <div class="informe-turno">
+        <h2>👥 Por usuario</h2>
+        ${tot.total === 0 ? `<div style="font-size:12.5px; color:#777;">No hubo reservas en ${mesLabel}.</div>` : `
+        <table>
+          <thead><tr><th>Usuario</th><th>Hechas</th><th>Efectivas</th><th>Activas</th><th>Ya pasaron</th><th>Pendientes</th><th>Vencieron</th><th>Canceladas</th><th>% efectivas</th></tr></thead>
+          <tbody>${filasHtml}
+            <tr style="font-weight:700; border-top:2px solid #d4af37;"><td>TOTAL</td>${celda(tot.total)}${celda(tot.efectivas)}${celda(tot.activa)}${celda(tot.yaPaso)}${celda(tot.pendiente)}${celda(tot.vencidaSinConfirmar)}${celda(tot.cancelada)}<td style="text-align:center;">${pct(tot.efectivas, tot.total)}</td></tr>
+          </tbody>
+        </table>`}
+      </div>` + pie;
+    document.getElementById('overlayInforme').classList.add('open');
+    return;
+  }
+
+  // ---- Un solo usuario
+  const mias = delMes.filter(r => responsableDeReserva(r).ini === filtroIni);
+  const nombreSel = mias.length ? responsableDeReserva(mias[0]).nombre
+    : (((usuariosCache||[]).find(u => u.iniciales === filtroIni) || {}).nombre || (filtroIni === '—' ? 'Sin responsable' : filtroIni));
+  const tituloUsuario = filtroIni === '—' ? 'Sin responsable (entró por el link)' : `${filtroIni} — ${nombreSel}`;
+  const t = resumir(mias);
+  // Por mes de la fecha de la reserva (cuántas vencen en cada mes).
+  const porMes = {};
+  mias.forEach(r => {
+    const k = (r.fecha || '').slice(0,7) || 'sin fecha';
+    const o = porMes[k] = porMes[k] || { total:0, efectivas:0, activas:0 };
+    o.total++;
+    const c = categoriaInformeResponsable(r, hoyISO);
+    if(c === 'activa' || c === 'yaPaso') o.efectivas++;
+    if(c === 'activa') o.activas++;
+  });
+  const filasMes = Object.keys(porMes).sort().map(k => {
+    const [y,m] = k.split('-').map(Number);
+    const nombre = isNaN(m) ? k : `${MESES[m-1]} ${y}`;
+    const o = porMes[k];
+    return `<tr><td>${escapeHtml(nombre)}</td><td style="text-align:center;">${o.total}</td><td style="text-align:center;">${o.efectivas}</td><td style="text-align:center;">${o.activas}</td></tr>`;
+  }).join('');
+  const ordenadas = mias.slice().sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.hora||'').localeCompare(b.hora||''));
+  const filasDetalle = ordenadas.map(r => {
+    const c = categoriaInformeResponsable(r, hoyISO);
+    return `<tr>
+      <td>${escapeHtml(formatearFechaCorta(r.fecha||''))}<br><span style="color:#777; font-size:11px;">${escapeHtml(formatearHora12(r.hora||''))} · ${escapeHtml(r.turno||'')}</span></td>
+      <td>${escapeHtml(r.nombre||'')}${Number(r.pax)>=20?' ⭐':''}</td>
+      <td style="text-align:center;">${Number(r.pax)||0}</td>
+      <td style="color:${colorCat[c]}; font-weight:700;">${etiquetaCat[c]}</td>
+      <td style="font-size:11px; color:#777;">${escapeHtml(r.codigoReserva||'')}<br>${escapeHtml(fechaClave(r)||'')}</td>
+    </tr>`;
+  }).join('');
+  const fila = (txt, n, pax, color) => `<div class="ie-fila-metrica"><span>${txt}</span><b${color?` style="color:${color};"`:''}>${n}${pax!==undefined?` · ${pax} pax`:''}</b></div>`;
+  const paxDe = c => sumaPax(mias.filter(r => categoriaInformeResponsable(r, hoyISO) === c));
+  document.getElementById('informeContenido').innerHTML = encabezado(escapeHtml(tituloUsuario)) + `
+    <div class="ie-total-card">
+      <div class="ie-total-num">${t.total} · ${t.pax} pax</div>
+      <div class="ie-total-label">RESERVAS QUE HIZO EN EL MES</div>
+    </div>
+    <div class="ie-bloque-gestion">
+      <h2 style="background:none; color:#1a1a1a; padding:0; margin-bottom:10px; font-size:15px;">✅ RESULTADO DE SUS RESERVAS</h2>
+      ${fila('Efectivas (confirmadas):', t.efectivas, t.efectivasPax, '#1f7a52')}
+      ${fila('&nbsp;&nbsp;↳ Activas, todavía por llegar:', t.activa, paxDe('activa'))}
+      ${fila('&nbsp;&nbsp;↳ Ya pasaron (fecha vencida):', t.yaPaso, paxDe('yaPaso'))}
+      ${fila('Pendientes por confirmar:', t.pendiente, paxDe('pendiente'), '#a17a1c')}
+      ${fila('Vencieron sin confirmar:', t.vencidaSinConfirmar, paxDe('vencidaSinConfirmar'), '#a33')}
+      ${fila('Canceladas:', t.cancelada, paxDe('cancelada'), '#a33')}
+      ${t.otra ? fila('Otras:', t.otra, paxDe('otra')) : ''}
+      <div class="ie-fila-metrica" style="border-top:1px solid #ddd; margin-top:6px; padding-top:6px;"><span>Efectividad (efectivas ÷ hechas):</span><b>${pct(t.efectivas, t.total)}</b></div>
+      <div class="ie-formula">${t.efectivas} ÷ ${t.total||0} × 100</div>
+    </div>
+    <div class="informe-turno">
+      <h2>📆 Por mes de la fecha de la reserva</h2>
+      ${t.total === 0 ? `<div style="font-size:12.5px; color:#777;">No hizo reservas en ${mesLabel}.</div>` : `
+      <table>
+        <thead><tr><th>Mes de la reserva</th><th>Hechas</th><th>Efectivas</th><th>Activas por venir</th></tr></thead>
+        <tbody>${filasMes}</tbody>
+      </table>`}
+    </div>
+    <div class="informe-turno">
+      <h2>🧾 Detalle de reservas</h2>
+      ${t.total === 0 ? '' : `
+      <table>
+        <thead><tr><th>Reserva</th><th>Cliente</th><th>Pax</th><th>Estado</th><th>Código · Hecha el</th></tr></thead>
+        <tbody>${filasDetalle}</tbody>
+      </table>`}
+    </div>` + pie;
+  document.getElementById('overlayInforme').classList.add('open');
+}
 // ===== Informe administrativo: INGRESOS AL LINK de solicitudes (v6.52) =====
 // Lee la colección `visitasFormulario` que escribe solicitud.html (una por
 // cada apertura del formulario): cuántos entran, a qué hora, hasta qué paso
@@ -8124,6 +8322,7 @@ function toggleConfigGrupo(id){
   const contenido = document.getElementById(id);
   const chevron = document.getElementById('chevron_' + id);
   const yaAbierto = contenido.style.display !== 'none';
+  if(id === 'grupoInformesAdmin' && !yaAbierto) poblarSelectorInformeResponsable();
   ['grupoMensajes', 'grupoHorarios', 'grupoCarrusel', 'grupoEventos', 'grupoUsuarios', 'grupoBackup', 'grupoInformesAdmin', 'grupoClientes', 'grupoBajaDatos', 'grupoPeligro'].forEach(otroId => {
     const otroContenido = document.getElementById(otroId);
     const otroChevron = document.getElementById('chevron_' + otroId);
@@ -8186,6 +8385,7 @@ function cambiarVistaApp(v){
   if(v==='host') renderHost(); else detenerHostSinReserva();
   if(v==='registro') renderRegistro(); else detenerRegistro();
   if(v==='config') renderConfigMensajes();
+  if(v==='config'){ try{ poblarSelectorInformeResponsable(); }catch(e){ console.warn(e); } }
   // Misma protección que en cambiarVista(): si el modal de una reserva se
   // quedó abierto de fondo, cambiar de pantalla principal también lo
   // cierra, para que nunca se quede bloqueado el redibujado de datos
