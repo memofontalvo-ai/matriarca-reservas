@@ -48,7 +48,7 @@
   (function(){
     var origen = document.querySelector('.version-tag');
     var destino = document.getElementById('headerVersionLine');
-    if(origen && destino) destino.textContent = origen.textContent + ' · js6.62'; // marca: confirma que app.js y app.html son de la misma entrega
+    if(origen && destino) destino.textContent = origen.textContent + ' · js6.63'; // marca: confirma que app.js y app.html son de la misma entrega
   })();
 
 /* ============ SEGURIDAD: ESCAPE DE HTML ============ */
@@ -5665,8 +5665,10 @@ function renderInformeResponsable(yearMonth, filtroIni){
   const [anio, mes] = yearMonth.split('-').map(Number);
   const mesLabel = `${MESES[mes-1]} ${anio}`;
   const hoyISO = fechaISO(new Date());
-  const fechaClave = r => r.fechaSolicitud || r.fecha;
-  const delMes = reservas.filter(r => fechaClave(r) && fechaClave(r).startsWith(yearMonth));
+  // El informe es por la FECHA DE LA RESERVA (el día al que vienen), no por cuándo se creó:
+  // una reserva hecha en noviembre para diciembre aparece en diciembre.
+  const fechaClave = r => r.fecha || r.fechaSolicitud;
+  const delMes = reservas.filter(r => r.fecha && r.fecha.startsWith(yearMonth));
   const sumaPax = arr => arr.reduce((s,r) => s + (Number(r.pax)||0), 0);
   const pct = (a,b) => b > 0 ? (a/b*100).toFixed(0) + '%' : '—';
   const CATS = ['activa','yaPaso','pendiente','vencidaSinConfirmar','cancelada','otra'];
@@ -5687,7 +5689,7 @@ function renderInformeResponsable(yearMonth, filtroIni){
     </div>`;
   const pie = `
     <div style="margin-top:16px; padding-top:12px; border-top:2px solid #d4af37; font-size:12px; text-align:center; color:#666; line-height:1.5;">
-      "Del mes" = reservas que se HICIERON en ${mesLabel}. Responsable = quien creó la reserva (si entró por el link, quien la gestionó).<br>
+      "Del mes" = reservas con FECHA de llegada en ${mesLabel} (sin importar cuándo se hicieron). Responsable = quien creó la reserva (si entró por el link, quien la gestionó).<br>
       Efectivas = confirmadas (activas + ya pasaron). Activa = confirmada con fecha de hoy en adelante. Corte: ${formatearFechaCorta(hoyISO)}.
     </div>`;
 
@@ -5710,13 +5712,13 @@ function renderInformeResponsable(yearMonth, filtroIni){
     document.getElementById('informeContenido').innerHTML = encabezado('Comparativo de todos los usuarios') + `
       <div class="ie-total-card">
         <div class="ie-total-num">${tot.total} · ${tot.pax} pax</div>
-        <div class="ie-total-label">RESERVAS HECHAS EN EL MES (TODOS)</div>
+        <div class="ie-total-label">RESERVAS PARA EL MES (TODOS)</div>
       </div>
       <div class="informe-turno">
         <h2>👥 Por usuario</h2>
-        ${tot.total === 0 ? `<div style="font-size:12.5px; color:#777;">No hubo reservas en ${mesLabel}.</div>` : `
+        ${tot.total === 0 ? `<div style="font-size:12.5px; color:#777;">No hay reservas para ${mesLabel}.</div>` : `
         <table>
-          <thead><tr><th>Usuario</th><th>Hechas</th><th>Efectivas</th><th>Activas</th><th>Ya pasaron</th><th>Pendientes</th><th>Vencieron</th><th>Canceladas</th><th>% efectivas</th></tr></thead>
+          <thead><tr><th>Usuario</th><th>Reservas</th><th>Efectivas</th><th>Activas</th><th>Ya pasaron</th><th>Pendientes</th><th>Vencieron</th><th>Canceladas</th><th>% efectivas</th></tr></thead>
           <tbody>${filasHtml}
             <tr style="font-weight:700; border-top:2px solid #d4af37;"><td>TOTAL</td>${celda(tot.total)}${celda(tot.efectivas)}${celda(tot.activa)}${celda(tot.yaPaso)}${celda(tot.pendiente)}${celda(tot.vencidaSinConfirmar)}${celda(tot.cancelada)}<td style="text-align:center;">${pct(tot.efectivas, tot.total)}</td></tr>
           </tbody>
@@ -5756,7 +5758,7 @@ function renderInformeResponsable(yearMonth, filtroIni){
       <td>${escapeHtml(r.nombre||'')}${Number(r.pax)>=20?' ⭐':''}</td>
       <td style="text-align:center;">${Number(r.pax)||0}</td>
       <td style="color:${colorCat[c]}; font-weight:700;">${etiquetaCat[c]}</td>
-      <td style="font-size:11px; color:#777;">${escapeHtml(r.codigoReserva||'')}<br>${escapeHtml(fechaClave(r)||'')}</td>
+      <td style="font-size:11px; color:#777;">${escapeHtml(r.codigoReserva||'')}<br>${escapeHtml(r.fechaSolicitud||'')}</td>
     </tr>`;
   }).join('');
   const fila = (txt, n, pax, color) => `<div class="ie-fila-metrica"><span>${txt}</span><b${color?` style="color:${color};"`:''}>${n}${pax!==undefined?` · ${pax} pax`:''}</b></div>`;
@@ -5764,7 +5766,7 @@ function renderInformeResponsable(yearMonth, filtroIni){
   document.getElementById('informeContenido').innerHTML = encabezado(escapeHtml(tituloUsuario)) + `
     <div class="ie-total-card">
       <div class="ie-total-num">${t.total} · ${t.pax} pax</div>
-      <div class="ie-total-label">RESERVAS QUE HIZO EN EL MES</div>
+      <div class="ie-total-label">RESERVAS PARA ${mesLabel.toUpperCase()}</div>
     </div>
     <div class="ie-bloque-gestion">
       <h2 style="background:none; color:#1a1a1a; padding:0; margin-bottom:10px; font-size:15px;">✅ RESULTADO DE SUS RESERVAS</h2>
@@ -5775,22 +5777,14 @@ function renderInformeResponsable(yearMonth, filtroIni){
       ${fila('Vencieron sin confirmar:', t.vencidaSinConfirmar, paxDe('vencidaSinConfirmar'), '#a33')}
       ${fila('Canceladas:', t.cancelada, paxDe('cancelada'), '#a33')}
       ${t.otra ? fila('Otras:', t.otra, paxDe('otra')) : ''}
-      <div class="ie-fila-metrica" style="border-top:1px solid #ddd; margin-top:6px; padding-top:6px;"><span>Efectividad (efectivas ÷ hechas):</span><b>${pct(t.efectivas, t.total)}</b></div>
+      <div class="ie-fila-metrica" style="border-top:1px solid #ddd; margin-top:6px; padding-top:6px;"><span>Efectividad (efectivas ÷ reservas):</span><b>${pct(t.efectivas, t.total)}</b></div>
       <div class="ie-formula">${t.efectivas} ÷ ${t.total||0} × 100</div>
-    </div>
-    <div class="informe-turno">
-      <h2>📆 Por mes de la fecha de la reserva</h2>
-      ${t.total === 0 ? `<div style="font-size:12.5px; color:#777;">No hizo reservas en ${mesLabel}.</div>` : `
-      <table>
-        <thead><tr><th>Mes de la reserva</th><th>Hechas</th><th>Efectivas</th><th>Activas por venir</th></tr></thead>
-        <tbody>${filasMes}</tbody>
-      </table>`}
     </div>
     <div class="informe-turno">
       <h2>🧾 Detalle de reservas</h2>
       ${t.total === 0 ? '' : `
       <table>
-        <thead><tr><th>Reserva</th><th>Cliente</th><th>Pax</th><th>Estado</th><th>Código · Hecha el</th></tr></thead>
+        <thead><tr><th>Reserva</th><th>Cliente</th><th>Pax</th><th>Estado</th><th>Código · Creada el</th></tr></thead>
         <tbody>${filasDetalle}</tbody>
       </table>`}
     </div>` + pie;
