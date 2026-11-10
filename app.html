@@ -499,6 +499,23 @@
           </div>
         </div>
         <div class="config-mensaje-bloque">
+          <div class="config-mensaje-titulo">👤 Informe por responsable (usuario)</div>
+          <div class="config-mensaje-sub">Elige un mes y un usuario: cuántas reservas hizo en el mes, cuántas quedaron efectivas, cuántas siguen activas, cuántas ya pasaron, cuántas están pendientes, cuántas vencieron sin confirmar y cuántas se cancelaron. También puedes ver el comparativo de todos los usuarios.</div>
+          <div class="field" style="margin-top:10px;">
+            <label>Usuario</label>
+            <select id="fInformeResponsable"><option value="__todos__">Todos los usuarios (comparativo)</option></select>
+          </div>
+          <div class="field-row phone-two-cols" style="margin-top:10px;">
+            <div class="field">
+              <label>Mes</label>
+              <input type="month" id="fInformeResponsableMes">
+            </div>
+          </div>
+          <div class="config-mensaje-acciones">
+            <button class="btn-config-guardar" onclick="generarInformeResponsable()">👤 Generar informe</button>
+          </div>
+        </div>
+        <div class="config-mensaje-bloque">
           <div class="config-mensaje-titulo">🔗 Ingresos al link de solicitudes</div>
           <div class="config-mensaje-sub">Cuántas personas abren el link de reservas, a qué hora, hasta qué paso llegan y cuántas envían la solicitud — por día y por hora. Incluye la lista de quienes dejaron su celular y no terminaron, con botón de WhatsApp. Elige un mes, o un día específico.</div>
           <div class="field-row phone-two-cols" style="margin-top:10px;">
@@ -594,7 +611,7 @@
      version-tag quedara adentro, no se vería en la pantalla de login. Aquí
      afuera, es visible siempre — login o ya adentro de la app — para poder
      confirmar en cualquier momento qué versión quedó publicada. -->
-<div class="version-tag">v6.59</div>
+<div class="version-tag">v6.60</div>
 
 
 <div class="overlay" id="overlay">
@@ -1382,6 +1399,6 @@
 </div>
 
 
-<script src="app.js?v=6.59"></script>
+<script src="app.js?v=6.60"></script>
 </body>
 </html>
